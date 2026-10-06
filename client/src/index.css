@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 39 33% 97%;
+    --foreground: 20 10% 10%;
+    --card: 39 30% 95%;
+    --card-foreground: 20 10% 10%;
+    --popover: 39 33% 97%;
+    --popover-foreground: 20 10% 10%;
+    --primary: 20 10% 10%;
+    --primary-foreground: 39 33% 97%;
+    --secondary: 35 20% 90%;
+    --secondary-foreground: 20 10% 10%;
+    --muted: 35 15% 88%;
+    --muted-foreground: 20 5% 45%;
+    --accent: 35 20% 90%;
+    --accent-foreground: 20 10% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 60 9.1% 97.8%;
+    --border: 35 15% 82%;
+    --input: 35 15% 82%;
+    --ring: 20 10% 10%;
+    --radius: 0.25rem;
+  }
+
+  body {
+    background-color: #FBF9F5;
+    color: #1A1A1A;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  h1, h2, h3, h4, .font-serif {
+    font-family: 'Playfair Display', serif;
+  }
+
+  /* Every interactive affordance should visibly signal that it can be used. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  input[type="checkbox"],
+  input[type="radio"],
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.container {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: 1.5rem;
+  padding-left: 1.5rem;
+  max-width: 1280px;
+}

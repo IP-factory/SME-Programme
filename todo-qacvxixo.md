@@ -1,0 +1,24 @@
+# Project TODO
+
+- [x] Inspect the current participant portal schema, authentication routes, and magic-link lifecycle.
+- [x] Define secure participant credentials, trusted-device session handling, password setup, and reset behavior.
+- [x] Add participant password credentials and password-reset token persistence without altering current participant records.
+- [x] Add backend procedures for password setup, sign-in, reset request, reset completion, and persistent participant sessions.
+- [x] Replace the public magic-link-only participant sign-in modal with email-and-password sign-in plus clear account setup and recovery actions.
+- [x] Preserve secure email links only for first-time password setup and password recovery.
+- [x] Add Vitest coverage for password hashing, sign-in validation, session creation, and reset-token expiry.
+- [x] Add direct password-flow tests for valid sign-in, failed-password lockout, session persistence/logout, and expired setup or reset links.
+- [x] Validate the updated sign-in experience in the browser using a non-existent test identity without touching participant records.
+- [x] Save a checkpoint and publish the participant authentication upgrade.
+- [x] Locate Priscilla Nalunkuma’s active registration and identify her recorded Foundation pathway.
+- [x] Verify the Foundation payment-guidance behaviour in the controlled pre-consent participant portal; Priscilla’s active record currently uses the same pathway-specific guidance.
+- [x] Restore the payment-guidance section through the portal-wide release, using every participant’s currently recorded pathway.
+- [x] Verify the restored payment-guidance view and save a published checkpoint.
+- [x] Inspect the current payment-guidance gate and all active pathway records to identify why guidance is not consistently visible.
+- [x] Make the pathway-specific payment section available to all eligible participant portals, including before engagement-brief consent is recorded.
+- [x] Test Foundation, Engine Room, and Boardroom payment guidance for correct amounts, instalment timing, and upfront-payment option.
+- [x] Resolve Priscilla Nalunkuma’s pathway conflict: preserve the original Foundation registration snapshot while align the active record to the documented Makers Engine Room designation.
+- [x] Save a checkpoint and publish the portal-wide payment-guidance visibility update.
+- [x] Update Priscilla Nalunkuma’s active pathway from Foundation to Makers Engine Room based on the documented personal follow-up.
+- [x] Verify that Priscilla’s participant portal displays the Engine Room fee, 40/30/30 instalments, and full-upfront option.
+- [x] Save a checkpoint and publish the Priscilla pathway alignment.
