@@ -7262,6 +7262,28 @@ function isSafePath(path) {
   if (/[\u0000-\u001f\u007f\\]/.test(decoded) || /[\u0000-\u001f\u007f\\]/.test(path)) return false;
   return !decoded.split("/").some((segment) => segment === "." || segment === "..");
 }
+var UNSAFE_CHARACTERS = /[\u0000-\u001f\u007f\\]/;
+var hasDotSegment = (path) => path.split("/").some((segment) => segment === "." || segment === "..");
+function decodeInternalPath(raw) {
+  let decoded;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  let decodedAgain = decoded;
+  try {
+    decodedAgain = decodeURIComponent(decoded);
+  } catch {
+  }
+  for (const candidate of [decoded, decodedAgain]) {
+    if (UNSAFE_CHARACTERS.test(candidate) || hasDotSegment(candidate)) return null;
+  }
+  return decoded.replace(/^\/+/, "");
+}
+function encodePath(path) {
+  return encodeURI(path).replace(/\?/g, "%3F").replace(/#/g, "%23");
+}
 function restoreOriginalUrl(rewrittenUrl) {
   const { pathname, query } = splitUrl(rewrittenUrl);
   const pairs = query ? query.split("&") : [];
@@ -7291,9 +7313,9 @@ function restoreOriginalUrl(rewrittenUrl) {
     return allowed && pathname !== "/api/index" ? `${pathname}${search}` : null;
   }
   if (!GATEWAY_PREFIXES.includes(prefix)) return null;
-  const path = (internal.get(PATH_PARAM) ?? "").replace(/^\/+/, "");
-  if (!isSafePath(path)) return null;
-  return `/${prefix}${path ? `/${path}` : ""}${search}`;
+  const path = decodeInternalPath(internal.get(PATH_PARAM) ?? "");
+  if (path === null) return null;
+  return `/${prefix}${path ? `/${encodePath(path)}` : ""}${search}`;
 }
 function createVercelGateway(app) {
   const gateway = express2();

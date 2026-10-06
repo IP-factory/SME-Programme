@@ -33,10 +33,45 @@ function isSafePath(path: string) {
   return !decoded.split("/").some(segment => segment === "." || segment === "..");
 }
 
+const UNSAFE_CHARACTERS = /[\u0000-\u001f\u007f\\]/;
+const hasDotSegment = (path: string) => path.split("/").some(segment => segment === "." || segment === "..");
+
+/**
+ * Vercel encodes the whole `:path*` value into the internal `__path` parameter, including the slashes
+ * (`/api/trpc/x` arrives as `trpc%2Fx`). This decodes that one internal value once and returns the original,
+ * slash-separated path, ready to be re-encoded for the URL. Returns null (never throws) for malformed
+ * encoding, control characters, backslashes or traversal, including a second layer of encoding, because a
+ * downstream handler (Express params, the storage key normaliser) decodes once more.
+ */
+function decodeInternalPath(raw: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  let decodedAgain = decoded;
+  try {
+    decodedAgain = decodeURIComponent(decoded);
+  } catch {
+    // A literal "%" that is not a second escape is fine; only a real second layer matters below.
+  }
+  for (const candidate of [decoded, decodedAgain]) {
+    if (UNSAFE_CHARACTERS.test(candidate) || hasDotSegment(candidate)) return null;
+  }
+  return decoded.replace(/^\/+/, "");
+}
+
+/** Encodes a decoded path for use in a URL path: `/` and the sub-delimiters tRPC batching uses (`,`) are kept. */
+function encodePath(path: string) {
+  return encodeURI(path).replace(/\?/g, "%3F").replace(/#/g, "%23");
+}
+
 /**
  * Rebuilds the URL the browser originally requested from the internal Vercel rewrite
  * (`/api/index?__prefix=api&__path=trpc/x&batch=1` -> `/api/trpc/x?batch=1`).
- * Genuine query parameters are passed through byte-for-byte. If the platform already delivered
+ * The internal `__path` value is percent-decoded (Vercel encodes its slashes); genuine query parameters are
+ * never decoded and pass through byte-for-byte. If the platform already delivered
  * the original path, it is kept. Returns null for anything outside the configured prefixes.
  */
 export function restoreOriginalUrl(rewrittenUrl: string): string | null {
@@ -74,9 +109,9 @@ export function restoreOriginalUrl(rewrittenUrl: string): string | null {
   }
 
   if (!(GATEWAY_PREFIXES as readonly string[]).includes(prefix)) return null;
-  const path = (internal.get(PATH_PARAM) ?? "").replace(/^\/+/, "");
-  if (!isSafePath(path)) return null;
-  return `/${prefix}${path ? `/${path}` : ""}${search}`;
+  const path = decodeInternalPath(internal.get(PATH_PARAM) ?? "");
+  if (path === null) return null;
+  return `/${prefix}${path ? `/${encodePath(path)}` : ""}${search}`;
 }
 
 export function createVercelGateway(app: Express): Express {
