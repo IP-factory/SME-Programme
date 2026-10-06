@@ -152,7 +152,7 @@ export default function ParticipantDashboard() {
       <div className="min-h-screen bg-paper text-slate-900">
         <header className="bg-brand px-6 py-7 text-white shadow-md md:px-12">
           <div className="mx-auto max-w-5xl">
-            <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mb-5 h-9 w-auto max-w-full shrink-0 object-contain" />
+            <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mb-5 h-16 w-auto max-w-full shrink-0 object-contain" />
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-highlight">{BRAND.programmeName} · Private participant portal</p>
             <h1 className="mt-2 font-serif text-3xl">Your engagement brief</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">Review your personalised brief and payment guidance. Acknowledging the brief unlocks the assessment, document sharing, and eligible session selection.</p>
@@ -278,7 +278,7 @@ export default function ParticipantDashboard() {
       <header className="bg-brand text-white py-6 px-6 md:px-12 shadow-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mb-4 h-8 w-auto max-w-full shrink-0 object-contain" />
+            <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mb-4 h-14 w-auto max-w-full shrink-0 object-contain" />
             <div className="flex items-center gap-2 text-highlight text-xs tracking-widest uppercase font-semibold mb-1">
               <Sparkles className="w-3.5 h-3.5" /> {BRAND.programmeFullName}
             </div>

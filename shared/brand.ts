@@ -32,10 +32,13 @@ export const BRAND = {
   productTagline: "Support for business owners",
   /** External page for the free business check, if it runs elsewhere. Empty: the on-site form opens. */
   applyUrl: "",
-  /** Logo files in client/public/brand (ipf-teal-navy). Use as supplied: never recolour or stretch. */
-  logoUrl: "/brand/ipf-logo-teal-navy.webp",
-  logoOnDarkUrl: "/brand/ipf-logo-white.webp",
-  markUrl: "/brand/ipf-mark-teal-navy.webp",
+  /**
+   * Logo files in client/public/brand (ipf-gradient, the Option 1 stacked logo). Use as supplied:
+   * never recolour or stretch. The white version goes on dark panels only.
+   */
+  logoUrl: "/brand/ipf-gradient-logo.webp",
+  logoOnDarkUrl: "/brand/ipf-gradient-logo-white.webp",
+  markUrl: "/brand/ipf-gradient-mark.webp",
 
   /** Short programme name used in compounds such as "JUMP portal" or "JUMP administrator". */
   programmeShortName,
@@ -63,8 +66,8 @@ export const BRAND = {
    * Brand colours for email HTML and PDFs, which cannot read CSS variables.
    * Must match --color-brand / --color-brand-deep in client/src/index.css (enforced by brand.test.ts).
    */
-  colorBrand: "#174579",
-  colorBrandDeep: "#0F2E52",
+  colorBrand: "#1C4E7E",
+  colorBrandDeep: "#12324F",
 } as const;
 
 export type Brand = typeof BRAND;

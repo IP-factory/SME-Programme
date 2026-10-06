@@ -87,9 +87,8 @@ export default function Home() {
       <header className="border-b border-line bg-paper/90 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-20">
           <a href="#top" className="flex items-center gap-3" aria-label={`${BRAND.organisationName} ${BRAND.productName}`}>
-            <img src={BRAND.markUrl} alt={BRAND.organisationName} className="h-9 w-auto shrink-0 sm:hidden" />
-            <img src={BRAND.logoUrl} alt={BRAND.organisationName} className="hidden h-10 w-auto shrink-0 sm:block" />
-            <span className="hidden lg:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.productName}</span>
+            <img src={BRAND.markUrl} alt={BRAND.organisationName} className="h-10 w-auto shrink-0" />
+            <span className="hidden sm:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.productName}</span>
           </a>
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-ink-600">
             <a href="#how" className="hover:text-brand transition-colors">How it works</a>
@@ -126,7 +125,7 @@ export default function Home() {
             {BRAND.productName} gets in with you, names the real problem, shows you exactly what to do, gives you the tools, and checks your work every week until the number moves.
           </p>
           <div className="flex flex-col items-center gap-3">
-            <Button onClick={handleStartCheck} className="h-14 w-full max-w-sm bg-ink text-paper hover:bg-charcoal text-sm uppercase tracking-widest px-8 rounded-none font-semibold shadow-lg">
+            <Button onClick={handleStartCheck} className="h-14 w-full max-w-sm bg-ink text-paper hover:bg-charcoal text-sm uppercase tracking-wider sm:tracking-widest px-6 sm:px-8 rounded-none font-semibold shadow-lg">
               Start with a free business check <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
             <p className="text-sm text-ink-muted">Ten minutes, on your phone.</p>
@@ -262,9 +261,9 @@ export default function Home() {
       </section>
 
       {/* The ask */}
-      <section className="py-20 bg-brand text-paper">
+      <section className="py-20 bg-linear-to-t from-brand to-brand-plum text-paper">
         <div className="container max-w-3xl mx-auto text-center">
-          <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mx-auto mb-8 h-12 w-auto" />
+          <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mx-auto mb-8 h-28 w-auto" />
           <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">Start with the free business check.</h2>
           <p className="text-on-dark-muted max-w-xl mx-auto mb-8">Ten minutes. No card. You&apos;ll know where you stand before you decide anything.</p>
           <Button onClick={handleStartCheck} className="bg-highlight text-brand-deep hover:bg-highlight-hover rounded-none px-10 h-14 text-sm uppercase tracking-widest font-semibold">
@@ -342,7 +341,7 @@ export default function Home() {
       <footer className="py-12 border-t border-line bg-paper">
         <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-ink-muted">
           <div className="flex items-center gap-4">
-            <img src={BRAND.markUrl} alt="" className="h-8 w-auto" />
+            <img src={BRAND.logoUrl} alt={BRAND.organisationName} className="h-16 w-auto" />
             <p>© 2026 {BRAND.organisationLegalName} ({BRAND.organisationName}). {BRAND.productTagline}.</p>
           </div>
           <div className="flex items-center gap-6">
