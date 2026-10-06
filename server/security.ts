@@ -12,7 +12,7 @@ export function getTrustedApplicationOrigin(nodeEnv = process.env.NODE_ENV) {
 export function isTrustedBrowserOrigin(origin: string | undefined, nodeEnv = process.env.NODE_ENV) {
   if (!origin) return false;
   if (nodeEnv !== "production") return LOCAL_ORIGIN_PATTERN.test(origin);
-  return origin === ENV.appOrigin || ENV.appAlternateOrigins.includes(origin);
+  return origin === ENV.appOrigin || ENV.appAlternateOrigins.includes(origin) || (Boolean(ENV.vercelOrigin) && origin === ENV.vercelOrigin);
 }
 
 /**

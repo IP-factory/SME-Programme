@@ -46,4 +46,11 @@ describe("deployment identity configuration", () => {
     expect(config.isTrustedBrowserOrigin("https://www.emmanueltarfa.com", "production")).toBe(true);
     expect(config.OWNER_ADMIN_EMAIL).toBe("emmanueltarfa@gmail.com");
   });
+
+  it("treats blank origin variables as unset instead of failing at import", async () => {
+    const config = await loadWith({ APP_ORIGIN: "", APP_ALTERNATE_ORIGINS: "" });
+
+    expect(config.getTrustedApplicationOrigin("production")).toBe("https://emmanueltarfa.com");
+    expect(config.isTrustedBrowserOrigin("https://www.emmanueltarfa.com", "production")).toBe(true);
+  });
 });

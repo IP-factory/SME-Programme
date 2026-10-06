@@ -1,0 +1,56 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    {
+      "source": "/((?!api/|manus-storage/|portal/authenticate|portal/access).*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://www.instagram.com; connect-src 'self' https://www.instagram.com; frame-src https://accounts.google.com https://www.instagram.com"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "same-origin"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?__prefix=api&__path=:path*"
+    },
+    {
+      "source": "/portal/authenticate",
+      "destination": "/api/index?__prefix=portal&__path=authenticate"
+    },
+    {
+      "source": "/portal/access",
+      "destination": "/api/index?__prefix=portal&__path=access"
+    },
+    {
+      "source": "/manus-storage/:path*",
+      "destination": "/api/index?__prefix=manus-storage&__path=:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

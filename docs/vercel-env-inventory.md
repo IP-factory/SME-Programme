@@ -1,0 +1,50 @@
+# Vercel environment variable inventory
+
+Names only; no values. Derived from `process.env.*` / `import.meta.env.*` in this repository (`server/_core/env.ts` is the main reader).
+Server variables go in Vercel → Project Settings → Environment Variables. `VITE_*` variables are inlined into the browser bundle **at build time**, so they must exist before `vite build` runs.
+
+Requirement groups: **A** basic API, **B** database, **C** registration, **D** participant login, **E** admin login, **F** email, **G** uploads, **H** Google OAuth/Calendar.
+
+| Variable | Used By | Server / Client | Required / Optional | Purpose | Production Notes |
+|---|---|---|---|---|---|
+| `NODE_ENV` | security.ts, vite.ts, index.ts, email.ts, gmail.ts | Server | Required (A) | Switches CSP, origin policy and test-mode email suppression | Vercel sets `production` for builds/functions. Production origin policy applies only when it is `production`. |
+| `PORT` | server/_core/index.ts | Server (local only) | Optional | Preferred local listen port | Not used on Vercel (no listener). |
+| `DATABASE_URL` | db.ts, drizzle.config.ts | Server | Required (B, C, D, E) | MySQL connection string | Must be reachable from the public internet; see database report. Without it `getDb()` returns null and features degrade. |
+| `JWT_SECRET` | env.ts → sdk.ts | Server | Required (D, E) | Signs session cookies/tokens | Generate fresh per environment. Changing it signs everyone out. |
+| `APP_ORIGIN` | env.ts → security.ts, links in email | Server | Required in production (A, C, F) | Canonical public origin for CSRF checks and emailed links | Set to `https://ipfactory.co`. Defaults to `https://emmanueltarfa.com` if unset. |
+| `APP_ALTERNATE_ORIGINS` | env.ts → security.ts | Server | Required in production (A) | Extra trusted browser origins, comma-separated | Set to `https://www.ipfactory.co` (add the production `*.vercel.app` alias if wanted). Defaults to `https://www.emmanueltarfa.com`. |
+| `VERCEL_URL` | env.ts → security.ts | Server | Optional (system var, set by Vercel) | Trusts the current deployment's own origin | Provided automatically; do not set manually. Only honoured in production mode. |
+| `OWNER_ADMIN_EMAIL` | env.ts, adminSecurity.ts, db.ts | Server | Required (E) | Permanent Super Admin email | Defaults to a hard-coded address if unset; set explicitly. |
+| `OWNER_OPEN_ID` | env.ts, db.ts | Server | Optional (E) | Manus openId auto-promoted to admin | Manus-specific. |
+| `CRON_SECRET` | env.ts → scheduledReminder.ts | Server | Required for scheduled reminders | Bearer secret authorising `/api/scheduled/*` | Vercel Cron sends `Authorization: Bearer $CRON_SECRET` automatically when this variable exists. |
+| `VITE_APP_ID` | env.ts (as `appId`), client/src/const.ts | Both | Required for Manus admin OAuth (E) | Manus app id | Manus-specific; needed at build time for the client. |
+| `OAUTH_SERVER_URL` | env.ts → sdk.ts | Server | Required for Manus admin OAuth (E) | Manus OAuth server base URL | Manus-specific. |
+| `VITE_OAUTH_PORTAL_URL` | client/src/const.ts | Client | Required for Manus admin OAuth (E) | Manus login portal URL | Manus-specific; build time. |
+| `BUILT_IN_FORGE_API_URL` | env.ts → storage.ts, storageProxy.ts, llm.ts, map.ts, dataApi.ts, imageGeneration.ts, voiceTranscription.ts, notification | Server | Required for uploads (G) | Manus Forge API (presigned S3 storage and other services) | Manus-specific storage backend. |
+| `BUILT_IN_FORGE_API_KEY` | same as above | Server | Required for uploads (G) | Bearer key for Forge API | Secret. |
+| `VITE_FRONTEND_FORGE_API_URL` | client/src/components/Map.tsx | Client | Optional | Maps proxy URL | Build time; only for map component. |
+| `VITE_FRONTEND_FORGE_API_KEY` | client/src/components/Map.tsx | Client | Optional | Maps key | Public by design (bundled); build time. |
+| `RESEND_API_KEY` | env.ts → email.ts, scripts/send-test-email.mjs | Server | Required for primary email (F) | Resend transport | Secret. |
+| `EMAIL_FROM` | env.ts → email.ts | Server | Optional (F) | Sender display/address | Defaults to the brand administration mailbox. Sender domain must be verified in Resend. |
+| `EMAIL_REPLY_TO` | env.ts → email.ts, gmail.ts | Server | Optional (F) | Reply-To address | Defaults to the brand administration mailbox. |
+| `GOOGLE_CLIENT_ID` | env.ts → gmail.ts, workspaceMailbox.ts, calendar; scripts | Server | Required (F fallback, H) | Google OAuth client | |
+| `GOOGLE_CLIENT_SECRET` | same | Server | Required (F fallback, H) | Google OAuth client secret | Secret. |
+| `GOOGLE_REFRESH_TOKEN` | env.ts → gmail.ts, calendar; scripts | Server | Required (F fallback, H) | Refresh token for Gmail send and Calendar | Secret. |
+| `JUMP_GMAIL_REFRESH_TOKEN` | env.ts → workspaceMailbox.ts | Server | Optional (F) | Workspace mailbox send / reply sync | Secret. |
+| `GOOGLE_CALENDAR_ID` | env.ts, scripts | Server | Optional (H) | Calendar to create sessions in | Defaults to `primary`. |
+| `PAYSTACK_PUBLIC_KEY` | env.ts | Server | Optional | Paystack (read into ENV; no call site found in server code) | Confirm whether payments are used before setting. |
+| `PAYSTACK_SECRET_KEY` | env.ts | Server | Optional | As above | Secret. |
+| `VITE_ANALYTICS_ENDPOINT` | security.ts (CSP), vite.config.ts | Both | Optional | Self-hosted analytics script origin | Build time; also server-read for CSP, so set for both. |
+| `VITE_ANALYTICS_WEBSITE_ID` | vite.config.ts | Client | Optional | Analytics site id | Build time. |
+| `VALIDATE_RESEND_CREDENTIALS`, `VALIDATE_RESEND_SENDER`, `VALIDATE_GOOGLE_CALENDAR` | opt-in tests only | Test | Never in production | Run live-integration tests | Leave unset on Vercel. |
+
+## Minimum sets by capability
+
+- **A basic API:** `NODE_ENV` (automatic), `APP_ORIGIN`, `APP_ALTERNATE_ORIGINS`
+- **B database:** `DATABASE_URL`
+- **C registration:** A + B (+ F for confirmation email)
+- **D participant login:** B + `JWT_SECRET` (+ F for sign-in email)
+- **E admin login:** B + `JWT_SECRET`, `OWNER_ADMIN_EMAIL`, `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `OWNER_OPEN_ID`
+- **F email:** `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`; Gmail fallback adds `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`; workspace mailbox adds `JUMP_GMAIL_REFRESH_TOKEN`
+- **G uploads:** `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`
+- **H Google OAuth/Calendar:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`
