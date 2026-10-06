@@ -3,6 +3,7 @@
  * and the questions. Copy comes from shared/businessSupport.ts (concept note v0.8.1, section 16).
  */
 import { EASE, Reveal } from "@/components/motion";
+import { onSectionLinkClick } from "@/lib/scrollToSection";
 import { BRAND } from "@shared/brand";
 import { JOURNEY, PROBLEM_AREAS, PROMISE } from "@shared/businessSupport";
 import { AnimatePresence, motion } from "framer-motion";
@@ -137,7 +138,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           </span>
         </motion.button>
 
-        <motion.a href="#problem" aria-label="Scroll down" className="mx-auto mt-6 flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink-faint hover:border-brand hover:text-brand" animate={{ y: [0, 6, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
+        <motion.a href="#problem" onClick={onSectionLinkClick} aria-label="Scroll down" className="mx-auto mt-6 flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink-faint hover:border-brand hover:text-brand" animate={{ y: [0, 6, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
           <ArrowDown className="h-4 w-4" />
         </motion.a>
       </div>

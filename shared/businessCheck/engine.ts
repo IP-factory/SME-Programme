@@ -121,17 +121,24 @@ export function isComplete(answers: Answers) {
 }
 
 /** Options and prompt for this owner (idea-stage founders see different wording). */
+/** The prompt in the right tense and context for the owner's stage. */
 export function promptFor(question: Question, answers: Answers) {
-  return stageOf(answers) === "idea" && question.ideaPrompt ? question.ideaPrompt : question.prompt;
+  const stage = stageOf(answers);
+  if (stage === "idea" && question.ideaPrompt) return question.ideaPrompt;
+  if (stage === "side" && question.sidePrompt) return question.sidePrompt;
+  return question.prompt;
 }
 
 export function optionsFor(question: Question, answers: Answers): readonly Option[] {
-  return stageOf(answers) === "idea" && question.ideaOptions ? question.ideaOptions : question.options;
+  const stage = stageOf(answers);
+  const options = stage === "idea" && question.ideaOptions ? question.ideaOptions : question.options;
+  return options.filter((option) => !option.stages || (stage !== undefined && option.stages.includes(stage)));
 }
 
 /** The example shown under a section's definition, matched to the kind of business described. */
 export function exampleFor(section: Section, answers: Answers) {
   if (stageOf(answers) === "idea" && section.examples.idea) return section.examples.idea;
+  if (stageOf(answers) === "side" && section.examples.side) return section.examples.side;
   return section.examples[typeOf(answers)] ?? section.examples.mixed;
 }
 
@@ -277,10 +284,17 @@ export const READINESS_LABELS: Record<ReadinessLevel, string> = {
 
 /** Root-cause order: money and model problems usually sit under sales, offer and people problems. */
 const AREA_PRIORITY = [7, 4, 5, 3, 6, 1, 2, 8, 9, 10, 0];
+/** Over ten years and flat or declining: the way the business makes money has usually stopped working (ET). */
+const MATURE_STRUGGLING_PRIORITY = [4, 7, 5, 3, 6, 1, 2, 8, 9, 10, 0];
 
-export function primaryArea(outline: AreaRead[]): AreaRead | undefined {
+export function isMatureAndStruggling(answers: Answers) {
+  return answers.p_age === "over10" && (answers.p_trend === "flat" || answers.p_trend === "declining");
+}
+
+export function primaryArea(outline: AreaRead[], answers: Answers = {}): AreaRead | undefined {
+  const priority = isMatureAndStruggling(answers) ? MATURE_STRUGGLING_PRIORITY : AREA_PRIORITY;
   for (const health of ["stuck", "watch"] as const) {
-    for (const area of AREA_PRIORITY) {
+    for (const area of priority) {
       const row = outline.find((item) => item.area === area && item.health === health);
       if (row) return row;
     }
@@ -308,7 +322,7 @@ export function matchedOfferings(answers: Answers, outline: AreaRead[], limit = 
     // The main problem area's answers count most.
     add(option.offerings, question.id.endsWith("_status") ? 2 : 1);
   }
-  const main = primaryArea(outline);
+  const main = primaryArea(outline, answers);
   if (main) {
     const status = chosenOption(`s${main.area}_status`, sectionByArea(main.area), answers);
     add(status?.offerings, 1);
@@ -350,7 +364,7 @@ export function evaluate(rawAnswers: Answers): CheckResult {
   const route = routeFor(answers);
   const founder = founderRead(answers);
   const outline = businessOutline(answers);
-  const main = primaryArea(outline);
+  const main = primaryArea(outline, answers);
   const gap = primaryGap(outline, main);
   const offerings = route === "advisory" ? [] : matchedOfferings(answers, outline);
   return { route, founder, outline, primaryArea: main, primaryGap: gap, offerings, summary: writeSummary({ answers, route, founder, outline, main, gap, offerings }) };
@@ -410,6 +424,9 @@ function writeSummary(input: {
   const think = main
     ? `The place to start is ${main.name.toLowerCase()}${gap ? `, and the gap looks like ${GAP_LABELS[gap].name.toLowerCase()}: ${lower(GAP_LABELS[gap].meaning)}` : "."}${offerings.length ? ` That points to ${offerings.map((offering) => offering.name).join(", ")}.` : ""}`
     : "The business looks in good shape on what we asked. The next gains are likely in sharper priorities and stronger numbers.";
+  const matureNote = isMatureAndStruggling(input.answers) && main?.area === 4
+    ? ` After more than ten years with revenue ${input.answers.p_trend === "declining" ? "falling" : "flat"}, that usually means the way the business makes money has stopped working, not that the effort has dropped.`
+    : "";
 
-  return { found, think, next: "Book the free 20-minute call. We will tell you honestly whether we can help, and what to fix first." };
+  return { found, think: think + matureNote, next: "Book the free 20-minute call. We will tell you honestly whether we can help, and what to fix first." };
 }

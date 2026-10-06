@@ -27,6 +27,10 @@ export type Option = {
   offerings?: readonly string[];
   /** In a multi-select, choosing this clears the others. */
   exclusive?: boolean;
+  /** A line under the label, where the label alone needs context. */
+  description?: string;
+  /** Offered only to owners at these stages. Missing means every stage. */
+  stages?: readonly Stage[];
 };
 
 export type Question = {
@@ -35,6 +39,10 @@ export type Question = {
   prompt: string;
   /** Prompt used for idea-stage founders, where the wording differs. */
   ideaPrompt?: string;
+  /** Prompt used for side businesses run alongside a job. */
+  sidePrompt?: string;
+  /** "cards": large choices with a description each, for the questions that set the path. */
+  display?: "cards";
   help?: string;
   options: readonly Option[];
   ideaOptions?: readonly Option[];
@@ -65,7 +73,7 @@ export type Section = {
   /** What the section is about, in a sentence or two. */
   means: string;
   /** An example for the kind of business the owner described. */
-  examples: Partial<Record<BusinessType | "idea", string>>;
+  examples: Partial<Record<BusinessType | "idea" | "side", string>>;
   questions: readonly Question[];
 };
 
@@ -80,17 +88,31 @@ export const SECTIONS: Record<SectionId, Section> = {
   profile: {
     id: "profile",
     title: "Your business",
-    means: "A few facts about you and the business. Ranges are fine. Your answers here decide which questions follow, so nobody answers questions that don't apply to them.",
+    means: "First, where you are: running a business full-time, running one alongside a job, or still at the idea stage. That, and how long the business has been trading, determines which questions follow and how they are worded. Ranges are fine.",
     examples: {},
     questions: [
       {
         id: "p_stage",
         kind: "single",
-        prompt: "Where is the business today?",
+        display: "cards",
+        prompt: "Which best describes you today?",
         options: [
-          { value: "idea", label: "An idea: I haven't started trading yet" },
-          { value: "side", label: "A side business: I have a job, and the business already earns" },
-          { value: "operating", label: "My main business: I run it full-time" },
+          { value: "operating", label: "I run my business full-time", description: "It is my main work, and it is trading. Next we ask how long it has been running." },
+          { value: "side", label: "I run a business alongside a job", description: "A 9-to-5 or other work takes most of my time. The business is on the side, but it exists and earns." },
+          { value: "idea", label: "I have an idea and haven't started", description: "Nothing is trading yet. The check focuses on you as the founder and on the idea itself." },
+        ],
+      },
+      {
+        id: "p_age",
+        kind: "single",
+        prompt: "How long has the business been trading?",
+        sidePrompt: "How long has the side business been trading?",
+        showIf: notIdea,
+        options: [
+          { value: "under2", label: "Under 2 years", description: "Still finding its feet" },
+          { value: "2to5", label: "2 to 5 years", description: "Past the start, building the base" },
+          { value: "5to10", label: "5 to 10 years", description: "Established; growing, or stuck at a level" },
+          { value: "over10", label: "Over 10 years", description: "Mature; the model that got you here may need renewing" },
         ],
       },
       {
@@ -112,21 +134,10 @@ export const SECTIONS: Record<SectionId, Section> = {
         options: ["Fashion", "Food and drink", "Retail", "Services", "Technology", "Real estate", "Health", "Education", "Manufacturing", "Agriculture", "Logistics", "Other"].map((label) => ({ value: label.toLowerCase(), label })),
       },
       {
-        id: "p_age",
-        kind: "single",
-        prompt: "How long has it been trading?",
-        showIf: notIdea,
-        options: [
-          { value: "under2", label: "Under 2 years" },
-          { value: "2to5", label: "2 to 5 years" },
-          { value: "5to10", label: "5 to 10 years" },
-          { value: "over10", label: "Over 10 years" },
-        ],
-      },
-      {
         id: "p_staff",
         kind: "single",
         prompt: "How many people work in it, including contract staff?",
+        sidePrompt: "How many people work in the business, including contract staff?",
         showIf: notIdea,
         options: [
           { value: "0", label: "Just me" },
@@ -142,6 +153,7 @@ export const SECTIONS: Record<SectionId, Section> = {
         id: "p_revenue",
         kind: "single",
         prompt: "In a typical month, how much comes in? (Revenue, not profit.)",
+        sidePrompt: "In a typical month, how much does the side business bring in? (Revenue, not profit.)",
         showIf: notIdea,
         options: [
           { value: "under1m", label: "Under ₦1 million" },
@@ -179,6 +191,7 @@ export const SECTIONS: Record<SectionId, Section> = {
       expert: "A gifted stylist may still struggle to manage and keep a team.",
       mixed: "Someone excellent at the work itself may still find selling, deciding alone or managing people the hard part.",
       idea: "Many people who do well in a job find that a business asks for different strengths: selling, deciding alone and living with uncertainty.",
+      side: "Someone with a good job and a growing side business often finds the limit is time: the business only gets evenings and weekends, and decisions wait.",
     },
     questions: [
       {
@@ -208,6 +221,7 @@ export const SECTIONS: Record<SectionId, Section> = {
         id: "f_team",
         kind: "single",
         prompt: "Who carries the business with you?",
+        sidePrompt: "Who keeps the business going while you are at work?",
         ideaPrompt: "Who are you starting with?",
         options: [
           { value: "solo", label: "Mostly me" },
@@ -261,6 +275,8 @@ export const SECTIONS: Record<SectionId, Section> = {
         id: "f_hours",
         kind: "single",
         prompt: "How many hours a week can you give to working on the business, not just in it?",
+        sidePrompt: "Alongside your job, how many hours a week can you give to working on the business, not just in it?",
+        ideaPrompt: "Alongside everything else, how many hours a week can you give to building the business?",
         help: "Working on the business means planning, fixing and improving, rather than serving today's customers.",
         options: [
           { value: "lt2", label: "Less than 2" },
@@ -349,6 +365,7 @@ export const SECTIONS: Record<SectionId, Section> = {
           { value: "choices", label: "I have several ideas and can't choose between them", health: "stuck", gap: "strategy", offerings: ["growth-strategy"] },
           { value: "how", label: "I know where I want to go, but not how to get there", health: "watch", gap: "knowhow", offerings: ["growth-strategy", "implementation"] },
           { value: "means", label: "I know the way, but I don't have the money or people to get there", health: "watch", gap: "resources", offerings: ["funding"] },
+          { value: "go_fulltime", label: "I'm deciding whether to leave my job and run the business full-time", health: "watch", gap: "strategy", offerings: ["feasibility", "growth-strategy"], stages: ["side"] },
         ],
       },
       {

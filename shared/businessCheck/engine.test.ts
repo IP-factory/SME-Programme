@@ -6,6 +6,8 @@ import {
   exampleFor,
   founderRead,
   isComplete,
+  optionsFor,
+  promptFor,
   nextStep,
   questionPath,
   sectionPath,
@@ -130,6 +132,43 @@ describe("business check path", () => {
   it("keeps an exclusive choice on its own", () => {
     const clean = cleanAnswers({ p_stage: "idea", ...founderAnswers, f_finance: ["pl", "none"] });
     expect(clean.f_finance).toEqual(["none"]);
+  });
+});
+
+describe("stage first", () => {
+  it("asks the stage first, with full-time owners listed first, then years trading for anyone who trades", () => {
+    const stage = nextStep({})!.question;
+    expect(stage.id).toBe("p_stage");
+    expect(stage.options.map((option) => option.value)).toEqual(["operating", "side", "idea"]);
+    expect(nextStep({ p_stage: "operating" })?.question.id).toBe("p_age");
+    expect(nextStep({ p_stage: "side" })?.question.id).toBe("p_age");
+    expect(nextStep({ p_stage: "idea" })?.question.id).toBe("p_type");
+  });
+
+  it("words questions for the owner's stage", () => {
+    const type = SECTIONS.profile.questions.find((question) => question.id === "p_type")!;
+    const hours = SECTIONS.founder.questions.find((question) => question.id === "f_hours")!;
+    expect(promptFor(type, { p_stage: "operating" })).toBe("How does the business make money?");
+    expect(promptFor(type, { p_stage: "side" })).toBe("How does the business make money?");
+    expect(promptFor(type, { p_stage: "idea" })).toBe("How will the business make money?");
+    expect(promptFor(hours, { p_stage: "side" })).toMatch(/^Alongside your job/);
+    expect(exampleFor(SECTIONS.founder, { p_stage: "side", p_type: "maker" })).toMatch(/evenings and weekends/);
+  });
+
+  it("offers the go-full-time choice only to side businesses", () => {
+    const intent = SECTIONS.intent.questions[0];
+    expect(optionsFor(intent, { p_stage: "side" }).map((option) => option.value)).toContain("go_fulltime");
+    expect(optionsFor(intent, { p_stage: "operating" }).map((option) => option.value)).not.toContain("go_fulltime");
+    expect(cleanAnswers({ ...operating("2to5"), s1_status: "go_fulltime" }).s1_status).toBeUndefined();
+  });
+
+  it("points a business over ten years old that is flat or declining at the business model first", () => {
+    const stuck = { s4_status: "no_money", s7_status: "tight_guess" };
+    const flat = evaluate(completeWith(operating("over10", { p_trend: "flat", ...stuck })));
+    expect(flat.primaryArea?.area).toBe(4);
+    expect(flat.summary.think).toMatch(/ten years/);
+    const growing = evaluate(completeWith(operating("over10", { p_trend: "growing", ...stuck })));
+    expect(growing.primaryArea?.area).toBe(7);
   });
 });
 

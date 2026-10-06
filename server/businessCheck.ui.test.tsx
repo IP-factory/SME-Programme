@@ -47,7 +47,7 @@ describe("business check page", () => {
     expect(await screen.findByText("What this means")).toBeTruthy();
     await pick(/questions/i);
 
-    await pick(/An idea: I haven't started trading yet/);
+    await pick(/I have an idea and haven't started/);
     expect(await screen.findByText("How will the business make money?")).toBeTruthy();
     await pick(/We make things/);
     await pick("Food and drink");
@@ -74,10 +74,10 @@ describe("business check page", () => {
     render(React.createElement(BusinessCheck));
     await pick(/take the check/i);
     await pick(/questions/i);
-    await pick(/My main business/);
-    await screen.findByText("How does the business make money?");
+    await pick(/I run my business full-time/);
+    await screen.findByText("How long has the business been trading?");
     await pick(/back/i);
-    expect(await screen.findByText("Where is the business today?")).toBeTruthy();
+    expect(await screen.findByText("Which best describes you today?")).toBeTruthy();
   });
 
   it("asks for contact details last and sends the cleaned answers", async () => {

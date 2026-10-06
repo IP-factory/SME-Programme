@@ -1,6 +1,6 @@
 /**
  * The free business check. One question per screen, grouped under broad headers: the business
- * profile, founder readiness, then the problem areas that apply to this owner. Each answer decides
+ * profile, founder readiness, then the problem areas that apply to this owner. Each answer determines
  * what comes next (shared/businessCheck/engine.ts). Every area opens with what it means and an
  * example for the kind of business the owner described. The result is written on the server.
  */
@@ -25,7 +25,7 @@ import {
 } from "@shared/businessCheck/engine";
 import { AREA_NAMES, GAP_LABELS, SECTIONS, stageOf, type Answers, type Health, type Question, type SectionId } from "@shared/businessCheck/questions";
 import { formatNaira, PRICES, PROMISE } from "@shared/businessSupport";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, LockKeyhole, Mail, PhoneCall, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, CheckCircle2, Clock3, Lightbulb, LockKeyhole, Mail, PencilLine, PhoneCall, RotateCcw, type LucideIcon } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { EASE } from "@/components/motion";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform, type Variants } from "framer-motion";
@@ -181,7 +181,13 @@ export default function BusinessCheck() {
           </Link>
           <Link href="/" className="text-xs font-semibold uppercase tracking-wider text-brand hover:text-brand-deep">Back to site</Link>
         </div>
-        {showOutline && <SectionRail answers={answers} current={step?.section.id} />}
+        {showOutline && (
+          <SectionRail
+            answers={answers}
+            current={step?.section.id}
+            onChangeStage={step?.question.id === "p_stage" ? undefined : () => { setDirection(-1); setEditing("p_stage"); }}
+          />
+        )}
       </header>
 
       <main className="flex-1 py-8 md:py-12">
@@ -208,7 +214,12 @@ export default function BusinessCheck() {
 }
 
 /** The broad headers along the top: where the owner is in the check. */
-function SectionRail({ answers, current }: { answers: Answers; current?: SectionId }) {
+const STAGE_LABELS: Record<string, string> = { operating: "Full-time business", side: "Side business", idea: "Idea, not started" };
+const AGE_LABELS: Record<string, string> = { under2: "under 2 years", "2to5": "2 to 5 years", "5to10": "5 to 10 years", over10: "over 10 years" };
+
+function SectionRail({ answers, current, onChangeStage }: { answers: Answers; current?: SectionId; onChangeStage?: () => void }) {
+  const stage = stageOf(answers);
+  const age = typeof answers.p_age === "string" ? AGE_LABELS[answers.p_age] : undefined;
   const sections = sectionPath(answers);
   const path = questionPath(answers);
   const done = path.filter((item) => isAnswered(item.question, answers)).length;
@@ -236,8 +247,21 @@ function SectionRail({ answers, current }: { answers: Answers; current?: Section
               {current ? SECTIONS[current].title : "Your details"}
             </motion.span>
           </AnimatePresence>
-          <span className="shrink-0 tabular-nums">{done} of {path.length} answered</span>
+          <span className="flex shrink-0 items-center gap-3">
+            {stage && onChangeStage && (
+              <button type="button" onClick={onChangeStage} className="group hidden items-center gap-1.5 border border-brand-line bg-brand-tint px-2 py-0.5 normal-case tracking-normal text-brand transition-colors hover:border-brand sm:inline-flex" title="Change where you are">
+                {STAGE_LABELS[stage]}{age ? `, ${age}` : ""}
+                <PencilLine className="h-3 w-3 opacity-60 transition-opacity group-hover:opacity-100" />
+              </button>
+            )}
+            <span className="tabular-nums">{done} of {path.length} answered</span>
+          </span>
         </p>
+        {stage && onChangeStage && (
+          <button type="button" onClick={onChangeStage} className="mt-2 inline-flex items-center gap-1.5 border border-brand-line bg-brand-tint px-2 py-0.5 text-[11px] text-brand sm:hidden">
+            {STAGE_LABELS[stage]}{age ? `, ${age}` : ""} <PencilLine className="h-3 w-3" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -254,8 +278,8 @@ function Intro({ hasProgress, onStart, onRestart }: { hasProgress: boolean; onSt
         <p className="mt-6 text-lg leading-relaxed text-ink-600">
           Some owners know exactly what is wrong. Many can only feel it: busy every day, money in and out, and no clear picture of why it isn't working. This check is for both.
         </p>
-        <p className="mt-4 leading-relaxed text-ink-soft">
-          It starts with you, the founder, then walks through the parts of the business that apply to you. Each answer decides the next question, so you only see what is relevant. At the end you get a short read: what we found, what we think the real problem is, and where to start.
+        <p className="mt-4 font-serif text-lg italic leading-relaxed text-ink-soft">
+          It starts with you, the founder, then walks through the parts of the business that apply to you. Each answer determines the next question, so you only see what is relevant. At the end you get a short read: what we found, what we think the real problem is, and where to start.
         </p>
       </motion.div>
 
@@ -380,7 +404,8 @@ function QuestionScreen({ step, answers, onAnswer, onBack }: { step: Step; answe
     }
   });
 
-  const grid = question.kind === "select" ? "grid grid-cols-2 gap-2.5 sm:grid-cols-3" : "grid gap-2.5";
+  const cards = question.display === "cards";
+  const grid = cards ? "grid gap-3 md:grid-cols-3" : question.kind === "select" ? "grid grid-cols-2 gap-2.5 sm:grid-cols-3" : "grid gap-2.5";
 
   return (
     <div className="space-y-7">
@@ -402,10 +427,10 @@ function QuestionScreen({ step, answers, onAnswer, onBack }: { step: Step; answe
               variants={itemMotion}
               onClick={() => (question.kind === "multi" ? toggle(option.value) : choose(option.value))}
               aria-pressed={on}
-              whileHover={{ x: question.kind === "select" ? 0 : 4, y: question.kind === "select" ? -2 : 0 }}
+              whileHover={{ x: cards || question.kind === "select" ? 0 : 4, y: cards ? -4 : question.kind === "select" ? -2 : 0 }}
               whileTap={{ scale: 0.98 }}
               animate={dimmed ? { opacity: 0.45 } : { opacity: 1 }}
-              className={`group relative flex min-h-14 items-center gap-3 overflow-hidden border px-4 py-3 text-left transition-colors duration-200 ${on ? "border-brand text-ink" : "border-line bg-paper-raised hover:border-brand hover:shadow-md"}`}
+              className={`group relative flex overflow-hidden border text-left transition-colors duration-200 ${cards ? "min-h-48 flex-col items-start gap-3 p-5" : "min-h-14 items-center gap-3 px-4 py-3"} ${on ? "border-brand text-ink" : "border-line bg-paper-raised hover:border-brand hover:shadow-md"}`}
             >
               {/* The fill sweeps in from the left when chosen. */}
               <motion.span aria-hidden className="absolute inset-0 origin-left bg-brand-tint" initial={false} animate={{ scaleX: on ? 1 : 0 }} transition={{ duration: 0.3, ease: EASE }} />
@@ -413,13 +438,18 @@ function QuestionScreen({ step, answers, onAnswer, onBack }: { step: Step; answe
                 <span className={`relative flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${on ? "border-brand bg-brand text-paper" : "border-line-strong bg-paper-raised"}`}>
                   <AnimatePresence>{on && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={{ type: "spring", stiffness: 500, damping: 25 }}><Check className="h-3.5 w-3.5" /></motion.span>}</AnimatePresence>
                 </span>
+              ) : cards ? (
+                <CardIcon value={option.value} on={on} />
               ) : (
                 index < 9 && <span aria-hidden className={`relative hidden h-6 w-6 shrink-0 items-center justify-center border text-[11px] font-semibold tabular-nums transition-colors sm:flex ${on ? "border-brand bg-brand text-paper" : "border-line text-ink-faint group-hover:border-brand group-hover:text-brand"}`}>{index + 1}</span>
               )}
-              <span className="relative flex-1 text-[15px] leading-snug">{option.label}</span>
+              <span className="relative flex-1">
+                <span className={`block leading-snug ${cards ? "font-serif text-xl font-bold" : "text-[15px]"}`}>{option.label}</span>
+                {option.description && <span className={`mt-1 block leading-relaxed text-ink-muted ${cards ? "text-sm" : "text-[13px]"}`}>{option.description}</span>}
+              </span>
               <AnimatePresence>
                 {on && question.kind !== "multi" && (
-                  <motion.span className="relative" initial={{ scale: 0, rotate: -45 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0 }} transition={{ type: "spring", stiffness: 500, damping: 22 }}>
+                  <motion.span className={cards ? "absolute right-4 top-4" : "relative"} initial={{ scale: 0, rotate: -45 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0 }} transition={{ type: "spring", stiffness: 500, damping: 22 }}>
                     <CheckCircle2 className="h-5 w-5 shrink-0 text-brand" />
                   </motion.span>
                 )}
@@ -438,6 +468,17 @@ function QuestionScreen({ step, answers, onAnswer, onBack }: { step: Step; answe
         )}
       </div>
     </div>
+  );
+}
+
+const CARD_ICONS: Record<string, LucideIcon> = { operating: BriefcaseBusiness, side: Clock3, idea: Lightbulb };
+
+function CardIcon({ value, on }: { value: string; on: boolean }) {
+  const Icon = CARD_ICONS[value] ?? Check;
+  return (
+    <motion.span animate={{ rotate: on ? [0, -8, 0] : 0 }} transition={{ duration: 0.4 }} className={`relative flex h-11 w-11 items-center justify-center transition-colors ${on ? "bg-brand text-paper" : "bg-brand-tint text-brand group-hover:bg-brand group-hover:text-paper"}`}>
+      <Icon className="h-5 w-5" />
+    </motion.span>
   );
 }
 

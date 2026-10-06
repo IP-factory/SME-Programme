@@ -3,6 +3,7 @@
  * Same pages and components as the real app; routing is in memory and the server is simulated,
  * so it runs from any static host or a claude.ai page.
  */
+import { scrollToSection } from "@/lib/scrollToSection";
 import { trpc } from "@/lib/trpc";
 import { BRAND } from "@shared/brand";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -20,12 +21,12 @@ for (const key of ["logoUrl", "logoOnDarkUrl", "markUrl"] as const) {
 
 // Same-page links (#how, #questions…) scroll instead of navigating away from the preview.
 document.addEventListener("click", (event) => {
+  if (event.defaultPrevented) return;
   const link = (event.target as HTMLElement).closest?.("a[href^='#']");
   const id = link?.getAttribute("href")?.slice(1);
   if (!id) return;
   event.preventDefault();
-  if (id === "top") window.scrollTo({ top: 0, behavior: "smooth" });
-  else document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  scrollToSection(id);
 });
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

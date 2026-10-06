@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import { onSectionLinkClick } from "@/lib/scrollToSection";
 import { CtaButton, Faq, Hero, Journey, NAV, StuckPicker, useActiveSection, useScrolled } from "@/components/home/HomeSections";
 import { Reveal, ScrollProgress, Stagger, staggerChild } from "@/components/motion";
 import { motion } from "framer-motion";
@@ -82,13 +83,13 @@ export default function Home() {
       <ScrollProgress />
       <header className={`border-b bg-paper/85 backdrop-blur-md sticky top-0 z-50 transition-[box-shadow,border-color] duration-300 ${scrolled ? "border-line shadow-[0_8px_30px_-12px_rgba(18,50,79,0.25)]" : "border-transparent"}`}>
         <div className={`container flex items-center justify-between transition-[height] duration-300 ${scrolled ? "h-16" : "h-20"}`}>
-          <a href="#top" className="flex items-center gap-3" aria-label={`${BRAND.organisationName} ${BRAND.productName}`}>
+          <a href="#top" onClick={onSectionLinkClick} className="flex items-center gap-3" aria-label={`${BRAND.organisationName} ${BRAND.productName}`}>
             <img src={BRAND.markUrl} alt={BRAND.organisationName} className="h-10 w-auto shrink-0" />
             <span className="hidden sm:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.productName}</span>
           </a>
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-ink-600">
             {NAV.map((item) => (
-              <a key={item.id} href={`#${item.id}`} className={`relative py-1 transition-colors hover:text-brand ${active === item.id ? "text-brand" : ""}`}>
+              <a key={item.id} href={`#${item.id}`} onClick={onSectionLinkClick} className={`relative py-1 transition-colors hover:text-brand ${active === item.id ? "text-brand" : ""}`}>
                 {item.label}
                 {active === item.id && <motion.span layoutId="nav-underline" className="absolute inset-x-0 -bottom-0.5 h-0.5 bg-highlight-ink" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
               </a>
@@ -275,9 +276,9 @@ export default function Home() {
             <p>© 2026 {BRAND.organisationLegalName} ({BRAND.organisationName}). {BRAND.productTagline}.</p>
           </div>
           <div className="flex items-center gap-6">
-            <a href="#how" className="hover:text-ink">How it works</a>
-            <a href="#stuck" className="hover:text-ink">Where you're stuck</a>
-            <a href="#questions" className="hover:text-ink">Questions</a>
+            <a href="#how" onClick={onSectionLinkClick} className="hover:text-ink">How it works</a>
+            <a href="#stuck" onClick={onSectionLinkClick} className="hover:text-ink">Where you're stuck</a>
+            <a href="#questions" onClick={onSectionLinkClick} className="hover:text-ink">Questions</a>
           </div>
         </div>
       </footer>
