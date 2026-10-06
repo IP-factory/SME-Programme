@@ -470,3 +470,33 @@ export const consultingReports = mysqlTable("consulting_reports", {
 
 export type ConsultingReport = typeof consultingReports.$inferSelect;
 export type InsertConsultingReport = typeof consultingReports.$inferInsert;
+
+/**
+ * Completed business checks from the public site. Answers are stored as given (after cleaning);
+ * the result is recomputed on the server so the outline can never be set by the browser.
+ * publicToken lets the owner ask for the call or the full report without signing in.
+ */
+export const businessChecks = mysqlTable("business_checks", {
+  id: int("id").autoincrement().primaryKey(),
+  publicToken: varchar("publicToken", { length: 64 }).notNull().unique(),
+  fullName: varchar("fullName", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  whatsapp: varchar("whatsapp", { length: 32 }),
+  businessName: varchar("businessName", { length: 255 }),
+  description: varchar("description", { length: 500 }),
+  stage: varchar("stage", { length: 16 }).notNull(),
+  route: mysqlEnum("route", ["advisory", "programme", "foundation", "idea"]).notNull(),
+  readiness: mysqlEnum("readiness", ["advanced", "intermediate", "nascent"]).notNull(),
+  primaryArea: int("primaryArea"),
+  answersJson: text("answersJson").notNull(),
+  resultJson: text("resultJson").notNull(),
+  summaryJson: text("summaryJson").notNull(),
+  summarySource: mysqlEnum("summarySource", ["AI", "Rules"]).notNull(),
+  notificationStatus: mysqlEnum("notificationStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  callRequestedAt: timestamp("callRequestedAt"),
+  reportRequestedAt: timestamp("reportRequestedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type BusinessCheck = typeof businessChecks.$inferSelect;
+export type InsertBusinessCheck = typeof businessChecks.$inferInsert;

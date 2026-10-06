@@ -1,15 +1,15 @@
 import { Button } from "@/components/ui/button";
-import DiagnosticRegistrationDialog from "@/components/DiagnosticRegistrationDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { ArrowRight, CheckCircle2, KeyRound, MailCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { BRAND } from "@shared/brand";
-import { JOURNEY, PROBLEM_AREAS } from "@shared/businessSupport";
+import { JOURNEY, PROBLEM_AREAS, PROMISE } from "@shared/businessSupport";
 
 export default function Home() {
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [, setLocation] = useLocation();
   const [isParticipantSignInOpen, setIsParticipantSignInOpen] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
@@ -62,22 +62,13 @@ export default function Home() {
     requestPortalLinkMutation.mutate({ email: signInEmail });
   };
 
-  const [selectedPackage, setSelectedPackage] = useState<"Foundation" | "Engine Room" | "Boardroom">("Foundation");
-
-
-
-  const handleOpenRegister = (pkg: "Foundation" | "Engine Room" | "Boardroom") => {
-    setSelectedPackage(pkg);
-    setIsRegisterOpen(true);
-  };
-
-  /** The free business check: the external form when configured, otherwise the on-site form. */
+  /** The free business check: the external form when configured, otherwise the on-site check. */
   const handleStartCheck = () => {
     if (BRAND.applyUrl) {
       window.open(BRAND.applyUrl, "_blank", "noopener,noreferrer");
       return;
     }
-    handleOpenRegister("Foundation");
+    setLocation("/check");
   };
 
 
@@ -115,6 +106,7 @@ export default function Home() {
       {/* Hero */}
       <section id="top" className="relative pt-20 pb-20 md:pt-28 md:pb-24 border-b border-line">
         <div className="container max-w-4xl mx-auto text-center px-4">
+          <p className="mb-6 text-xs sm:text-sm font-semibold uppercase tracking-[0.3em] text-highlight-ink">{PROMISE.join(" ")}</p>
           <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.08] text-ink mb-8">
             You know what your business needs.
           </h1>
@@ -336,7 +328,6 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      <DiagnosticRegistrationDialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen} selectedPackage={selectedPackage} />
 
       <footer className="py-12 border-t border-line bg-paper">
         <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-ink-muted">

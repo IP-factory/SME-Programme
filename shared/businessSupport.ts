@@ -37,6 +37,12 @@ export const PROBLEM_AREAS: readonly ProblemArea[] = [
   { number: 10, name: "Owner transition", ownerWords: "Who am I after this business, and how do I lead what I built?", together: "Career and leadership plan for the business owner; succession where needed.", measure: "Transition plan in use" },
 ];
 
+/**
+ * The offer in three words, in place of JUMP's "Learn, Apply, Decide". It starts with finding the
+ * problem because many owners can feel that something is wrong without being able to name it.
+ */
+export const PROMISE = ["Find it.", "Fix it.", "Follow through."] as const;
+
 /** Prices in naira (section 11). Ongoing support is deliberately unpriced: copy must not quote a figure. */
 export const PRICES = {
   fullReport: 100_000,

@@ -33,6 +33,11 @@ export const BRAND = {
   /** External page for the free business check, if it runs elsewhere. Empty: the on-site form opens. */
   applyUrl: "",
   /**
+   * Booking page for the free 20-minute discovery call (Calendly or similar). Empty: the business
+   * check records the request and the office books the call by email or WhatsApp.
+   */
+  discoveryCallUrl: "",
+  /**
    * Logo files in client/public/brand (ipf-gradient, the Option 1 stacked logo). Use as supplied:
    * never recolour or stretch. The white version goes on dark panels only.
    */

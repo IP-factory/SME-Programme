@@ -7,6 +7,8 @@ import { TRPCClientError, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
 import type { AppRouter } from "../../../server/routers";
 import { deriveDiagnostic, type DiagnosticInput } from "../../../server/diagnostic";
+import { evaluate } from "@shared/businessCheck/engine";
+import type { Answers } from "@shared/businessCheck/questions";
 
 const PREVIEW_NOTICE = "This is a preview: nothing was saved or sent.";
 
@@ -27,6 +29,18 @@ const responders: Record<string, Responder> = {
     };
   },
   "registration.requestPortalLink": () => ({ success: true }),
+  // The live site has the AI write the summary; the preview shows the rules-based version.
+  "businessCheck.submit": (input) => {
+    const result = evaluate((input as { answers: Answers }).answers);
+    return {
+      token: "preview-token-0000000000",
+      result,
+      summary: { ...result.summary, offerings: result.offerings.map((offering) => ({ id: offering.id, name: offering.name, why: offering.summary })) },
+      summarySource: "Rules",
+      discoveryCallUrl: "",
+    };
+  },
+  "businessCheck.requestNext": (input) => ({ success: true, choice: (input as { choice: string }).choice }),
 };
 
 const refusals: Record<string, string> = {

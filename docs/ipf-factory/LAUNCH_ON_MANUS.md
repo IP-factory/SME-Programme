@@ -59,7 +59,7 @@ Prices and site wording for the journey live in `shared/businessSupport.ts`, one
 |---|---|
 | Rebrand: name, logo, colours | Done: IP Factory, ipf-gradient logo and palette, favicon |
 | Home page: section 16 copy, journey and prices | Done |
-| Free business check flow (profile, founder readiness, problem, four-gap result, next step) | **Not built.** "Start with a free business check" opens the existing Jump registration form for now. |
+| Free business check flow (profile, founder readiness, problem, four-gap result, next step) | **Built** at `/check`. Every "free business check" button opens it. Branching rules in `shared/businessCheck/engine.ts`; questions and examples in `questions.ts`; the Enzo Krypton service catalogue it recommends from in `catalogue.ts`. The summary is written by the Manus built-in AI (`BUILT_IN_FORGE_*`) and falls back to a rules-written summary if the AI is unavailable. Needs migration `0023_business_checks` (run `pnpm db:push`). Set `discoveryCallUrl` in `shared/brand.ts` once there is a booking page; until then "Book my free call" records the request and emails the administration mailbox. |
 | Full report (₦100,000) and Paystack links for the report, Current State and fix | **Not built.** The existing payment guidance still lists Jump packages. |
 | Book a call: two blocks a week, 20 minutes | Existing scheduling can carry it; slot kinds and copy still say Jump. |
 | Client area: uploads, feedback, files | Works as in Jump; wording still Jump. |
