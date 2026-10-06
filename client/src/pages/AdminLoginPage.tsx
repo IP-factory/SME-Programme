@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
           <CardContent className="space-y-6">
             {loading ? <p className="text-sm text-ink-muted">Checking your secure sign-in…</p> : null}
             {!loading && !user ? <>
-              <div className="p-4 bg-paper border border-line-soft text-xs text-ink-muted space-y-2"><p className="font-semibold text-ink">Step 1 of 2 — Verify identity</p><p>Sign in with your authorised Gmail account. {BRAND.facilitatorFirstName}’s super-admin account is emmanueltarfa@gmail.com.</p></div>
+              <div className="p-4 bg-paper border border-line-soft text-xs text-ink-muted space-y-2"><p className="font-semibold text-ink">Step 1 of 2 — Verify identity</p><p>Sign in with your authorised Gmail account.</p></div>
               <Button onClick={() => startLogin()} size="lg" className="w-full bg-brand hover:bg-brand-deep-hover text-white rounded-none uppercase tracking-wider text-xs h-12">Continue with authorised Gmail</Button>
             </> : null}
             {!loading && user && access.isLoading ? <p className="text-sm text-ink-muted">Checking account permissions…</p> : null}
