@@ -840,15 +840,15 @@ export const participantRouter = router({
         doc.on("error", (err: Error) => reject(err));
 
         // PDF Header styling (McKinsey Blue theme)
-        doc.fillColor("#1F4E79").fontSize(20).font("Helvetica-Bold").text(BRAND.programmeFullName, { align: "left" });
+        doc.fillColor(BRAND.colorBrand).fontSize(20).font("Helvetica-Bold").text(BRAND.programmeFullName, { align: "left" });
         doc.fontSize(12).fillColor("#555555").text("Current Status Assessment Summary Report", { align: "left" });
         doc.moveDown(0.5);
 
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#1F4E79").lineWidth(1.5).stroke();
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor(BRAND.colorBrand).lineWidth(1.5).stroke();
         doc.moveDown(1);
 
         // Participant Information block
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Participant & Business Profile");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Participant & Business Profile");
         doc.fontSize(10).font("Helvetica").fillColor("#333333");
         doc.text(`Full Name: ${applicant.fullName}`);
         doc.text(`Email: ${applicant.email}`);
@@ -860,7 +860,7 @@ export const participantRouter = router({
         doc.moveDown(1.5);
 
         // Assessment Responses
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Assessment Questionnaire Responses");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Assessment Questionnaire Responses");
         doc.moveDown(0.5);
 
         const sections = [
@@ -874,7 +874,7 @@ export const participantRouter = router({
         ];
 
         for (const sec of sections) {
-          doc.fontSize(11).font("Helvetica-Bold").fillColor("#1F4E79").text(sec.title);
+          doc.fontSize(11).font("Helvetica-Bold").fillColor(BRAND.colorBrand).text(sec.title);
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(sec.text || "Not provided.", {
             align: "justify",
           });
@@ -1078,15 +1078,15 @@ export const participantRouter = router({
         doc.on("error", (err: Error) => reject(err));
 
         // Header
-        doc.fillColor("#1F4E79").fontSize(20).font("Helvetica-Bold").text(BRAND.programmeFullName);
+        doc.fillColor(BRAND.colorBrand).fontSize(20).font("Helvetica-Bold").text(BRAND.programmeFullName);
         doc.fontSize(12).fillColor("#555555").text("AI Management Consulting Inferred Diagnostic Report");
         doc.moveDown(0.5);
 
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#1F4E79").lineWidth(1.5).stroke();
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor(BRAND.colorBrand).lineWidth(1.5).stroke();
         doc.moveDown(1);
 
         // Profile
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Executive & Venture Profile");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Executive & Venture Profile");
         doc.fontSize(10).font("Helvetica").fillColor("#333333");
         doc.text(`Entrepreneur: ${applicant.fullName}`);
         doc.text(`Venture: ${applicant.businessName}`);
@@ -1095,7 +1095,7 @@ export const participantRouter = router({
         doc.moveDown(1.5);
 
         // Strategic Hypotheses
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Strategic Hypotheses & Value Driver Analysis");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Strategic Hypotheses & Value Driver Analysis");
         doc.moveDown(0.5);
         for (const hyp of summary.strategicHypotheses) {
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(`• ${hyp}`, { indent: 10 });
@@ -1104,7 +1104,7 @@ export const participantRouter = router({
         doc.moveDown(1);
 
         // Risks & Bottlenecks
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Identified Bottlenecks & Strategic Risks");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Identified Bottlenecks & Strategic Risks");
         doc.moveDown(0.5);
         for (const risk of summary.risksAndBottlenecks) {
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(`• ${risk}`, { indent: 10 });
@@ -1113,7 +1113,7 @@ export const participantRouter = router({
         doc.moveDown(1);
 
         // Recommendations
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Consulting Recommendations for 1-on-1 Decide Session");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Consulting Recommendations for 1-on-1 Decide Session");
         doc.moveDown(0.5);
         for (const rec of summary.recommendations) {
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(`• ${rec}`, { indent: 10 });

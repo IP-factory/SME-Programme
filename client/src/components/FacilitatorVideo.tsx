@@ -63,7 +63,7 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
     <figure ref={sectionRef} className="w-full md:max-w-[380px]">
       {mp4Url ? (
         <video
-          className="aspect-[9/16] w-full bg-[#1A1A1A] object-cover"
+          className="aspect-[9/16] w-full bg-ink object-cover"
           controls
           playsInline
           preload="metadata"
@@ -73,7 +73,7 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
           Your browser does not support embedded video.
         </video>
       ) : isVisible ? (
-        <div className="aspect-[9/16] w-full overflow-hidden bg-[#F4F1E8]">
+        <div className="aspect-[9/16] w-full overflow-hidden bg-paper-sunken">
           <blockquote
             className="instagram-media"
             data-instgrm-captioned
@@ -87,11 +87,11 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
           </blockquote>
         </div>
       ) : (
-        <div className="aspect-[9/16] w-full bg-[#F4F1E8] border border-[#E6E2D8] flex items-center justify-center text-center px-8">
-          <p className="text-xs uppercase tracking-[0.18em] text-[#6A6760]">Loading facilitator video</p>
+        <div className="aspect-[9/16] w-full bg-paper-sunken border border-line flex items-center justify-center text-center px-8">
+          <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">Loading facilitator video</p>
         </div>
       )}
-      <figcaption className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-[#6A6760]">
+      <figcaption className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-ink-muted">
         {BRAND.facilitatorFormalName} on {BRAND.programmeName}
       </figcaption>
     </figure>

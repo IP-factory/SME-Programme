@@ -62,7 +62,7 @@ export function buildWorkingDiagnosticReport(applicant: Registration, draft: Str
 }
 
 function writeSection(doc: PDFKit.PDFDocument, title: string, items: string[]) {
-  doc.moveDown(0.8).font("Helvetica-Bold").fontSize(13).fillColor("#163859").text(title);
+  doc.moveDown(0.8).font("Helvetica-Bold").fontSize(13).fillColor(BRAND.colorBrandDeep).text(title);
   doc.moveDown(0.3).font("Helvetica").fontSize(10).fillColor("#1E293B");
   for (const item of items) {
     doc.text(`• ${item}`, { indent: 10, lineGap: 3 });
@@ -77,12 +77,12 @@ export function renderWorkingDiagnosticReportPdf(report: WorkingDiagnosticReport
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.rect(0, 0, doc.page.width, 142).fill("#163859");
+    doc.rect(0, 0, doc.page.width, 142).fill(BRAND.colorBrandDeep);
     doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(11).text(BRAND.programmeName, 54, 42);
     doc.fontSize(24).text("Current State Working Diagnostic", 54, 64, { width: 480 });
     doc.font("Helvetica").fontSize(10).text(`Prepared for ${report.participant.fullName} · ${report.participant.businessName}`, 54, 106);
     doc.fillColor("#1E293B").font("Helvetica").fontSize(10).text(`Generated ${new Date(report.generatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, 54, 168);
-    doc.moveDown(2.5).font("Helvetica-Bold").fontSize(13).fillColor("#163859").text("Executive readout");
+    doc.moveDown(2.5).font("Helvetica-Bold").fontSize(13).fillColor(BRAND.colorBrandDeep).text("Executive readout");
     doc.moveDown(0.4).font("Helvetica").fontSize(10).fillColor("#1E293B").text(report.executiveReadout, { lineGap: 4 });
     writeSection(doc, "Current position", report.currentPosition.map((item) => `${item.label}: ${item.value}`));
     writeSection(doc, "Working hypotheses to test", report.workingHypotheses);

@@ -109,19 +109,19 @@ export default function ParticipantDashboard() {
 
   if (error || (!data && !isLoading)) {
     return (
-      <div className="min-h-screen bg-[#FBF9F5] flex items-center justify-center p-6">
-        <Card className="max-w-md w-full border-[#1F4E79]/20 shadow-lg bg-white">
+      <div className="min-h-screen bg-paper flex items-center justify-center p-6">
+        <Card className="max-w-md w-full border-brand/20 shadow-lg bg-white">
           <CardHeader className="text-center space-y-2">
             <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-2">
               <ShieldAlert className="w-6 h-6" />
             </div>
-            <CardTitle className="font-serif text-2xl text-[#1F4E79]">Sign in to your private portal</CardTitle>
+            <CardTitle className="font-serif text-2xl text-brand">Sign in to your private portal</CardTitle>
             <CardDescription>
               Use your registered email address and {BRAND.programmeShortName} participant password to return to your private portal.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pb-6">
-            <Button type="button" onClick={() => window.location.assign("/?participant_signin=1")} className="w-full bg-[#1F4E79] hover:bg-[#163859] text-white">
+            <Button type="button" onClick={() => window.location.assign("/?participant_signin=1")} className="w-full bg-brand hover:bg-brand-deep text-white">
               Sign in with email and password
             </Button>
             <p className="text-center text-xs leading-5 text-slate-500">First time here or forgotten your password? The sign-in page can send a short-lived, single-use password setup or reset link to your registered email address.</p>
@@ -133,10 +133,10 @@ export default function ParticipantDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#FBF9F5] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-paper flex items-center justify-center p-6">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-[#1F4E79] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="font-serif text-lg text-[#1F4E79]">Loading your {BRAND.programmeName} participant portal...</p>
+          <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="font-serif text-lg text-brand">Loading your {BRAND.programmeName} participant portal...</p>
         </div>
       </div>
     );
@@ -149,8 +149,8 @@ export default function ParticipantDashboard() {
   if (!engagement.hasConsented) {
     const brief = engagement.brief;
     return (
-      <div className="min-h-screen bg-[#FBF9F5] text-slate-900">
-        <header className="bg-[#1F4E79] px-6 py-7 text-white shadow-md md:px-12">
+      <div className="min-h-screen bg-paper text-slate-900">
+        <header className="bg-brand px-6 py-7 text-white shadow-md md:px-12">
           <div className="mx-auto max-w-5xl">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">{BRAND.programmeName} · Private participant portal</p>
             <h1 className="mt-2 font-serif text-3xl">Your engagement brief</h1>
@@ -165,14 +165,14 @@ export default function ParticipantDashboard() {
           />
 
           <div className="border-l-4 border-l-amber-400 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1F4E79]">Prepared for {applicant.businessName}</p>
-            <p className="mt-3 font-serif text-2xl leading-snug text-[#1F4E79]">{brief.welcome}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Prepared for {applicant.businessName}</p>
+            <p className="mt-3 font-serif text-2xl leading-snug text-brand">{brief.welcome}</p>
           </div>
 
-          <Card className="border-[#1F4E79]/20 bg-white shadow-sm" aria-labelledby="initial-perspective-heading">
+          <Card className="border-brand/20 bg-white shadow-sm" aria-labelledby="initial-perspective-heading">
             <CardHeader>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Personalised starting point</p>
-              <CardTitle id="initial-perspective-heading" className="mt-1 font-serif text-2xl text-[#1F4E79]">{brief.initialPerspective.heading}</CardTitle>
+              <CardTitle id="initial-perspective-heading" className="mt-1 font-serif text-2xl text-brand">{brief.initialPerspective.heading}</CardTitle>
               <CardDescription className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{brief.initialPerspective.summary}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
@@ -180,22 +180,22 @@ export default function ParticipantDashboard() {
                 <p className="font-semibold text-amber-900">Potential challenge to explore</p>
                 <p className="mt-2">{brief.initialPerspective.potentialChallenge}</p>
               </div>
-              <div className="rounded-xl border border-[#1F4E79]/15 bg-[#F2F6FA] p-5 text-sm leading-6 text-[#1F4E79]">
+              <div className="rounded-xl border border-brand/15 bg-brand-tint-soft p-5 text-sm leading-6 text-brand">
                 <p className="font-semibold">What this may point to in the sessions</p>
                 <p className="mt-2">{brief.initialPerspective.exploration}</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-[#1F4E79]/20 bg-white shadow-sm">
+          <Card className="border-brand/20 bg-white shadow-sm">
             <CardHeader>
-              <CardTitle className="font-serif text-2xl text-[#1F4E79]">{brief.programme.heading}</CardTitle>
+              <CardTitle className="font-serif text-2xl text-brand">{brief.programme.heading}</CardTitle>
               <CardDescription className="max-w-3xl text-sm leading-6 text-slate-600">{brief.programme.body}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
                 {brief.programme.outcomes.map((outcome) => (
-                  <div key={outcome} className="flex gap-3 rounded-lg border border-[#1F4E79]/10 bg-[#FBF9F5] p-4 text-sm leading-6 text-slate-700">
+                  <div key={outcome} className="flex gap-3 rounded-lg border border-brand/10 bg-paper p-4 text-sm leading-6 text-slate-700">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                     <span>{outcome}</span>
                   </div>
@@ -204,20 +204,20 @@ export default function ParticipantDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border-[#1F4E79]/20 bg-white shadow-sm">
+          <Card className="border-brand/20 bg-white shadow-sm">
             <CardHeader>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-600">Your selected pathway · {brief.selectedPackage}</p>
-              <CardTitle className="font-serif text-xl text-[#1F4E79]">{brief.package.heading}</CardTitle>
+              <CardTitle className="font-serif text-xl text-brand">{brief.package.heading}</CardTitle>
               <CardDescription className="leading-6">{brief.package.summary}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
-              {brief.package.included.map((item) => <div key={item} className="rounded-md bg-[#F4F1E8] p-3 text-sm leading-6 text-slate-700">{item}</div>)}
+              {brief.package.included.map((item) => <div key={item} className="rounded-md bg-paper-sunken p-3 text-sm leading-6 text-slate-700">{item}</div>)}
             </CardContent>
           </Card>
 
-          <Card className="border-[#1F4E79]/20 bg-white shadow-sm">
+          <Card className="border-brand/20 bg-white shadow-sm">
             <CardHeader>
-              <CardTitle className="font-serif text-xl text-[#1F4E79]">{brief.calendar.heading}</CardTitle>
+              <CardTitle className="font-serif text-xl text-brand">{brief.calendar.heading}</CardTitle>
               <CardDescription className="leading-6">{brief.calendar.body}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -225,27 +225,27 @@ export default function ParticipantDashboard() {
               <div className="border-l-4 border-l-emerald-600 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"><strong>Payment framework:</strong> {brief.payment.body}</div>
             </CardContent>
           </Card>
-          {paymentGuidance && <Card className="border-[#1F4E79]/20 bg-white shadow-sm" aria-labelledby="pre-consent-payment-guidance-heading">
+          {paymentGuidance && <Card className="border-brand/20 bg-white shadow-sm" aria-labelledby="pre-consent-payment-guidance-heading">
             <CardHeader>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Private payment guidance</p>
-              <CardTitle id="pre-consent-payment-guidance-heading" className="mt-1 font-serif text-2xl text-[#1F4E79]">Your {paymentGuidance.packageName} payment schedule</CardTitle>
+              <CardTitle id="pre-consent-payment-guidance-heading" className="mt-1 font-serif text-2xl text-brand">Your {paymentGuidance.packageName} payment schedule</CardTitle>
               <CardDescription className="mt-2 max-w-3xl leading-6">Your pathway-specific fee, instalment schedule, and approved payment routes are available below. You may review this before acknowledging your engagement brief.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#FBF9F5] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Programme fee</p><p className="mt-1 font-serif text-lg text-[#1F4E79]">{paymentGuidance.fullProgrammeFee}</p></div>
+                <div className="rounded-lg border border-brand/10 bg-paper p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Programme fee</p><p className="mt-1 font-serif text-lg text-brand">{paymentGuidance.fullProgrammeFee}</p></div>
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-amber-800">First commitment · 40%</p><p className="mt-1 font-serif text-lg text-amber-950">{paymentGuidance.commitmentPayment}</p></div>
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#FBF9F5] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">End September · 30%</p><p className="mt-1 font-serif text-lg text-[#1F4E79]">{paymentGuidance.firstInstalment}</p></div>
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#FBF9F5] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mid October · 30%</p><p className="mt-1 font-serif text-lg text-[#1F4E79]">{paymentGuidance.secondInstalment}</p></div>
+                <div className="rounded-lg border border-brand/10 bg-paper p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">End September · 30%</p><p className="mt-1 font-serif text-lg text-brand">{paymentGuidance.firstInstalment}</p></div>
+                <div className="rounded-lg border border-brand/10 bg-paper p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mid October · 30%</p><p className="mt-1 font-serif text-lg text-brand">{paymentGuidance.secondInstalment}</p></div>
               </div>
               <div className="rounded-lg border-l-4 border-l-amber-400 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><strong>10% full-upfront option:</strong> {paymentGuidance.fullUpfrontFee}. {paymentGuidance.fullUpfrontNote}</div>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {paymentGuidance.paymentRoutes.map((route) => <section key={route.id} className="rounded-xl border border-[#1F4E79]/15 bg-[#FBF9F5] p-5" aria-label={`${route.title} payment instructions`}><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">{route.eyebrow}</p><h3 className="mt-1 font-serif text-xl text-[#1F4E79]">{route.title}</h3><dl className="mt-4 space-y-2 text-sm leading-5 text-slate-700">{route.details.map((detail) => <div key={detail.label} className="flex flex-col gap-0.5 border-b border-[#1F4E79]/10 pb-2 last:border-b-0"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{detail.label}</dt><dd className="font-medium text-slate-900">{detail.value}</dd></div>)}</dl><p className="mt-4 border-l-2 border-amber-400 pl-3 text-xs leading-5 text-slate-700">{route.note}</p></section>)}
+                {paymentGuidance.paymentRoutes.map((route) => <section key={route.id} className="rounded-xl border border-brand/15 bg-paper p-5" aria-label={`${route.title} payment instructions`}><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">{route.eyebrow}</p><h3 className="mt-1 font-serif text-xl text-brand">{route.title}</h3><dl className="mt-4 space-y-2 text-sm leading-5 text-slate-700">{route.details.map((detail) => <div key={detail.label} className="flex flex-col gap-0.5 border-b border-brand/10 pb-2 last:border-b-0"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{detail.label}</dt><dd className="font-medium text-slate-900">{detail.value}</dd></div>)}</dl><p className="mt-4 border-l-2 border-amber-400 pl-3 text-xs leading-5 text-slate-700">{route.note}</p></section>)}
               </div>
               <p className="text-sm leading-6 text-slate-600">{paymentGuidance.confirmationNote} Payment-receipt upload and session selection become available after you acknowledge your engagement brief.</p>
             </CardContent>
           </Card>}
-          <Card className="border-[#1F4E79] bg-[#1F4E79] text-white shadow-lg">
+          <Card className="border-brand bg-brand text-white shadow-lg">
             <CardHeader>
               <CardTitle className="font-serif text-2xl text-white">Acknowledge and continue</CardTitle>
               <CardDescription className="leading-6 text-blue-100">{brief.consentStatement}</CardDescription>
@@ -258,7 +258,7 @@ export default function ParticipantDashboard() {
               <Button
                 disabled={!hasReadBrief || acknowledgeBriefMutation.isPending}
                 onClick={() => acknowledgeBriefMutation.mutate({ confirmed: true })}
-                className="w-full bg-amber-400 py-6 text-sm font-semibold text-[#1F4E79] hover:bg-amber-300"
+                className="w-full bg-amber-400 py-6 text-sm font-semibold text-brand hover:bg-amber-300"
               >
                 {acknowledgeBriefMutation.isPending ? "Recording your acknowledgement…" : "I have read and consent to the terms"}
                 {!acknowledgeBriefMutation.isPending && <ArrowRight className="ml-2 h-4 w-4" />}
@@ -272,9 +272,9 @@ export default function ParticipantDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF9F5] text-slate-900 font-sans">
+    <div className="min-h-screen bg-paper text-slate-900 font-sans">
       {/* Top Banner */}
-      <header className="bg-[#1F4E79] text-white py-6 px-6 md:px-12 shadow-md">
+      <header className="bg-brand text-white py-6 px-6 md:px-12 shadow-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-2 text-amber-300 text-xs tracking-widest uppercase font-semibold mb-1">
@@ -307,32 +307,32 @@ export default function ParticipantDashboard() {
       <main className="max-w-6xl mx-auto px-6 md:px-12 py-10">
         <Tabs value={activePortalTab} onValueChange={setActivePortalTab} className="gap-8">
           <div className="overflow-x-auto pb-1">
-            <TabsList className="h-auto min-w-max gap-1 bg-[#EAF1F8] p-1.5">
-              <TabsTrigger value="programme" className="px-4 py-2.5 text-[#1F4E79] data-[state=active]:bg-white data-[state=active]:text-[#1F4E79]">Programme</TabsTrigger>
-              <TabsTrigger value="assessment" className="px-4 py-2.5 text-[#1F4E79] data-[state=active]:bg-white data-[state=active]:text-[#1F4E79]">Current State Assessment</TabsTrigger>
-              <TabsTrigger value="payment" className="px-4 py-2.5 text-[#1F4E79] data-[state=active]:bg-white data-[state=active]:text-[#1F4E79]">Payment</TabsTrigger>
-              <TabsTrigger value="documents" className="px-4 py-2.5 text-[#1F4E79] data-[state=active]:bg-white data-[state=active]:text-[#1F4E79]">Documents</TabsTrigger>
-              <TabsTrigger value="sessions" className="px-4 py-2.5 text-[#1F4E79] data-[state=active]:bg-white data-[state=active]:text-[#1F4E79]">Sessions</TabsTrigger>
+            <TabsList className="h-auto min-w-max gap-1 bg-brand-tint p-1.5">
+              <TabsTrigger value="programme" className="px-4 py-2.5 text-brand data-[state=active]:bg-white data-[state=active]:text-brand">Programme</TabsTrigger>
+              <TabsTrigger value="assessment" className="px-4 py-2.5 text-brand data-[state=active]:bg-white data-[state=active]:text-brand">Current State Assessment</TabsTrigger>
+              <TabsTrigger value="payment" className="px-4 py-2.5 text-brand data-[state=active]:bg-white data-[state=active]:text-brand">Payment</TabsTrigger>
+              <TabsTrigger value="documents" className="px-4 py-2.5 text-brand data-[state=active]:bg-white data-[state=active]:text-brand">Documents</TabsTrigger>
+              <TabsTrigger value="sessions" className="px-4 py-2.5 text-brand data-[state=active]:bg-white data-[state=active]:text-brand">Sessions</TabsTrigger>
             </TabsList>
           </div>
 
         {activePortalTab === "programme" && (
           <div className="space-y-10">
-        <Card className="border-[#1F4E79]/20 bg-[#EAF1F8] shadow-sm">
+        <Card className="border-brand/20 bg-brand-tint shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1F4E79]">Brief acknowledged</p>
-                <CardTitle className="mt-1 font-serif text-2xl text-[#1F4E79]">Your next steps</CardTitle>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Brief acknowledged</p>
+                <CardTitle className="mt-1 font-serif text-2xl text-brand">Your next steps</CardTitle>
                 <CardDescription className="mt-2 max-w-2xl leading-6 text-slate-600">Your personalised engagement brief has been recorded. Move through these steps at your own pace; your assessment responses will shape the advisory work around your business.</CardDescription>
               </div>
               <Badge className="w-fit border-emerald-200 bg-emerald-50 text-emerald-800">Acknowledged {engagement.acknowledgedAt ? new Date(engagement.acknowledgedAt).toLocaleDateString() : ""}</Badge>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-lg border border-[#1F4E79]/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-[#1F4E79]">01 · Start here</p><p className="mt-2 text-sm leading-6 text-slate-700">Complete the Current State Assessment so {BRAND.facilitatorFirstName} can add depth to the initial diagnosis.</p></div>
-            <div className="rounded-lg border border-[#1F4E79]/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-[#1F4E79]">02 · Confirm commitment</p><p className="mt-2 text-sm leading-6 text-slate-700">Review your payment status and follow the 40/30/30 structure communicated in your brief.</p></div>
-            <div className="rounded-lg border border-[#1F4E79]/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-[#1F4E79]">03 · Choose sessions</p><p className="mt-2 text-sm leading-6 text-slate-700">After the 40% commitment is confirmed, eligible calendar slots open on a first-come, first-served basis.</p></div>
+            <div className="rounded-lg border border-brand/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-brand">01 · Start here</p><p className="mt-2 text-sm leading-6 text-slate-700">Complete the Current State Assessment so {BRAND.facilitatorFirstName} can add depth to the initial diagnosis.</p></div>
+            <div className="rounded-lg border border-brand/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-brand">02 · Confirm commitment</p><p className="mt-2 text-sm leading-6 text-slate-700">Review your payment status and follow the 40/30/30 structure communicated in your brief.</p></div>
+            <div className="rounded-lg border border-brand/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-brand">03 · Choose sessions</p><p className="mt-2 text-sm leading-6 text-slate-700">After the 40% commitment is confirmed, eligible calendar slots open on a first-come, first-served basis.</p></div>
           </CardContent>
         </Card>
 
@@ -342,22 +342,22 @@ export default function ParticipantDashboard() {
         />
 
         {referralShare && (
-          <Card className="border-[#1F4E79]/20 bg-white shadow-sm">
+          <Card className="border-brand/20 bg-white shadow-sm">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{BRAND.programmeShortName} community introduction</p>
-                  <CardTitle className="mt-1 flex items-center gap-2 font-serif text-2xl text-[#1F4E79]"><Share2 className="h-5 w-5" />Share this programme with someone</CardTitle>
+                  <CardTitle className="mt-1 flex items-center gap-2 font-serif text-2xl text-brand"><Share2 className="h-5 w-5" />Share this programme with someone</CardTitle>
                   <CardDescription className="mt-2 max-w-3xl leading-6 text-slate-600">If you know a business leader who may genuinely benefit, kindly share your personal programme link. We will record the introduction when they apply; any credit is reviewed by {BRAND.facilitatorFirstName}, never applied automatically.</CardDescription>
                 </div>
                 <Badge className="w-fit border-amber-200 bg-amber-50 text-amber-900"><Gift className="mr-1 h-3.5 w-3.5" />{referralShare.availableCreditSlots} credit {referralShare.availableCreditSlots === 1 ? "place" : "places"} available</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border border-[#1F4E79]/10 bg-[#F2F6FA] p-4 text-sm leading-6 text-[#1F4E79]">{referralShare.policySummary}</div>
+              <div className="rounded-lg border border-brand/10 bg-brand-tint-soft p-4 text-sm leading-6 text-brand">{referralShare.policySummary}</div>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button onClick={copyReferralLink} variant="outline" className="border-[#1F4E79]/30 text-[#1F4E79] hover:bg-[#EAF1F8]"><Copy className="mr-2 h-4 w-4" />{referralLinkCopied ? "Personal link copied" : "Copy my personal link"}</Button>
-                <Button asChild className="bg-[#1F4E79] text-white hover:bg-[#153554]"><a href={`https://wa.me/?text=${encodeURIComponent(`I thought this ${BRAND.programmeName} programme may be useful for your business. Kindly take a look here: ${referralShare.shareUrl}`)}`} target="_blank" rel="noreferrer"><Share2 className="mr-2 h-4 w-4" />Share by WhatsApp</a></Button>
+                <Button onClick={copyReferralLink} variant="outline" className="border-brand/30 text-brand hover:bg-brand-tint"><Copy className="mr-2 h-4 w-4" />{referralLinkCopied ? "Personal link copied" : "Copy my personal link"}</Button>
+                <Button asChild className="bg-brand text-white hover:bg-brand-deep-hover"><a href={`https://wa.me/?text=${encodeURIComponent(`I thought this ${BRAND.programmeName} programme may be useful for your business. Kindly take a look here: ${referralShare.shareUrl}`)}`} target="_blank" rel="noreferrer"><Share2 className="mr-2 h-4 w-4" />Share by WhatsApp</a></Button>
               </div>
               {referralShare.referrals.length > 0 && <p className="text-xs leading-5 text-slate-500">Your recorded introductions: {referralShare.referrals.length}. Approved referral credits: {referralShare.approvedCount}.</p>}
             </CardContent>
@@ -367,42 +367,42 @@ export default function ParticipantDashboard() {
         )}
 
         {activePortalTab === "payment" && paymentGuidance && (
-          <Card className="border-[#1F4E79]/20 bg-white shadow-sm" aria-labelledby="payment-guidance-heading">
+          <Card className="border-brand/20 bg-white shadow-sm" aria-labelledby="payment-guidance-heading">
             <CardHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Private payment guidance</p>
-                  <CardTitle id="payment-guidance-heading" className="mt-1 font-serif text-2xl text-[#1F4E79]">Confirm your commitment</CardTitle>
+                  <CardTitle id="payment-guidance-heading" className="mt-1 font-serif text-2xl text-brand">Confirm your commitment</CardTitle>
                   <CardDescription className="mt-2 max-w-3xl leading-6">Your selected {paymentGuidance.packageName} pathway follows a {paymentGuidance.structure} structure. Kindly select the private Nigeria, UK, or U.S. route that is most suitable for you, then submit your confirmation below.</CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-2"><Badge className="w-fit border-amber-200 bg-amber-50 text-amber-900">Payment awaiting confirmation</Badge><Button type="button" variant="outline" size="sm" onClick={() => setIsPricingRequestOpen(true)} className="border-[#1F4E79]/30 text-xs text-[#1F4E79] hover:bg-[#EAF1F8]">Request programme pricing</Button></div>
+                <div className="flex flex-wrap items-center gap-2"><Badge className="w-fit border-amber-200 bg-amber-50 text-amber-900">Payment awaiting confirmation</Badge><Button type="button" variant="outline" size="sm" onClick={() => setIsPricingRequestOpen(true)} className="border-brand/30 text-xs text-brand hover:bg-brand-tint">Request programme pricing</Button></div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#FBF9F5] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Programme fee</p><p className="mt-1 font-serif text-lg text-[#1F4E79]">{paymentGuidance.fullProgrammeFee}</p></div>
+                <div className="rounded-lg border border-brand/10 bg-paper p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Programme fee</p><p className="mt-1 font-serif text-lg text-brand">{paymentGuidance.fullProgrammeFee}</p></div>
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-amber-800">First commitment · 40%</p><p className="mt-1 font-serif text-lg text-amber-950">{paymentGuidance.commitmentPayment}</p></div>
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#FBF9F5] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">End September · 30%</p><p className="mt-1 font-serif text-lg text-[#1F4E79]">{paymentGuidance.firstInstalment}</p></div>
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#FBF9F5] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mid October · 30%</p><p className="mt-1 font-serif text-lg text-[#1F4E79]">{paymentGuidance.secondInstalment}</p></div>
+                <div className="rounded-lg border border-brand/10 bg-paper p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">End September · 30%</p><p className="mt-1 font-serif text-lg text-brand">{paymentGuidance.firstInstalment}</p></div>
+                <div className="rounded-lg border border-brand/10 bg-paper p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mid October · 30%</p><p className="mt-1 font-serif text-lg text-brand">{paymentGuidance.secondInstalment}</p></div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-lg border-l-4 border-l-amber-400 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><strong>10% full-upfront option:</strong> {paymentGuidance.fullUpfrontFee}. {paymentGuidance.fullUpfrontNote}</div>
-                <div className="rounded-lg border-l-4 border-l-[#1F4E79] bg-[#F2F6FA] p-4 text-sm leading-6 text-[#1F4E79]"><strong>Private payment instructions:</strong> {paymentGuidance.paymentInstructions}</div>
+                <div className="rounded-lg border-l-4 border-l-brand bg-brand-tint-soft p-4 text-sm leading-6 text-brand"><strong>Private payment instructions:</strong> {paymentGuidance.paymentInstructions}</div>
               </div>
 
-              <section className="rounded-xl border border-[#1F4E79]/15 bg-[#FBF9F5] p-5" aria-labelledby="paystack-payment-table-heading">
+              <section className="rounded-xl border border-brand/15 bg-paper p-5" aria-labelledby="paystack-payment-table-heading">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Paystack checkout</p>
-                    <h3 id="paystack-payment-table-heading" className="mt-1 font-serif text-xl text-[#1F4E79]">Approved payment table</h3>
+                    <h3 id="paystack-payment-table-heading" className="mt-1 font-serif text-xl text-brand">Approved payment table</h3>
                   </div>
                   <p className="max-w-xl text-xs leading-5 text-slate-600">Choose the row for your selected pathway and payment option. The full-payment rows include the approved 10% discount. Please confirm the amount and currency at checkout before paying.</p>
                 </div>
                 <div className="mt-4 overflow-x-auto">
                   <Table className="min-w-[680px]">
                     <TableHeader>
-                      <TableRow className="border-[#1F4E79]/15 hover:bg-transparent">
+                      <TableRow className="border-brand/15 hover:bg-transparent">
                         <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tier</TableHead>
                         <TableHead className="text-xs uppercase tracking-wide text-slate-500">Payment option</TableHead>
                         <TableHead className="text-right text-xs uppercase tracking-wide text-slate-500">Naira</TableHead>
@@ -412,12 +412,12 @@ export default function ParticipantDashboard() {
                     </TableHeader>
                     <TableBody>
                       {paymentGuidance.paystackOptions.map((option) => (
-                        <TableRow key={`${option.packageName}-${option.lineItem}`} className={option.packageName === paymentGuidance.packageName ? "border-[#1F4E79]/15 bg-white" : "border-[#1F4E79]/10"}>
-                          <TableCell className="font-medium text-[#1F4E79]">{option.packageName}{option.packageName === paymentGuidance.packageName && <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">Your pathway</span>}</TableCell>
+                        <TableRow key={`${option.packageName}-${option.lineItem}`} className={option.packageName === paymentGuidance.packageName ? "border-brand/15 bg-white" : "border-brand/10"}>
+                          <TableCell className="font-medium text-brand">{option.packageName}{option.packageName === paymentGuidance.packageName && <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">Your pathway</span>}</TableCell>
                           <TableCell className="text-slate-700">{option.lineItem}</TableCell>
                           <TableCell className="text-right font-medium text-slate-900">{option.naira}</TableCell>
                           <TableCell className="text-right font-medium text-slate-900">{option.usd}</TableCell>
-                          <TableCell className="text-right"><Button asChild type="button" size="sm" className="bg-[#1F4E79] text-white hover:bg-[#153554]"><a href={option.url} target="_blank" rel="noreferrer">Pay with Paystack <ExternalLink className="ml-1 h-3 w-3" /></a></Button></TableCell>
+                          <TableCell className="text-right"><Button asChild type="button" size="sm" className="bg-brand text-white hover:bg-brand-deep-hover"><a href={option.url} target="_blank" rel="noreferrer">Pay with Paystack <ExternalLink className="ml-1 h-3 w-3" /></a></Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -426,24 +426,24 @@ export default function ParticipantDashboard() {
               </section>
 
               <div className="space-y-4">
-                <section className="rounded-xl border border-[#1F4E79]/15 bg-[#F2F6FA] p-5" aria-labelledby="north-america-paystack-heading">
+                <section className="rounded-xl border border-brand/15 bg-brand-tint-soft p-5" aria-labelledby="north-america-paystack-heading">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">North America · USD</p>
-                  <h3 id="north-america-paystack-heading" className="mt-1 font-serif text-xl text-[#1F4E79]">Paystack <span className="font-sans text-sm font-semibold tracking-normal text-slate-600">(Payments in North America)</span></h3>
+                  <h3 id="north-america-paystack-heading" className="mt-1 font-serif text-xl text-brand">Paystack <span className="font-sans text-sm font-semibold tracking-normal text-slate-600">(Payments in North America)</span></h3>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">Use the approved Paystack checkout link in the table above that matches your pathway and payment option. The amounts include the approved 10% discount where full payment is selected.</p>
                 </section>
 
                 <section aria-labelledby="other-payment-options-heading">
                   <div className="mb-3 flex items-center gap-3">
-                    <div className="h-px flex-1 bg-[#1F4E79]/15" />
-                    <h3 id="other-payment-options-heading" className="font-serif text-xl text-[#1F4E79]">Other payment options</h3>
-                    <div className="h-px flex-1 bg-[#1F4E79]/15" />
+                    <div className="h-px flex-1 bg-brand/15" />
+                    <h3 id="other-payment-options-heading" className="font-serif text-xl text-brand">Other payment options</h3>
+                    <div className="h-px flex-1 bg-brand/15" />
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
-                    {paymentGuidance.paymentRoutes.filter((route) => route.id !== "north_america").map((route) => <section key={route.id} className="rounded-xl border border-[#1F4E79]/15 bg-[#FBF9F5] p-5" aria-label={`${route.title} payment instructions`}>
+                    {paymentGuidance.paymentRoutes.filter((route) => route.id !== "north_america").map((route) => <section key={route.id} className="rounded-xl border border-brand/15 bg-paper p-5" aria-label={`${route.title} payment instructions`}>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">{route.eyebrow}</p>
-                      <h3 className="mt-1 font-serif text-xl text-[#1F4E79]">{route.title}</h3>
+                      <h3 className="mt-1 font-serif text-xl text-brand">{route.title}</h3>
                       <dl className="mt-4 space-y-2 text-sm leading-5 text-slate-700">
-                        {route.details.map((detail) => <div key={detail.label} className="flex flex-col gap-0.5 border-b border-[#1F4E79]/10 pb-2 last:border-b-0"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{detail.label}</dt><dd className="font-medium text-slate-900">{detail.value}</dd></div>)}
+                        {route.details.map((detail) => <div key={detail.label} className="flex flex-col gap-0.5 border-b border-brand/10 pb-2 last:border-b-0"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{detail.label}</dt><dd className="font-medium text-slate-900">{detail.value}</dd></div>)}
                       </dl>
                       <p className="mt-4 border-l-2 border-amber-400 pl-3 text-xs leading-5 text-slate-700">{route.note}</p>
                     </section>)}
@@ -478,7 +478,7 @@ export default function ParticipantDashboard() {
                   <input
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xlsx,.xls,.txt"
-                    className="block w-full text-sm text-emerald-900 file:mr-4 file:rounded-md file:border-0 file:bg-[#1F4E79] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#153554]"
+                    className="block w-full text-sm text-emerald-900 file:mr-4 file:rounded-md file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-deep-hover"
                     disabled={isReceiptUploading || submitPaymentReceiptMutation.isPending}
                     onChange={async (event) => {
                       const file = event.target.files?.[0];
@@ -526,24 +526,24 @@ export default function ParticipantDashboard() {
         {activePortalTab === "documents" && (
           <div className="space-y-10">
         {/* Optional supporting documents */}
-        <Card className="border-[#1F4E79]/20 bg-white shadow-sm border-l-4 border-l-[#1F4E79]">
+        <Card className="border-brand/20 bg-white shadow-sm border-l-4 border-l-brand">
           <CardHeader>
-            <CardTitle className="font-serif text-xl text-[#1F4E79] flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#1F4E79]" /> Optional Supporting Documents
+            <CardTitle className="font-serif text-xl text-brand flex items-center gap-2">
+              <FileText className="w-5 h-5 text-brand" /> Optional Supporting Documents
             </CardTitle>
             <CardDescription>
               Your structured diagnostic is completed in this portal. Use this optional space only if you already have a file or information that would add useful context to your engagement.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg bg-[#F2F6FA] px-4 py-3 text-sm leading-6 text-[#1F4E79]">
+            <div className="rounded-lg bg-brand-tint-soft px-4 py-3 text-sm leading-6 text-brand">
               You may share an existing business plan, pitch deck, financial information, research, business model canvas, working notes, or another relevant document. <strong>No upload is required</strong> to complete your diagnosis or continue in {BRAND.programmeShortName}.
             </div>
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <input
                 type="file"
                 id="assignment-file-input"
-                className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[#1F4E79]/10 file:text-[#1F4E79] hover:file:bg-[#1F4E79]/20 cursor-pointer"
+                className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -585,16 +585,16 @@ export default function ParticipantDashboard() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Documents You Have Shared</p>
                 <div className="space-y-2">
                   {(assignments ?? []).map((asgn) => (
-                    <div key={asgn.id} className="flex items-center justify-between bg-[#FBF9F5] p-3 rounded-lg border border-slate-200">
+                    <div key={asgn.id} className="flex items-center justify-between bg-paper p-3 rounded-lg border border-slate-200">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#1F4E79]" />
+                        <FileText className="w-4 h-4 text-brand" />
                         <span className="text-sm font-medium text-slate-800">{asgn.fileName}</span>
                         <span className="text-xs text-slate-400">({new Date(asgn.createdAt).toLocaleDateString()})</span>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-[#1F4E79] border-[#1F4E79]"
+                        className="text-brand border-brand"
                         onClick={() => window.open(asgn.fileUrl, "_blank")}
                       >
                         View Submission <ExternalLink className="w-3 h-3 ml-1" />
@@ -611,7 +611,7 @@ export default function ParticipantDashboard() {
 
         {activePortalTab === "assessment" && (
           <div className="space-y-5">
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] px-5 py-4 text-sm leading-6 text-[#163859]">
+            <div className="rounded-xl border border-brand/15 bg-brand-tint px-5 py-4 text-sm leading-6 text-brand-deep">
               <strong className="font-semibold">Current State Assessment.</strong> This workspace is solely for your diagnostic. Answer one section at a time; your progress is saved quietly, and every completed section opens the next.
             </div>
             <StructuredDiagnostic />
@@ -622,11 +622,11 @@ export default function ParticipantDashboard() {
           <div className="space-y-4">
         {/* Scheduled Google Meet Sessions */}
           <div className="space-y-1">
-            <h2 className="font-serif text-2xl text-[#1F4E79]">Your Scheduled Sessions & Google Meet Links</h2>
+            <h2 className="font-serif text-2xl text-brand">Your Scheduled Sessions & Google Meet Links</h2>
             <p className="text-sm leading-6 text-slate-600">Confirmed meeting links will appear here as they are released for your engagement.</p>
           </div>
 
-          <Card className="overflow-hidden border-[#1F4E79]/25 bg-white shadow-sm">
+          <Card className="overflow-hidden border-brand/25 bg-white shadow-sm">
             <div className="h-1.5 bg-amber-400" />
             <CardHeader className="pb-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -634,7 +634,7 @@ export default function ParticipantDashboard() {
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
                     <Calendar className="h-4 w-4" /> Foundation opening class
                   </div>
-                  <CardTitle className="mt-2 font-serif text-2xl text-[#1F4E79]">{BRAND.programmeName} Foundation · First Class</CardTitle>
+                  <CardTitle className="mt-2 font-serif text-2xl text-brand">{BRAND.programmeName} Foundation · First Class</CardTitle>
                   <CardDescription className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     The {BRAND.programmeName} cohort begins with a shared Foundation class. Every pathway includes this Foundation experience; it establishes the common strategic language for the advisory work ahead.
                   </CardDescription>
@@ -644,22 +644,22 @@ export default function ParticipantDashboard() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 text-sm sm:grid-cols-3">
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#F2F6FA] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[#1F4E79]">Time</p><p className="mt-1 font-medium text-slate-900">9:00 pm</p><p className="mt-1 text-xs text-slate-600">Lagos time · Sunday, 6 September</p></div>
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#F2F6FA] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[#1F4E79]">Format</p><p className="mt-1 font-medium text-slate-900">Live shared cohort class</p><p className="mt-1 text-xs text-slate-600">Meeting access will appear here when released</p></div>
-                <div className="rounded-lg border border-[#1F4E79]/10 bg-[#F2F6FA] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[#1F4E79]">If you miss it</p><p className="mt-1 font-medium text-slate-900">Recording available</p><p className="mt-1 text-xs text-slate-600">Shared after the live class for catch-up</p></div>
+                <div className="rounded-lg border border-brand/10 bg-brand-tint-soft p-4"><p className="text-xs font-semibold uppercase tracking-wide text-brand">Time</p><p className="mt-1 font-medium text-slate-900">9:00 pm</p><p className="mt-1 text-xs text-slate-600">Lagos time · Sunday, 6 September</p></div>
+                <div className="rounded-lg border border-brand/10 bg-brand-tint-soft p-4"><p className="text-xs font-semibold uppercase tracking-wide text-brand">Format</p><p className="mt-1 font-medium text-slate-900">Live shared cohort class</p><p className="mt-1 text-xs text-slate-600">Meeting access will appear here when released</p></div>
+                <div className="rounded-lg border border-brand/10 bg-brand-tint-soft p-4"><p className="text-xs font-semibold uppercase tracking-wide text-brand">If you miss it</p><p className="mt-1 font-medium text-slate-900">Recording available</p><p className="mt-1 text-xs text-slate-600">Shared after the live class for catch-up</p></div>
               </div>
-              <div className="rounded-lg border-l-4 border-l-[#1F4E79] bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">
+              <div className="rounded-lg border-l-4 border-l-brand bg-brand-tint p-4 text-sm leading-6 text-brand-deep">
                 <strong>Schedule note.</strong> {BRAND.facilitatorFirstName} will share any necessary adjustment at least 72 hours in advance, with a revised date advised. Further Foundation, Engine Room, and Boardroom sessions will be added here as their dates and meeting access are confirmed.
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-[#1F4E79]/20 bg-white shadow-sm">
+          <Card className="border-brand/20 bg-white shadow-sm">
             <CardHeader className="pb-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Foundation classes</p>
-                  <CardTitle className="mt-1 font-serif text-2xl text-[#1F4E79]">Your five shared Foundation sessions</CardTitle>
+                  <CardTitle className="mt-1 font-serif text-2xl text-brand">Your five shared Foundation sessions</CardTitle>
                   <CardDescription className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These are the five Foundation classes currently scheduled for the {BRAND.programmeName} group. All times are Lagos time. Meeting access will appear here when released.</CardDescription>
                 </div>
                 <Badge className="w-fit border-amber-200 bg-amber-50 text-amber-950">5 classes</Badge>
@@ -668,9 +668,9 @@ export default function ParticipantDashboard() {
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {FOUNDATION_CLASSES.map((session) => (
-                  <div key={session.date} className="border border-[#1F4E79]/10 bg-[#F2F6FA] p-4">
+                  <div key={session.date} className="border border-brand/10 bg-brand-tint-soft p-4">
                     <p className="text-sm font-semibold leading-5 text-slate-900">{session.date}</p>
-                    <p className="mt-2 text-xs font-medium text-[#1F4E79]">{session.time} · Africa/Lagos</p>
+                    <p className="mt-2 text-xs font-medium text-brand">{session.time} · Africa/Lagos</p>
                   </div>
                 ))}
               </div>
@@ -689,10 +689,10 @@ export default function ParticipantDashboard() {
                 const startDate = new Date(booking.startAt);
                 const endDate = new Date(booking.endAt);
                 return (
-                  <Card key={booking.id} className="border-[#1F4E79]/20 bg-white shadow-sm hover:shadow-md transition-shadow">
+                  <Card key={booking.id} className="border-brand/20 bg-white shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-start">
-                        <Badge className="bg-[#1F4E79] text-white font-normal">
+                        <Badge className="bg-brand text-white font-normal">
                           {booking.kind} Session #{booking.sessionNumber}
                         </Badge>
                         <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded">
@@ -703,7 +703,7 @@ export default function ParticipantDashboard() {
                         {startDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}
                       </CardTitle>
                       <CardDescription className="text-slate-600 flex items-center gap-2 pt-1">
-                        <Clock className="w-4 h-4 text-[#1F4E79]" />
+                        <Clock className="w-4 h-4 text-brand" />
                         {startDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – {endDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ({booking.timezone})
                       </CardDescription>
                     </CardHeader>
@@ -727,7 +727,7 @@ export default function ParticipantDashboard() {
           <div className="space-y-4">
         {/* Uploaded Briefs & Documents */}
         <div className="space-y-4">
-          <h2 className="font-serif text-2xl text-[#1F4E79]">Your Engagement Briefs & Diagnostic Documents</h2>
+          <h2 className="font-serif text-2xl text-brand">Your Engagement Briefs & Diagnostic Documents</h2>
 
           {briefs.length === 0 ? (
             <Card className="border-dashed border-slate-300 bg-white/50 p-8 text-center space-y-3">
@@ -740,10 +740,10 @@ export default function ParticipantDashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {briefs.map((brief) => (
-                <Card key={brief.id} className="border-[#1F4E79]/20 bg-white shadow-sm">
+                <Card key={brief.id} className="border-brand/20 bg-white shadow-sm">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
-                      <Badge variant="outline" className="text-[#1F4E79] border-[#1F4E79]">
+                      <Badge variant="outline" className="text-brand border-brand">
                         {brief.fileType.toUpperCase()} Document
                       </Badge>
                       <span className="text-xs text-slate-400">
@@ -762,7 +762,7 @@ export default function ParticipantDashboard() {
                   <CardContent className="pt-2 border-t border-slate-100 mt-2 flex justify-end">
                     <Button
                       size="sm"
-                      className="bg-[#1F4E79] hover:bg-[#163859] text-white"
+                      className="bg-brand hover:bg-brand-deep text-white"
                       onClick={() => window.open(brief.fileUrl, "_blank")}
                     >
                       <FileText className="w-4 h-4 mr-2" /> Download / View Brief <ExternalLink className="w-3 h-3 ml-1 opacity-70" />

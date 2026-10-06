@@ -71,7 +71,7 @@ export default function DashboardLayout({
           <Button
             onClick={() => window.location.href = "/admin/login"}
             size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all bg-[#1F4E79] hover:bg-[#153554] text-white rounded-none uppercase tracking-wider text-xs"
+            className="w-full shadow-lg hover:shadow-xl transition-all bg-brand hover:bg-brand-deep-hover text-white rounded-none uppercase tracking-wider text-xs"
           >
             Go to Admin Sign In
           </Button>

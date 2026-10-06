@@ -41,6 +41,13 @@ export const BRAND = {
   programmeMailbox: "jump@emmanueltarfa.com",
   /** Receives the monitoring copy of operational email and administrative notices. */
   administrationMailbox: "admin@emmanueltarfa.com",
+
+  /**
+   * Brand colours for email HTML and PDFs, which cannot read CSS variables.
+   * Must match --color-brand / --color-brand-deep in client/src/index.css (enforced by brand.test.ts).
+   */
+  colorBrand: "#1F4E79",
+  colorBrandDeep: "#163859",
 } as const;
 
 export type Brand = typeof BRAND;
