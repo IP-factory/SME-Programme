@@ -1,3 +1,4 @@
+import { BRAND } from "./brand";
 export const ADMIN_PERMISSION_DEFINITIONS = [
   {
     id: "view_participants",
@@ -42,7 +43,7 @@ export const ADMIN_PERMISSION_DEFINITIONS = [
   {
     id: "view_communications",
     label: "Review communication history",
-    description: "Read the recorded email history for participant context. Emmanuel retains approval and sending authority.",
+    description: `Read the recorded email history for participant context. ${BRAND.facilitatorFirstName} retains approval and sending authority.`,
   },
   {
     id: "manage_portal_access",

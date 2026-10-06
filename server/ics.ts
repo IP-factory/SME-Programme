@@ -1,3 +1,4 @@
+import { BRAND } from "../shared/brand";
 export interface ICSOptions {
   title: string;
   description: string;
@@ -24,7 +25,7 @@ export function generateICS(options: ICSOptions): string {
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//JUMP 2026 Strategy & Innovation Genius Track//EN",
+    `PRODID:-//${BRAND.programmeFullName}//EN`,
     "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
@@ -38,7 +39,7 @@ export function generateICS(options: ICSOptions): string {
     options.url ? `URL:${options.url}` : "",
     options.organizerName && options.organizerEmail 
       ? `ORGANIZER;CN="${options.organizerName}":mailto:${options.organizerEmail}` 
-      : "ORGANIZER;CN=\"Emmanuel Tarfa | JUMP 2026\":mailto:admin@emmanueltarfa.com",
+      : `ORGANIZER;CN=\"${BRAND.senderDisplayName}\":mailto:${BRAND.administrationMailbox}`,
     "STATUS:CONFIRMED",
     "SEQUENCE:0",
     "BEGIN:VALARM",

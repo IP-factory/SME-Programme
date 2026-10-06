@@ -11,6 +11,7 @@ import { StructuredDiagnostic } from "@/components/StructuredDiagnostic";
 import PricingRequestDialog from "@/components/PricingRequestDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { BRAND } from "@shared/brand";
 
 const FOUNDATION_CLASSES = [
   { date: "Sunday, 6 September 2026", time: "9:00 pm" },
@@ -90,7 +91,7 @@ export default function ParticipantDashboard() {
     onSuccess: () => {
       utils.participant.listPaymentReceipts.invalidate();
       setReceiptNote("");
-      alert("Your payment receipt has been submitted for Emmanuel’s confirmation. Your payment status will not change until it is reviewed.");
+      alert(`Your payment receipt has been submitted for ${BRAND.facilitatorFirstName}’s confirmation. Your payment status will not change until it is reviewed.`);
     },
     onError: (err) => {
       alert("We could not record your payment receipt: " + err.message);
@@ -116,7 +117,7 @@ export default function ParticipantDashboard() {
             </div>
             <CardTitle className="font-serif text-2xl text-[#1F4E79]">Sign in to your private portal</CardTitle>
             <CardDescription>
-              Use your registered email address and JUMP participant password to return to your private portal.
+              Use your registered email address and {BRAND.programmeShortName} participant password to return to your private portal.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pb-6">
@@ -135,7 +136,7 @@ export default function ParticipantDashboard() {
       <div className="min-h-screen bg-[#FBF9F5] flex items-center justify-center p-6">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-[#1F4E79] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="font-serif text-lg text-[#1F4E79]">Loading your JUMP 2026 participant portal...</p>
+          <p className="font-serif text-lg text-[#1F4E79]">Loading your {BRAND.programmeName} participant portal...</p>
         </div>
       </div>
     );
@@ -151,7 +152,7 @@ export default function ParticipantDashboard() {
       <div className="min-h-screen bg-[#FBF9F5] text-slate-900">
         <header className="bg-[#1F4E79] px-6 py-7 text-white shadow-md md:px-12">
           <div className="mx-auto max-w-5xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">JUMP 2026 · Private participant portal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">{BRAND.programmeName} · Private participant portal</p>
             <h1 className="mt-2 font-serif text-3xl">Your engagement brief</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">Review your personalised brief and payment guidance. Acknowledging the brief unlocks the assessment, document sharing, and eligible session selection.</p>
           </div>
@@ -262,7 +263,7 @@ export default function ParticipantDashboard() {
                 {acknowledgeBriefMutation.isPending ? "Recording your acknowledgement…" : "I have read and consent to the terms"}
                 {!acknowledgeBriefMutation.isPending && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
-              <p className="text-center text-xs leading-5 text-blue-100">A dated confirmation will be emailed to you, with Emmanuel’s office copied privately for the programme record.</p>
+              <p className="text-center text-xs leading-5 text-blue-100">A dated confirmation will be emailed to you, with {BRAND.facilitatorFirstName}’s office copied privately for the programme record.</p>
             </CardContent>
           </Card>
         </main>
@@ -277,7 +278,7 @@ export default function ParticipantDashboard() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-2 text-amber-300 text-xs tracking-widest uppercase font-semibold mb-1">
-              <Sparkles className="w-3.5 h-3.5" /> JUMP 2026 Strategy & Innovation Genius Track
+              <Sparkles className="w-3.5 h-3.5" /> {BRAND.programmeFullName}
             </div>
             <h1 className="font-serif text-3xl font-normal tracking-tight">
               Welcome, {applicant.fullName}
@@ -329,7 +330,7 @@ export default function ParticipantDashboard() {
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-lg border border-[#1F4E79]/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-[#1F4E79]">01 · Start here</p><p className="mt-2 text-sm leading-6 text-slate-700">Complete the Current State Assessment so Emmanuel can add depth to the initial diagnosis.</p></div>
+            <div className="rounded-lg border border-[#1F4E79]/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-[#1F4E79]">01 · Start here</p><p className="mt-2 text-sm leading-6 text-slate-700">Complete the Current State Assessment so {BRAND.facilitatorFirstName} can add depth to the initial diagnosis.</p></div>
             <div className="rounded-lg border border-[#1F4E79]/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-[#1F4E79]">02 · Confirm commitment</p><p className="mt-2 text-sm leading-6 text-slate-700">Review your payment status and follow the 40/30/30 structure communicated in your brief.</p></div>
             <div className="rounded-lg border border-[#1F4E79]/10 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-[#1F4E79]">03 · Choose sessions</p><p className="mt-2 text-sm leading-6 text-slate-700">After the 40% commitment is confirmed, eligible calendar slots open on a first-come, first-served basis.</p></div>
           </CardContent>
@@ -345,9 +346,9 @@ export default function ParticipantDashboard() {
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">JUMP community introduction</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{BRAND.programmeShortName} community introduction</p>
                   <CardTitle className="mt-1 flex items-center gap-2 font-serif text-2xl text-[#1F4E79]"><Share2 className="h-5 w-5" />Share this programme with someone</CardTitle>
-                  <CardDescription className="mt-2 max-w-3xl leading-6 text-slate-600">If you know a business leader who may genuinely benefit, kindly share your personal programme link. We will record the introduction when they apply; any credit is reviewed by Emmanuel, never applied automatically.</CardDescription>
+                  <CardDescription className="mt-2 max-w-3xl leading-6 text-slate-600">If you know a business leader who may genuinely benefit, kindly share your personal programme link. We will record the introduction when they apply; any credit is reviewed by {BRAND.facilitatorFirstName}, never applied automatically.</CardDescription>
                 </div>
                 <Badge className="w-fit border-amber-200 bg-amber-50 text-amber-900"><Gift className="mr-1 h-3.5 w-3.5" />{referralShare.availableCreditSlots} credit {referralShare.availableCreditSlots === 1 ? "place" : "places"} available</Badge>
               </div>
@@ -356,7 +357,7 @@ export default function ParticipantDashboard() {
               <div className="rounded-lg border border-[#1F4E79]/10 bg-[#F2F6FA] p-4 text-sm leading-6 text-[#1F4E79]">{referralShare.policySummary}</div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button onClick={copyReferralLink} variant="outline" className="border-[#1F4E79]/30 text-[#1F4E79] hover:bg-[#EAF1F8]"><Copy className="mr-2 h-4 w-4" />{referralLinkCopied ? "Personal link copied" : "Copy my personal link"}</Button>
-                <Button asChild className="bg-[#1F4E79] text-white hover:bg-[#153554]"><a href={`https://wa.me/?text=${encodeURIComponent(`I thought this JUMP 2026 programme may be useful for your business. Kindly take a look here: ${referralShare.shareUrl}`)}`} target="_blank" rel="noreferrer"><Share2 className="mr-2 h-4 w-4" />Share by WhatsApp</a></Button>
+                <Button asChild className="bg-[#1F4E79] text-white hover:bg-[#153554]"><a href={`https://wa.me/?text=${encodeURIComponent(`I thought this ${BRAND.programmeName} programme may be useful for your business. Kindly take a look here: ${referralShare.shareUrl}`)}`} target="_blank" rel="noreferrer"><Share2 className="mr-2 h-4 w-4" />Share by WhatsApp</a></Button>
               </div>
               {referralShare.referrals.length > 0 && <p className="text-xs leading-5 text-slate-500">Your recorded introductions: {referralShare.referrals.length}. Approved referral credits: {referralShare.approvedCount}.</p>}
             </CardContent>
@@ -454,7 +455,7 @@ export default function ParticipantDashboard() {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">After making a transfer</p>
                     <h3 className="mt-1 font-serif text-xl text-emerald-950">Submit your payment receipt</h3>
-                    <p className="mt-1 max-w-2xl text-sm leading-6 text-emerald-900">Kindly upload your bank-transfer receipt or confirmation. It is recorded privately for Emmanuel’s review; uploading it does not automatically mark a payment as confirmed.</p>
+                    <p className="mt-1 max-w-2xl text-sm leading-6 text-emerald-900">Kindly upload your bank-transfer receipt or confirmation. It is recorded privately for {BRAND.facilitatorFirstName}’s review; uploading it does not automatically mark a payment as confirmed.</p>
                   </div>
                   <Badge className="w-fit border-emerald-200 bg-white text-emerald-800">Manual review required</Badge>
                 </div>
@@ -536,7 +537,7 @@ export default function ParticipantDashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg bg-[#F2F6FA] px-4 py-3 text-sm leading-6 text-[#1F4E79]">
-              You may share an existing business plan, pitch deck, financial information, research, business model canvas, working notes, or another relevant document. <strong>No upload is required</strong> to complete your diagnosis or continue in JUMP.
+              You may share an existing business plan, pitch deck, financial information, research, business model canvas, working notes, or another relevant document. <strong>No upload is required</strong> to complete your diagnosis or continue in {BRAND.programmeShortName}.
             </div>
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <input
@@ -575,7 +576,7 @@ export default function ParticipantDashboard() {
               />
               <div className="space-y-1">
                 {isAssignmentUploading && <p className="text-sm text-slate-600">Uploading your private document securely…</p>}
-                {!isAssignmentUploading && <p className="text-xs leading-5 text-slate-500">PDF, Word, Excel, or plain-text documents only; maximum 15 MB. Your document stays private to your JUMP engagement.</p>}
+                {!isAssignmentUploading && <p className="text-xs leading-5 text-slate-500">PDF, Word, Excel, or plain-text documents only; maximum 15 MB. Your document stays private to your {BRAND.programmeShortName} engagement.</p>}
               </div>
             </div>
             {/* List submitted assignments */}
@@ -633,9 +634,9 @@ export default function ParticipantDashboard() {
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
                     <Calendar className="h-4 w-4" /> Foundation opening class
                   </div>
-                  <CardTitle className="mt-2 font-serif text-2xl text-[#1F4E79]">JUMP 2026 Foundation · First Class</CardTitle>
+                  <CardTitle className="mt-2 font-serif text-2xl text-[#1F4E79]">{BRAND.programmeName} Foundation · First Class</CardTitle>
                   <CardDescription className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    The JUMP 2026 cohort begins with a shared Foundation class. Every pathway includes this Foundation experience; it establishes the common strategic language for the advisory work ahead.
+                    The {BRAND.programmeName} cohort begins with a shared Foundation class. Every pathway includes this Foundation experience; it establishes the common strategic language for the advisory work ahead.
                   </CardDescription>
                 </div>
                 <Badge className="w-fit border-amber-200 bg-amber-50 text-amber-950">Sunday, 6 September</Badge>
@@ -648,7 +649,7 @@ export default function ParticipantDashboard() {
                 <div className="rounded-lg border border-[#1F4E79]/10 bg-[#F2F6FA] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[#1F4E79]">If you miss it</p><p className="mt-1 font-medium text-slate-900">Recording available</p><p className="mt-1 text-xs text-slate-600">Shared after the live class for catch-up</p></div>
               </div>
               <div className="rounded-lg border-l-4 border-l-[#1F4E79] bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">
-                <strong>Schedule note.</strong> Emmanuel will share any necessary adjustment at least 72 hours in advance, with a revised date advised. Further Foundation, Engine Room, and Boardroom sessions will be added here as their dates and meeting access are confirmed.
+                <strong>Schedule note.</strong> {BRAND.facilitatorFirstName} will share any necessary adjustment at least 72 hours in advance, with a revised date advised. Further Foundation, Engine Room, and Boardroom sessions will be added here as their dates and meeting access are confirmed.
               </div>
             </CardContent>
           </Card>
@@ -659,7 +660,7 @@ export default function ParticipantDashboard() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Foundation classes</p>
                   <CardTitle className="mt-1 font-serif text-2xl text-[#1F4E79]">Your five shared Foundation sessions</CardTitle>
-                  <CardDescription className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These are the five Foundation classes currently scheduled for the JUMP 2026 group. All times are Lagos time. Meeting access will appear here when released.</CardDescription>
+                  <CardDescription className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These are the five Foundation classes currently scheduled for the {BRAND.programmeName} group. All times are Lagos time. Meeting access will appear here when released.</CardDescription>
                 </div>
                 <Badge className="w-fit border-amber-200 bg-amber-50 text-amber-950">5 classes</Badge>
               </div>
@@ -708,7 +709,7 @@ export default function ParticipantDashboard() {
                     </CardHeader>
                     <CardContent className="pt-0 flex flex-col gap-3 border-t border-slate-100 mt-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="text-xs text-slate-500">
-                        Facilitated by Dr. Emmanuel Tarfa
+                        Facilitated by {BRAND.facilitatorFormalName}
                       </div>
                       <div className="rounded-md bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600" role="status">
                         Verified Google Meet access will appear here when released.
@@ -780,7 +781,7 @@ export default function ParticipantDashboard() {
 
       {/* Footer */}
       <footer className="mt-20 border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500">
-        <p>JUMP 2026 Strategy & Innovation Genius Track • Enzo Krypton • Kindly email Dr. Emmanuel Tarfa directly with a screenshot if you need technical support.</p>
+        <p>{BRAND.programmeFullName} • Enzo Krypton • Kindly email {BRAND.facilitatorFormalName} directly with a screenshot if you need technical support.</p>
       </footer>
     </div>
   );

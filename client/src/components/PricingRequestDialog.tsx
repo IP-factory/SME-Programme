@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { BRAND } from "@shared/brand";
 
 type PricingRequestDialogProps = {
   open: boolean;
@@ -53,12 +54,12 @@ export default function PricingRequestDialog({ open, onOpenChange, source }: Pri
         <DialogHeader>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1F4E79]">Programme office</p>
           <DialogTitle className="font-serif text-3xl">Request programme pricing</DialogTitle>
-          <DialogDescription className="leading-6 text-[#5A5750]">Send a private request to the JUMP programme office. We will review your request and respond with the relevant pathway information.</DialogDescription>
+          <DialogDescription className="leading-6 text-[#5A5750]">Send a private request to the {BRAND.programmeShortName} programme office. We will review your request and respond with the relevant pathway information.</DialogDescription>
         </DialogHeader>
 
         {submitted ? (
           <div className="border border-emerald-200 bg-emerald-50 p-5 text-sm leading-6 text-emerald-950">
-            <p className="font-semibold">Your request has reached the JUMP programme office.</p>
+            <p className="font-semibold">Your request has reached the {BRAND.programmeShortName} programme office.</p>
             <p className="mt-2">Thank you. Kindly watch for a response from the programme team.</p>
             <Button type="button" onClick={() => close(false)} className="mt-5 rounded-none bg-[#1F4E79] text-xs uppercase tracking-wider text-white hover:bg-[#153554]">Close</Button>
           </div>

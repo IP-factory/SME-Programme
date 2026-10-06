@@ -8,6 +8,7 @@ import { ArrowLeft, KeyRound, MailCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { BRAND } from "@shared/brand";
 
 export default function ParticipantPasswordPage() {
   const [, setLocation] = useLocation();
@@ -43,19 +44,19 @@ export default function ParticipantPasswordPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#FBF9F5] p-6 text-[#1A1A1A]">
       <div className="w-full max-w-md space-y-6">
         <button onClick={() => setLocation("/")} className="flex items-center gap-2 text-xs uppercase tracking-widest text-[#1F4E79] hover:underline">
-          <ArrowLeft className="h-4 w-4" />Back to JUMP sign in
+          <ArrowLeft className="h-4 w-4" />Back to {BRAND.programmeShortName} sign in
         </button>
         <Card className="rounded-none border-[#E5E0D5] bg-white shadow-sm">
           <CardHeader className="space-y-3 pb-6">
             <div className="flex h-10 w-10 items-center justify-center bg-[#EAF1F8] text-[#1F4E79]"><MailCheck className="h-5 w-5" /></div>
             <CardTitle className="font-serif text-2xl font-bold tracking-tight">Set your participant password</CardTitle>
-            <CardDescription className="text-sm text-[#6A6760]">This secure email link is single-use. Once complete, use your registered email and password whenever you return to JUMP.</CardDescription>
+            <CardDescription className="text-sm text-[#6A6760]">This secure email link is single-use. Once complete, use your registered email and password whenever you return to {BRAND.programmeShortName}.</CardDescription>
           </CardHeader>
           <CardContent>
             {!token ? (
               <div className="space-y-4 border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
                 <p className="font-semibold">This password link is incomplete.</p>
-                <p>Return to JUMP and request a new secure password link using your registered email address.</p>
+                <p>Return to {BRAND.programmeShortName} and request a new secure password link using your registered email address.</p>
                 <Button onClick={() => setLocation("/")} className="rounded-none bg-[#1F4E79] text-xs uppercase tracking-wider text-white hover:bg-[#153554]">Return to sign in</Button>
               </div>
             ) : (

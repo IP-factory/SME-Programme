@@ -1,3 +1,4 @@
+import { BRAND } from "../../shared/brand";
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
@@ -8,7 +9,7 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
-  emailFrom: process.env.EMAIL_FROM ?? "Emmanuel Tarfa | JUMP 2026 <admin@emmanueltarfa.com>",
+  emailFrom: process.env.EMAIL_FROM ?? `${BRAND.senderDisplayName} <${BRAND.administrationMailbox}>`,
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   googleRefreshToken: process.env.GOOGLE_REFRESH_TOKEN ?? "",
@@ -16,5 +17,5 @@ export const ENV = {
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID ?? "primary",
   paystackPublicKey: process.env.PAYSTACK_PUBLIC_KEY ?? "",
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
-  emailReplyTo: process.env.EMAIL_REPLY_TO ?? "admin@emmanueltarfa.com",
+  emailReplyTo: process.env.EMAIL_REPLY_TO ?? BRAND.administrationMailbox,
 };

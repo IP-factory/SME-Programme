@@ -16,6 +16,7 @@ import { ArrowRight, CheckCircle2, KeyRound, MailCheck, ShieldAlert, Sparkles, U
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { BRAND } from "@shared/brand";
 
 export default function Home() {
   const { user } = useAuth();
@@ -125,7 +126,7 @@ export default function Home() {
       <header className="border-b border-[#E6E2D8] bg-[#FBF9F5]/80 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-20">
           <div className="flex items-center gap-3">
-            <span className="font-serif font-bold text-xl tracking-wider uppercase">JUMP 2026</span>
+            <span className="font-serif font-bold text-xl tracking-wider uppercase">{BRAND.programmeName}</span>
             <span className="hidden sm:inline-block text-xs uppercase tracking-widest px-2.5 py-1 bg-[#1F4E79] text-[#FBF9F5] rounded-full">Cohort 2</span>
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#4A4740]">
@@ -184,13 +185,13 @@ export default function Home() {
           <div className="mt-16 pt-12 border-t border-[#E6E2D8] grid grid-cols-2 md:grid-cols-[1.35fr_1fr_1fr_1fr] gap-8 text-left">
             <div className="col-span-2 md:col-span-1 flex items-center gap-4">
               <img
-                src="/manus-storage/jump-emmanuel-tarfa-portrait_a3b21e44.jpeg"
-                alt="Dr. Emmanuel Tarfa, facilitator of JUMP 2026"
+                src={BRAND.facilitatorPortraitUrl}
+                alt={`${BRAND.facilitatorFormalName}, facilitator of ${BRAND.programmeName}`}
                 className="h-24 w-20 shrink-0 border border-[#D6D0C4] object-cover object-center shadow-[4px_4px_0_0_#1F4E79] sm:h-28 sm:w-24"
               />
               <div>
                 <p className="text-xs uppercase tracking-widest text-[#6A6760] mb-1">Facilitator</p>
-                <p className="font-serif font-bold text-lg leading-tight">Dr. Emmanuel Tarfa</p>
+                <p className="font-serif font-bold text-lg leading-tight">{BRAND.facilitatorFormalName}</p>
                 <p className="mt-1 text-xs leading-relaxed text-[#5A5750]">Partner, Enzo Krypton<br />Strategy &amp; Innovation Advisor</p>
               </div>
             </div>
@@ -218,16 +219,16 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_380px] gap-12 md:gap-16 items-center">
             <div className="flex flex-col sm:flex-row gap-7 items-start">
               <img
-                src="/manus-storage/jump-emmanuel-tarfa-portrait_a3b21e44.jpeg"
-                alt="Dr. Emmanuel Tarfa, facilitator of JUMP 2026"
+                src={BRAND.facilitatorPortraitUrl}
+                alt={`${BRAND.facilitatorFormalName}, facilitator of ${BRAND.programmeName}`}
                 className="w-40 sm:w-48 aspect-[4/5] object-cover border border-[#D6D0C4] shadow-[6px_6px_0_0_#1F4E79]"
               />
               <div className="max-w-xl">
                 <span className="text-xs uppercase tracking-widest text-[#6A6760] font-semibold block mb-3">Facilitator</span>
-                <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-5">Meet Dr. Emmanuel Tarfa</h2>
+                <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-5">Meet {BRAND.facilitatorFormalName}</h2>
                 <p className="font-serif italic text-xl text-[#3A3730] mb-5">Strategy &amp; Innovation Advisor · Partner, Enzo Krypton</p>
                 <p className="text-[#5A5750] leading-relaxed">
-                  Emmanuel brings eighteen years of advisory experience to the room, helping leaders move from business friction to clear strategic decisions, practical architecture, and disciplined execution.
+                  {BRAND.facilitatorFirstName} brings eighteen years of advisory experience to the room, helping leaders move from business friction to clear strategic decisions, practical architecture, and disciplined execution.
                 </p>
               </div>
             </div>
@@ -248,7 +249,7 @@ export default function Home() {
                 Built for founders who are ready to stop guessing.
               </h2>
               <p className="text-[#5A5750] leading-relaxed mb-6">
-                JUMP 2026 is designed for leaders who sense friction in their enterprise but lack a rigorous architecture to diagnose and correct it. You leave with decisive answers, not academic theories.
+                {BRAND.programmeName} is designed for leaders who sense friction in their enterprise but lack a rigorous architecture to diagnose and correct it. You leave with decisive answers, not academic theories.
               </p>
               <div className="p-6 bg-[#EFECE4] border-l-2 border-[#1A1A1A]">
                 <p className="font-serif italic text-sm text-[#3A3730]">
@@ -288,10 +289,10 @@ export default function Home() {
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="text-xs uppercase tracking-widest text-[#6A6760] font-semibold block mb-3">The Classroom</span>
             <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-              How Emmanuel&apos;s Sessions Are Structured
+              How {BRAND.facilitatorFirstName}&apos;s Sessions Are Structured
             </h2>
             <p className="text-[#5A5750]">
-              Every session combines rigorous preparation, targeted masterclass teaching, and direct access to Emmanuel.
+              Every session combines rigorous preparation, targeted masterclass teaching, and direct access to {BRAND.facilitatorFirstName}.
             </p>
           </div>
 
@@ -300,7 +301,7 @@ export default function Home() {
               <span className="absolute -top-4 left-8 px-3 py-1 bg-[#1A1A1A] text-[#FBF9F5] text-xs font-mono uppercase">15 Mins Before</span>
               <h3 className="font-serif font-bold text-2xl mt-4 mb-3">Open Office</h3>
               <p className="text-sm text-[#5A5750] leading-relaxed mb-4">
-                Emmanuel opens the room 15 minutes before class for first-come, first-served questions on the assigned textbook and previous masterclass.
+                {BRAND.facilitatorFirstName} opens the room 15 minutes before class for first-come, first-served questions on the assigned textbook and previous masterclass.
               </p>
               <ul className="text-xs text-[#6A6760] space-y-2">
                 <li>• Two questions only</li>
@@ -456,7 +457,7 @@ export default function Home() {
                 </div>
                 <ul className="space-y-3 text-sm text-[#4A4740] mb-8">
                   <li className="flex items-start gap-2 font-medium">✓ Everything in Engine Room</li>
-                  <li className="flex items-start gap-2">✓ Three private strategy sessions with Emmanuel (90 mins each)</li>
+                  <li className="flex items-start gap-2">✓ Three private strategy sessions with {BRAND.facilitatorFirstName} (90 mins each)</li>
                   <li className="flex items-start gap-2">✓ Written action points after every session</li>
                   <li className="flex items-start gap-2 text-[#1F4E79] font-semibold">✓ Strictly capped at 8 businesses for Cohort 2</li>
                 </ul>
@@ -521,7 +522,7 @@ export default function Home() {
         <DialogContent className="max-w-md bg-[#FBF9F5] border border-[#E6E2D8] text-[#1A1A1A]">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl font-bold">Participant Sign In</DialogTitle>
-            <DialogDescription className="text-xs text-[#5A5750]">Sign in with the email address and password linked to your JUMP participant account.</DialogDescription>
+            <DialogDescription className="text-xs text-[#5A5750]">Sign in with the email address and password linked to your {BRAND.programmeShortName} participant account.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -537,7 +538,7 @@ export default function Home() {
             </div>
             {!isPasswordHelpMode && <div>
               <label className="text-xs uppercase tracking-wider text-[#6A6760] block mb-1 font-semibold">Password</label>
-              <Input type="password" placeholder="Your JUMP participant password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="bg-white border-[#E6E2D8]" autoComplete="current-password" />
+              <Input type="password" placeholder={`Your ${BRAND.programmeShortName} participant password`} value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="bg-white border-[#E6E2D8]" autoComplete="current-password" />
             </div>}
             {signInError && (
               <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
@@ -547,7 +548,7 @@ export default function Home() {
             {passwordLinkSent ? (
               <div className="p-4 bg-green-50 border border-green-200 rounded space-y-3">
                 <p className="text-xs text-green-800 font-medium">
-                  If this email is linked to an eligible JUMP registration, a secure password link will arrive shortly. It lets you set a first password or reset an existing one, and expires in 20 minutes.
+                  If this email is linked to an eligible {BRAND.programmeShortName} registration, a secure password link will arrive shortly. It lets you set a first password or reset an existing one, and expires in 20 minutes.
                 </p>
                 <Button
                   onClick={() => {
@@ -586,7 +587,7 @@ export default function Home() {
       <DiagnosticRegistrationDialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen} selectedPackage={selectedPackage} />
       <footer className="py-12 border-t border-[#E6E2D8] bg-[#FBF9F5]">
         <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-[#6A6760]">
-          <p>© 2026 JUMP Strategy &amp; Innovation Genius Track. Facilitated by Dr. Emmanuel Tarfa.</p>
+          <p>© 2026 {BRAND.programmeShortName} Strategy &amp; Innovation Genius Track. Facilitated by {BRAND.facilitatorFormalName}.</p>
           <div className="flex items-center gap-6">
             <a href="#about" className="hover:text-[#1A1A1A]">About</a>
             <a href="#packages" className="hover:text-[#1A1A1A]">Packages</a>
@@ -601,7 +602,7 @@ export default function Home() {
         <DialogContent className="max-w-xl bg-[#FBF9F5] border border-[#E6E2D8] text-[#1A1A1A] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl font-bold">
-              JUMP 2026 Application — {selectedPackage} Package
+              {BRAND.programmeName} Application — {selectedPackage} Package
             </DialogTitle>
             <DialogDescription className="text-xs text-[#5A5750]">
               Please complete the diagnostic details below. Our team reviews all applications to ensure cohort fit.
@@ -736,7 +737,7 @@ export default function Home() {
                   id="question"
                   value={formData.question}
                   onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-                  placeholder="What specific question or problem would you like Emmanuel to address in session?"
+                  placeholder={`What specific question or problem would you like ${BRAND.facilitatorFirstName} to address in session?`}
                   rows={2}
                   className="bg-[#F4F1E8] border-[#E6E2D8]"
                 />

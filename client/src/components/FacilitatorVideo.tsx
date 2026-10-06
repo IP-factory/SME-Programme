@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BRAND } from "@shared/brand";
 
 declare global {
   interface Window {
@@ -10,9 +11,9 @@ declare global {
   }
 }
 
-const INSTAGRAM_REEL_URL = "https://www.instagram.com/reel/DbIe9w9s_1L/";
+const INSTAGRAM_REEL_URL = BRAND.facilitatorInstagramReelUrl;
 const INSTAGRAM_EMBED_SCRIPT_ID = "instagram-embed-script";
-const DEFAULT_FACILITATOR_POSTER = "/manus-storage/jump-emmanuel-tarfa-portrait_a3b21e44.jpeg";
+const DEFAULT_FACILITATOR_POSTER = BRAND.facilitatorPortraitUrl;
 
 type FacilitatorVideoProps = {
   mp4Url?: string;
@@ -81,7 +82,7 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
             style={{ background: "#FFF", border: 0, margin: "1px", maxWidth: "380px", minWidth: 0, padding: 0, width: "calc(100% - 2px)" }}
           >
             <a href={INSTAGRAM_REEL_URL} target="_blank" rel="noreferrer">
-              View Dr. Emmanuel Tarfa on Instagram
+              View {BRAND.facilitatorFormalName} on Instagram
             </a>
           </blockquote>
         </div>
@@ -91,7 +92,7 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
         </div>
       )}
       <figcaption className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-[#6A6760]">
-        Dr. Emmanuel Tarfa on JUMP 2026
+        {BRAND.facilitatorFormalName} on {BRAND.programmeName}
       </figcaption>
     </figure>
   );

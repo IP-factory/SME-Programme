@@ -1,9 +1,10 @@
 import { ENV } from "./_core/env";
 import { buildPlainTextEmailHtml } from "./emailTemplates";
+import { BRAND } from "../shared/brand";
 
-export const JUMP_PROGRAMME_MAILBOX = "jump@emmanueltarfa.com";
-export const JUMP_PROGRAMME_SENDER = `Emmanuel Tarfa | JUMP 2026 <${JUMP_PROGRAMME_MAILBOX}>`;
-export const JUMP_ADMINISTRATION_MAILBOX = "admin@emmanueltarfa.com";
+export const JUMP_PROGRAMME_MAILBOX = BRAND.programmeMailbox;
+export const JUMP_PROGRAMME_SENDER = `${BRAND.senderDisplayName} <${JUMP_PROGRAMME_MAILBOX}>`;
+export const JUMP_ADMINISTRATION_MAILBOX = BRAND.administrationMailbox;
 /** A single audited copy of each operational JUMP email is retained in the programme administration mailbox. */
 export const JUMP_MONITORING_BCC: string[] = [JUMP_ADMINISTRATION_MAILBOX];
 
@@ -65,7 +66,7 @@ export async function deliverEmail(input: {
   }
 
   const apiKey = ENV.resendApiKey;
-  if (!apiKey) return { status: "Failed", reason: "JUMP programme email delivery is not configured" };
+  if (!apiKey) return { status: "Failed", reason: `${BRAND.programmeShortName} programme email delivery is not configured` };
 
   const html = input.html || buildPlainTextEmailHtml(input.body);
   const from = getJumpProgrammeSender();
@@ -104,6 +105,6 @@ export async function deliverEmail(input: {
     if (response.ok) return { status: "Sent", providerMessageId: data.id };
     return { status: "Failed", reason: data.message || data.name || `Resend API error: HTTP ${response.status}` };
   } catch (error) {
-    return { status: "Failed", reason: error instanceof Error ? error.message : "Unknown error during JUMP email delivery" };
+    return { status: "Failed", reason: error instanceof Error ? error.message : `Unknown error during ${BRAND.programmeShortName} email delivery` };
   }
 }

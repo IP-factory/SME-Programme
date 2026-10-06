@@ -21,6 +21,7 @@ import { deliverEmail, JUMP_MONITORING_BCC } from "../email";
 import { ownerAdminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getTrustedApplicationOrigin } from "../security";
 import { ADMIN_PERMISSION_IDS, isAdminPermission, parseAdminPermissions, serializeAdminPermissions } from "../../shared/adminPermissions";
+import { BRAND } from "../../shared/brand";
 
 const passwordSchema = z.string().min(12).max(160);
 const PASSWORD_RESET_TOKEN_MAX_AGE_MS = 20 * 60 * 1000;
@@ -51,7 +52,7 @@ export const adminAccessRouter = router({
     .input(z.object({ password: passwordSchema, confirmPassword: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user || !isOwnerAdmin(ctx.user) || ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only the recognised JUMP super administrator can create this password." });
+        throw new TRPCError({ code: "FORBIDDEN", message: `Only the recognised ${BRAND.programmeShortName} super administrator can create this password.` });
       }
       if (input.password !== input.confirmPassword) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "The password confirmation does not match." });
@@ -66,14 +67,14 @@ export const adminAccessRouter = router({
         action: "owner_password_enrolled",
         targetEmail: normalizeAdminEmail(ctx.user.email),
       });
-      return { success: true, message: "Your JUMP administrator password is now active." };
+      return { success: true, message: `Your ${BRAND.programmeShortName} administrator password is now active.` };
     }),
 
   verifyPassword: protectedProcedure
     .input(z.object({ password: z.string().min(1).max(160) }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user || ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "This account is not an authorised JUMP administrator." });
+        throw new TRPCError({ code: "FORBIDDEN", message: `This account is not an authorised ${BRAND.programmeShortName} administrator.` });
       }
       const result = await verifyAndRecordAdminPassword(ctx.user.id, input.password);
       if (!result.ok) throw new TRPCError({ code: "UNAUTHORIZED", message: result.reason });
@@ -83,7 +84,7 @@ export const adminAccessRouter = router({
 
   requestPasswordReset: protectedProcedure.mutation(async ({ ctx }) => {
     if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "This account is not an authorised JUMP administrator." });
+      throw new TRPCError({ code: "FORBIDDEN", message: `This account is not an authorised ${BRAND.programmeShortName} administrator.` });
     }
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -107,8 +108,8 @@ export const adminAccessRouter = router({
     const resetUrl = `${baseUrl}/admin/reset?token=${encodeURIComponent(token)}`;
     const delivery = await deliverEmail({
       to: email,
-      subject: "Reset your JUMP administrator password",
-      body: `Hello,\n\nWe received a request to reset the JUMP administrator password for ${email}. Kindly use the secure link below within 20 minutes:\n\n${resetUrl}\n\nFor your protection, this link can be used once. If you did not request this reset, please ignore this email; your existing password will remain unchanged.\n\nEmmanuel Tarfa | JUMP 2026`,
+      subject: `Reset your ${BRAND.programmeShortName} administrator password`,
+      body: `Hello,\n\nWe received a request to reset the ${BRAND.programmeShortName} administrator password for ${email}. Kindly use the secure link below within 20 minutes:\n\n${resetUrl}\n\nFor your protection, this link can be used once. If you did not request this reset, please ignore this email; your existing password will remain unchanged.\n\n${BRAND.senderDisplayName}`,
     });
     if (delivery.status !== "Sent") {
       await db.update(adminPasswordResetTokens).set({ revokedAt: new Date(), deliveryStatus: delivery.status, deliveryMessageId: null }).where(eq(adminPasswordResetTokens.id, resetId));
@@ -157,7 +158,7 @@ export const adminAccessRouter = router({
         targetEmail: normalizeAdminEmail(administrator.email),
         details: JSON.stringify({ resetTokenId: resetToken.id }),
       });
-      return { success: true, message: "Your JUMP administrator password has been reset. Kindly sign in again with your authorised Gmail account." };
+      return { success: true, message: `Your ${BRAND.programmeShortName} administrator password has been reset. Kindly sign in again with your authorised Gmail account.` };
     }),
 
   logoutPassword: protectedProcedure.mutation(async ({ ctx }) => {
@@ -180,7 +181,7 @@ export const adminAccessRouter = router({
       if (email === OWNER_ADMIN_EMAIL) throw new TRPCError({ code: "BAD_REQUEST", message: "The super administrator already has permanent access." });
 
       const existingAdmin = await db.select({ id: users.id }).from(users).where(and(eq(users.email, email), eq(users.role, "admin"))).limit(1);
-      if (existingAdmin.length) throw new TRPCError({ code: "CONFLICT", message: "That email is already an active JUMP administrator." });
+      if (existingAdmin.length) throw new TRPCError({ code: "CONFLICT", message: `That email is already an active ${BRAND.programmeShortName} administrator.` });
 
       const token = randomBytes(32).toString("base64url");
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -201,8 +202,8 @@ export const adminAccessRouter = router({
       const delivery = await deliverEmail({
         to: email,
         bcc: JUMP_MONITORING_BCC,
-        subject: "Invitation to the JUMP 2026 administration console",
-        body: `Hello${name},\n\nEmmanuel Tarfa has invited you to become an administrator for the JUMP 2026 Strategy & Innovation Genius Track. Kindly use the secure link below within seven days. You will sign in with this exact email address and create your own JUMP administrator password.\n\n${invitationUrl}\n\nThis link is personal. Please do not forward it.\n\nEmmanuel Tarfa | JUMP 2026`,
+        subject: `Invitation to the ${BRAND.programmeName} administration console`,
+        body: `Hello${name},\n\n${BRAND.facilitatorName} has invited you to become an administrator for the ${BRAND.programmeFullName}. Kindly use the secure link below within seven days. You will sign in with this exact email address and create your own ${BRAND.programmeShortName} administrator password.\n\n${invitationUrl}\n\nThis link is personal. Please do not forward it.\n\n${BRAND.senderDisplayName}`,
       });
       await db.update(adminInvitations).set({
         deliveryStatus: delivery.status,
@@ -249,7 +250,7 @@ export const adminAccessRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       const target = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
       if (!target[0] || target[0].role !== "admin") throw new TRPCError({ code: "NOT_FOUND", message: "Active administrator not found." });
-      if (isOwnerAdmin(target[0])) throw new TRPCError({ code: "FORBIDDEN", message: "The JUMP super administrator cannot be revoked here." });
+      if (isOwnerAdmin(target[0])) throw new TRPCError({ code: "FORBIDDEN", message: `The ${BRAND.programmeShortName} super administrator cannot be revoked here.` });
       await db.update(users).set({ role: "user" }).where(eq(users.id, target[0].id));
       await db.delete(adminPermissionProfiles).where(eq(adminPermissionProfiles.userId, target[0].id));
       await revokeAdminSessionsForUser(target[0].id);

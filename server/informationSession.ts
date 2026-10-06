@@ -1,7 +1,8 @@
+import { BRAND } from "../shared/brand";
 export const INFORMATION_SESSION = {
   eventId: "jump2026infosessionaug23",
-  subject: "JUMP 2026 — Information Session & Briefing | Sunday, 23 August",
-  summary: "JUMP 2026 Information Session & Briefing",
+  subject: `${BRAND.programmeName} — Information Session & Briefing | Sunday, 23 August`,
+  summary: `${BRAND.programmeName} Information Session & Briefing`,
   meetUrl: "https://meet.google.com/cxp-cgzi-hxm",
   startAt: new Date("2026-08-23T18:00:00.000Z"),
   endAt: new Date("2026-08-23T19:00:00.000Z"),
@@ -18,11 +19,11 @@ export const INFORMATION_SESSION_RECIPIENT_IDS = [
 ] as const;
 
 export function buildInformationSessionCalendarDescription() {
-  return `JUMP 2026 Information Session & Briefing
+  return `${BRAND.programmeName} Information Session & Briefing
 
 Having interacted with some individuals already, I would like to give everyone an opportunity to be properly advised on the programme. This live briefing is a chance to bring the room together, answer practical questions and allow participants to meet one another.
 
-During the session, I will explain what JUMP is designed to achieve, how the advisory journey is structured, and how the participant portal, Current State Assessment, working materials and subsequent sessions fit together.
+During the session, I will explain what ${BRAND.programmeShortName} is designed to achieve, how the advisory journey is structured, and how the participant portal, Current State Assessment, working materials and subsequent sessions fit together.
 
 If you are already clear on what you want and ready to move forward, kindly feel free to continue with your registration, portal consent, payment and any scheduling made available to you. You are still very welcome to attend this Information Session.
 

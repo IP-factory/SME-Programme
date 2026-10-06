@@ -1,4 +1,5 @@
 import { buildBrandedEmailHtml } from "../server/emailTemplates";
+import { BRAND } from "./brand";
 
 export const ENGAGEMENT_BRIEF_VERSION = "2026.2";
 
@@ -25,7 +26,7 @@ const packageAccess: Record<EngagementPackage, { heading: string; summary: strin
   Foundation: {
     heading: "Foundation — the full applied strategy journey",
     summary:
-      "Foundation gives you the complete five-class JUMP experience: structured teaching, live questions, recordings, practical frameworks, slides and curated resources. It is designed for founders who want a serious structure for better strategic choices.",
+      `Foundation gives you the complete five-class ${BRAND.programmeShortName} experience: structured teaching, live questions, recordings, practical frameworks, slides and curated resources. It is designed for founders who want a serious structure for better strategic choices.`,
     included: ["Five live applied strategy classes", "Open Office and deep-dive question time", "Session recordings, slides and curated resources", "A tailored diagnostic direction after your Current State Assessment"],
   },
   "Engine Room": {
@@ -35,9 +36,9 @@ const packageAccess: Record<EngagementPackage, { heading: string; summary: strin
     included: ["Everything in Foundation", "Two additional Engine Room advisory sessions", "Work tailored to the Maker, Trader or Expert commercial model", "Deeper work on positioning, economics and operating choices"],
   },
   Boardroom: {
-    heading: "Boardroom — the complete JUMP advisory engagement",
+    heading: `Boardroom — the complete ${BRAND.programmeShortName} advisory engagement`,
     summary:
-      "Boardroom is the full, cumulative JUMP engagement. It includes Foundation and Engine Room access, plus three private 90-minute strategy sessions with Emmanuel and written action points after each session. It is intentionally limited so that the individual work remains substantive.",
+      `Boardroom is the full, cumulative ${BRAND.programmeShortName} engagement. It includes Foundation and Engine Room access, plus three private 90-minute strategy sessions with ${BRAND.facilitatorFirstName} and written action points after each session. It is intentionally limited so that the individual work remains substantive.`,
     included: ["Everything in Foundation and Engine Room", "Three private 90-minute strategy sessions", "Written action points after each private session", "Priority space for the decisions that matter most to your business"],
   },
 };
@@ -67,7 +68,7 @@ function buildInitialPerspective(input: BriefInput) {
   const question = input.question?.trim();
   const statedContext = description
     ? `You described ${input.businessName} as ${description}`
-    : `You are joining JUMP 2026 with a ${input.businessModel.toLowerCase()} business model.`;
+    : `You are joining ${BRAND.programmeName} with a ${input.businessModel.toLowerCase()} business model.`;
   const questionLine = question
     ? ` You also highlighted this for consideration: “${question}”`
     : "";
@@ -96,12 +97,12 @@ export function getEngagementBrief(input: BriefInput) {
     selectedPackage: input.packageName,
     businessName: input.businessName,
     businessModel: input.businessModel,
-    welcome: `Welcome, ${firstName}. This private brief is for ${input.businessName}. It explains how JUMP 2026 will work with your selected ${input.packageName} pathway before you move into the rest of your participant portal.`,
+    welcome: `Welcome, ${firstName}. This private brief is for ${input.businessName}. It explains how ${BRAND.programmeName} will work with your selected ${input.packageName} pathway before you move into the rest of your participant portal.`,
     initialPerspective: buildInitialPerspective(input),
     programme: {
       heading: "The advisory engagement",
       body:
-        "JUMP 2026 — Strategy & Innovation Genius Track is an applied advisory engagement for one real business, not a generic lecture series. The work is designed to strengthen clarity, improve the quality of decisions, and convert strategic thinking into practical action in your enterprise.",
+        `${BRAND.programmeName} — Strategy & Innovation Genius Track is an applied advisory engagement for one real business, not a generic lecture series. The work is designed to strengthen clarity, improve the quality of decisions, and convert strategic thinking into practical action in your enterprise.`,
       outcomes: [
         "Sharper strategic clarity about what you are building and why it matters",
         "A more disciplined basis for commercial and operating decisions",
@@ -120,11 +121,11 @@ export function getEngagementBrief(input: BriefInput) {
       "Each live session is deliberately structured: the room opens 15 minutes early for focused questions, followed by a 60-minute applied masterclass and a 30-minute deep-dive discussion. The emphasis is on using the ideas against your own business, not merely collecting notes.",
     package: access,
     diagnostic:
-      "The Current State Assessment is your first step after consent. It adds colour and detail to your application so that Emmanuel can understand your founder context, business, market and strategic constraints. Your responses inform the diagnostic and how the engagement is shaped; they do not repeat your registration questions.",
+      `The Current State Assessment is your first step after consent. It adds colour and detail to your application so that ${BRAND.facilitatorFirstName} can understand your founder context, business, market and strategic constraints. Your responses inform the diagnostic and how the engagement is shaped; they do not repeat your registration questions.`,
     calendar: {
       heading: "Programme calendar, recordings and flexibility",
       body:
-        "The programme is currently scheduled to open on Friday, 4 September 2026. The live calendar and eligible session slots will be available within this portal. Emmanuel will communicate any unforeseen schedule adjustment at least 72 hours in advance and advise the rescheduled date. Every call will be recorded for participants who miss a session, and an additional make-up class may be arranged where there is significant absence. The process is designed to be flexible while retaining the rigour of the work.",
+        `The programme is currently scheduled to open on Friday, 4 September 2026. The live calendar and eligible session slots will be available within this portal. ${BRAND.facilitatorFirstName} will communicate any unforeseen schedule adjustment at least 72 hours in advance and advise the rescheduled date. Every call will be recorded for participants who miss a session, and an additional make-up class may be arranged where there is significant absence. The process is designed to be flexible while retaining the rigour of the work.`,
     },
     payment: {
       fullFee: naira(fee),
@@ -132,12 +133,12 @@ export function getEngagementBrief(input: BriefInput) {
       second: naira(fee * 0.3),
       final: naira(fee * 0.3),
       upfront: naira(fee * 0.9),
-      body: `Your selected ${input.packageName} package is ${naira(fee)}. The standard payment schedule is a 40% commitment payment of ${naira(fee * 0.4)} before classes begin, 30% (${naira(fee * 0.3)}) by the end of September, and the final 30% (${naira(fee * 0.3)}) by mid-October. A 10% full-upfront discount makes the total ${naira(fee * 0.9)}. Direct-transfer instructions will be confirmed by Emmanuel, while a Paystack payment route for international payments will be made available before the end of the week.`,
+      body: `Your selected ${input.packageName} package is ${naira(fee)}. The standard payment schedule is a 40% commitment payment of ${naira(fee * 0.4)} before classes begin, 30% (${naira(fee * 0.3)}) by the end of September, and the final 30% (${naira(fee * 0.3)}) by mid-October. A 10% full-upfront discount makes the total ${naira(fee * 0.9)}. Direct-transfer instructions will be confirmed by ${BRAND.facilitatorFirstName}, while a Paystack payment route for international payments will be made available before the end of the week.`,
     },
     technicalSupport:
-      "This portal was designed specifically for JUMP 2026 and will continue to improve during the programme. We are transparent that new technology can occasionally have glitches. If you experience a difficulty, kindly take a screenshot and email Emmanuel directly. He reads every participant email and will have the technical team investigate promptly.",
+      `This portal was designed specifically for ${BRAND.programmeName} and will continue to improve during the programme. We are transparent that new technology can occasionally have glitches. If you experience a difficulty, kindly take a screenshot and email ${BRAND.facilitatorFirstName} directly. He reads every participant email and will have the technical team investigate promptly.`,
     consentStatement:
-      "I confirm that I have read this personalised JUMP 2026 engagement brief, understand my selected package and the published payment, recording, scheduling and portal-support arrangements, and consent to proceed to the next steps in my participant portal.",
+      `I confirm that I have read this personalised ${BRAND.programmeName} engagement brief, understand my selected package and the published payment, recording, scheduling and portal-support arrangements, and consent to proceed to the next steps in my participant portal.`,
   };
 }
 
@@ -150,22 +151,22 @@ export function buildConsentConfirmationEmail(input: BriefInput & { acknowledged
   }).format(input.acknowledgedAt);
 
   return {
-    subject: `JUMP 2026 — Your engagement brief acknowledgement`,
-    body: `Dear ${brief.firstName},\n\nI trust this meets you well and in good health.\n\nThis email confirms that on ${date} you read and acknowledged version ${brief.version} of your personalised JUMP 2026 engagement brief for ${brief.businessName}. Your selected pathway is ${brief.selectedPackage}.\n\nYour private payment guidance remains available in your participant portal. Your Current State Assessment is now open, and eligible session scheduling will open after the 40% commitment payment is confirmed. The assessment is the first step in adding the detail that will shape the advisory work around your business.\n\nIf you encounter any technical difficulty, kindly take a screenshot and email Emmanuel directly. He reads every participant email and will ensure the technical team reviews it.\n\nWarm regards,\n\nEmmanuel Tarfa\nFacilitator, JUMP 2026 — Strategy & Innovation Genius Track`,
+    subject: `${BRAND.programmeName} — Your engagement brief acknowledgement`,
+    body: `Dear ${brief.firstName},\n\nI trust this meets you well and in good health.\n\nThis email confirms that on ${date} you read and acknowledged version ${brief.version} of your personalised ${BRAND.programmeName} engagement brief for ${brief.businessName}. Your selected pathway is ${brief.selectedPackage}.\n\nYour private payment guidance remains available in your participant portal. Your Current State Assessment is now open, and eligible session scheduling will open after the 40% commitment payment is confirmed. The assessment is the first step in adding the detail that will shape the advisory work around your business.\n\nIf you encounter any technical difficulty, kindly take a screenshot and email ${BRAND.facilitatorFirstName} directly. He reads every participant email and will ensure the technical team reviews it.\n\nWarm regards,\n\n${BRAND.facilitatorName}\nFacilitator, ${BRAND.programmeName} — Strategy & Innovation Genius Track`,
     html: buildBrandedEmailHtml({
       label: `${brief.selectedPackage} engagement`,
       title: "Your engagement brief is acknowledged",
-      preheader: "Your personalised JUMP 2026 engagement brief acknowledgement is recorded.",
+      preheader: `Your personalised ${BRAND.programmeName} engagement brief acknowledgement is recorded.`,
       greeting: `Dear ${brief.firstName},\n\nI trust this meets you well and in good health.`,
       paragraphs: [
-        `This email confirms that on ${date} you read and acknowledged version ${brief.version} of your personalised JUMP 2026 engagement brief for ${brief.businessName}.`,
+        `This email confirms that on ${date} you read and acknowledged version ${brief.version} of your personalised ${BRAND.programmeName} engagement brief for ${brief.businessName}.`,
         "Your private payment guidance remains available in your participant portal. Your Current State Assessment is now open, and eligible session scheduling will open after the 40% commitment payment is confirmed. The assessment is the first step in adding the detail that will shape the advisory work around your business.",
       ],
       details: [
         { label: "Selected pathway", value: brief.selectedPackage },
         { label: "Engagement brief version", value: brief.version },
       ],
-      footerNote: "If you encounter a technical difficulty, kindly take a screenshot and email Emmanuel directly. He reads every participant email and will ensure the technical team reviews it.",
+      footerNote: `If you encounter a technical difficulty, kindly take a screenshot and email ${BRAND.facilitatorFirstName} directly. He reads every participant email and will ensure the technical team reviews it.`,
     }),
   };
 }

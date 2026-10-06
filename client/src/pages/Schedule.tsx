@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { CalendarDays, Check, CircleAlert, Clock3, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BRAND } from "@shared/brand";
 
 export default function Schedule() {
   const [kind, setKind] = useState<"Decide" | "Learn" | "Apply">("Decide");
@@ -58,7 +59,7 @@ export default function Schedule() {
 
   return <main className="min-h-screen bg-[#FBF9F5] px-4 py-10 text-[#1A1A1A] sm:px-8">
     <div className="mx-auto max-w-5xl space-y-8">
-      <header className="max-w-3xl"><p className="text-[10px] uppercase tracking-[0.22em] text-[#1F4E79]">JUMP 2026 / Private scheduling</p><h1 className="mt-2 font-serif text-4xl font-bold tracking-tight sm:text-5xl">Choose the dates that can work.</h1><p className="mt-4 text-base leading-relaxed text-[#5A5750]">These are the programme team’s live availability windows. A slot is held on a first-come, first-served basis. Dates are displayed in West Africa Time.</p></header>
+      <header className="max-w-3xl"><p className="text-[10px] uppercase tracking-[0.22em] text-[#1F4E79]">{BRAND.programmeName} / Private scheduling</p><h1 className="mt-2 font-serif text-4xl font-bold tracking-tight sm:text-5xl">Choose the dates that can work.</h1><p className="mt-4 text-base leading-relaxed text-[#5A5750]">These are the programme team’s live availability windows. A slot is held on a first-come, first-served basis. Dates are displayed in West Africa Time.</p></header>
       <Card className="rounded-none border-[#C6D7E6] bg-[#EAF1F8] shadow-none"><CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-3"><LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-[#1F4E79]" /><div><p className="font-semibold text-[#1F4E79]">Private booking window</p><p className="mt-1 text-xs leading-relaxed text-[#4A5F73]">{availableQuery.data?.reason ?? "Your availability is managed directly through the programme schedule."}</p></div></div><Badge className="border-[#C6D7E6] bg-[#FBF9F5] text-[#1F4E79]">Coordinated schedule</Badge></CardContent></Card>
         <div className="flex flex-wrap gap-2">{(["Decide", "Learn", "Apply"] as const).map((item) => <Button key={item} type="button" variant="outline" onClick={() => { setKind(item); setSelected([]); }} className={`rounded-none text-xs uppercase tracking-wider ${kind === item ? "border-[#1F4E79] bg-[#1F4E79] text-[#FBF9F5]" : "border-[#C6D7E6] text-[#1F4E79]"}`}>{item}</Button>)}</div>
         <section className="grid gap-6 lg:grid-cols-[1fr_320px]">

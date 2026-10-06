@@ -1,3 +1,4 @@
+import { BRAND } from "../shared/brand";
 export type ParticipantPackage = "Foundation" | "Engine Room" | "Boardroom";
 
 type PrivatePaymentRoute = {
@@ -62,7 +63,7 @@ export function getPrivatePaymentGuidance(packageName: ParticipantPackage, fullN
         { label: "Account number", value: "0021722315" },
         { label: "Bank", value: "Access Bank Nigeria" },
       ],
-      note: "For Naira transfers, kindly use your name as the transfer reference where possible. If you need support before making payment, please email Emmanuel.",
+      note: `For Naira transfers, kindly use your name as the transfer reference where possible. If you need support before making payment, please email ${BRAND.facilitatorFirstName}.`,
     },
     {
       id: "uk_wise",
@@ -89,7 +90,7 @@ export function getPrivatePaymentGuidance(packageName: ParticipantPackage, fullN
     secondInstalment: formatNaira(fee.instalment),
     fullUpfrontFee: formatNaira(fee.fullUpfront),
     fullUpfrontNote: `The full-upfront option applies a 10% discount to the full ${packageName} programme fee. Kindly use the private payment route below that is most suitable for you.`,
-    paymentInstructions: "These payment instructions are visible only inside your authenticated JUMP portal. Kindly use your name as the transfer reference where possible.",
+    paymentInstructions: `These payment instructions are visible only inside your authenticated ${BRAND.programmeShortName} portal. Kindly use your name as the transfer reference where possible.`,
     paymentRoutes,
     confirmationNote: "After making payment using one of the private routes below, submit your receipt here so the programme office can confirm your place and open eligible session scheduling.",
   };

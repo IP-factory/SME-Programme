@@ -13,7 +13,7 @@ describe("JUMP administrator password reset safeguards", () => {
     expect(routerSource).toContain("randomBytes(32)");
     expect(routerSource).toContain("PASSWORD_RESET_TOKEN_MAX_AGE_MS");
     expect(routerSource).toContain("adminPasswordResetTokens");
-    expect(routerSource).toContain('subject: "Reset your JUMP administrator password"');
+    expect(routerSource).toContain("subject: `Reset your ${BRAND.programmeShortName} administrator password`");
     expect(requestSection).not.toContain("bcc:");
   });
 

@@ -28,6 +28,7 @@ import {
   type StructuredDiagnosticDraft,
   type StructuredDiagnosticSectionId,
 } from "../../../shared/structuredDiagnostic";
+import { BRAND } from "@shared/brand";
 
 const BUSINESS_AGE_OPTIONS = ["Pre-launch", "Under 1 year", "1 to 3 years", "3 to 5 years", "More than 5 years"];
 const ENGINE_OPTIONS = ["Makers", "Traders", "Experts"];
@@ -283,7 +284,7 @@ export function StructuredDiagnostic() {
     return <Card className="border-[#1F4E79]/20 bg-white"><CardContent className="p-6 text-sm text-slate-600">Preparing your diagnostic…</CardContent></Card>;
   }
   if (error || !draft) {
-    return <Card className="border-amber-300 bg-amber-50"><CardContent className="p-6 text-sm text-amber-950">We could not prepare the diagnostic just now. Kindly refresh the page; if the issue continues, please send Emmanuel a screenshot.</CardContent></Card>;
+    return <Card className="border-amber-300 bg-amber-50"><CardContent className="p-6 text-sm text-amber-950">We could not prepare the diagnostic just now. Kindly refresh the page; if the issue continues, please send {BRAND.facilitatorFirstName} a screenshot.</CardContent></Card>;
   }
 
   return (
@@ -293,7 +294,7 @@ export function StructuredDiagnostic() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{activeMeta.number} · Section {activeIndex} of {DIAGNOSTIC_SECTION_IDS.length}</p>
             <CardTitle id="structured-diagnostic-heading" className="mt-1 font-serif text-2xl text-[#1F4E79]">{isComplete ? "Diagnostic saved" : activeMeta.title}</CardTitle>
-            <CardDescription className="mt-2 max-w-2xl leading-6">{isComplete ? "Your completed answers are available to Emmanuel for the next stage of the advisory work." : `${activeMeta.duration}. Select the closest answer first; only the optional context prompts require typing.`}</CardDescription>
+            <CardDescription className="mt-2 max-w-2xl leading-6">{isComplete ? `Your completed answers are available to ${BRAND.facilitatorFirstName} for the next stage of the advisory work.` : `${activeMeta.duration}. Select the closest answer first; only the optional context prompts require typing.`}</CardDescription>
           </div>
           <Badge className="w-fit border-[#1F4E79]/20 bg-[#EAF1F8] text-[#1F4E79]">{savedAt ? `Saved ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : saveMutation.isPending ? "Saving…" : "Private draft"}</Badge>
         </div>
@@ -414,7 +415,7 @@ export function StructuredDiagnostic() {
 
         {activeSection === "founder" && (
           <>
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">This section is about the operating reality around the founder—not a personality test. Choose the answer that feels closest today, not the answer you think a business should have. If a question feels premature or unclear, select “I would prefer to explore this in conversation”; it gives Emmanuel useful context without forcing an answer.</div>
+            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">This section is about the operating reality around the founder—not a personality test. Choose the answer that feels closest today, not the answer you think a business should have. If a question feels premature or unclear, select “I would prefer to explore this in conversation”; it gives {BRAND.facilitatorFirstName} useful context without forcing an answer.</div>
             <QuestionCard question="How are you currently carrying the leadership load?" explainer="This helps distinguish a capacity constraint from a strategic or market constraint.">
               <ChoiceGrid options={FOUNDER_CAPACITY_OPTIONS} selected={draft.section4.founderCapacity} onSelect={(value) => updateDraft((current) => ({ ...current, section4: { ...current.section4, founderCapacity: value } }))} />
             </QuestionCard>
@@ -439,7 +440,7 @@ export function StructuredDiagnostic() {
 
         {activeSection === "future" && (
           <>
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">This final section anchors the advisory work in the outcome that matters to you. It is not a promise of a particular business result; it helps Emmanuel shape the questions, priorities, and recommendations around the choices ahead. You may choose to explore an item in conversation where a direction is not yet clear.</div>
+            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">This final section anchors the advisory work in the outcome that matters to you. It is not a promise of a particular business result; it helps {BRAND.facilitatorFirstName} shape the questions, priorities, and recommendations around the choices ahead. You may choose to explore an item in conversation where a direction is not yet clear.</div>
             <QuestionCard question="What planning horizon matters most right now?" explainer="Choose the period within which you most need greater clarity or progress.">
               <ChoiceGrid options={FUTURE_HORIZON_OPTIONS} selected={draft.section5.futureHorizon} onSelect={(value) => updateDraft((current) => ({ ...current, section5: { ...current.section5, futureHorizon: value } }))} />
             </QuestionCard>
@@ -470,7 +471,7 @@ export function StructuredDiagnostic() {
                   <div>
                     <p className="font-semibold">Thank you. Your completed diagnostic has been saved.</p>
                     <p className="mt-1">You may revisit any completed section from the navigator above. When you are ready, use the portal tabs at the top of this page to view your programme, payment status, shared documents, or session information.</p>
-                    <p className="mt-2">Emmanuel will use this record to shape the next stage of your engagement. If you have a question or experience a technical glitch, kindly email him directly with a screenshot.</p>
+                    <p className="mt-2">{BRAND.facilitatorFirstName} will use this record to shape the next stage of your engagement. If you have a question or experience a technical glitch, kindly email him directly with a screenshot.</p>
                   </div>
                 </div>
 

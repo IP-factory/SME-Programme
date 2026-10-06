@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { BRAND } from "../shared/brand";
 
 const source = readFileSync(new URL("../client/src/components/FacilitatorVideo.tsx", import.meta.url), "utf8");
 
@@ -11,7 +12,8 @@ describe("FacilitatorVideo", () => {
     expect(source).toContain("DEFAULT_FACILITATOR_POSTER");
     expect(source).toContain("IntersectionObserver");
     expect(source).toContain("https://www.instagram.com/embed.js");
-    expect(source).toContain("DbIe9w9s_1L");
+    expect(source).toContain("BRAND.facilitatorInstagramReelUrl");
+    expect(BRAND.facilitatorInstagramReelUrl).toContain("DbIe9w9s_1L");
     expect(source).not.toContain("instagram.com/explore");
   });
 });
