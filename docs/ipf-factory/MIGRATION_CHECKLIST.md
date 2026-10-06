@@ -1,6 +1,6 @@
 # IP Factory (IPF) — Migration Checklist & Baseline Audit
 
-**Prepared:** 6 October 2026 · **Updated:** 6 October 2026 (decisions, concept mapping, Phase 2 plan; see §0 and §8–§9)
+**Prepared:** 6 October 2026 · **Updated:** 6 October 2026 (decisions revised for concept note v0.8.1: v0.1 on Manus on 9 Oct, ipf-gradient brand; see §0 and `LAUNCH_ON_MANUS.md`)
 **Scope:** Take-over audit of the migrated JUMP 2026 platform and the plan to turn it into the IP Factory Business Support client area.
 **Companion to:** `IPF_FACTORY_HANDOVER_PLAN.md` (the seven-step route). This document is the engineering view of Steps 2, 4 and 5.
 
@@ -11,10 +11,11 @@
 | # | Decision |
 |---|---|
 | D1 | The organisation is **IP Factory (IPF), Intellectual Property Factory**. "IPF Factory" in the original handover documents is a misnomer. The product name ("Operating Partner", "Growth Desk" or "Next Monday") is set separately per the concept note, by 7 October. |
-| D3 | Brand variant **ipf-teal-navy**: the Option 2 iPF box logo, navy wordmark, teal box. |
+| D3 | Brand variant **ipf-gradient** (Option 1 stacked logo), per concept note v0.8.1. *Changed from ipf-teal-navy on 6 Oct.* |
 | D7 | **Start clean.** No JUMP participant data is migrated. JUMP contacts are reached through the warm list instead. |
-| D9 | **Leave Manus completely.** The platform runs on independent, IPF-owned hosting. |
-| — | **Platform role:** this platform becomes the **Phase 2 private client area, due 8 November 2026 on an IPF domain**. The 8 October Phase 1 front door stays a content site with Calendly and Paystack links, as the concept note specifies. |
+| D9 | **One code base: v0.1 launches on Manus on Friday 9 Oct, then hosting moves off Manus.** Code stays Manus-compatible until then. See `LAUNCH_ON_MANUS.md`. *Revised on 6 Oct, from "leave Manus completely".* |
+| — | **Platform role (v0.8.1):** this code base is IPF's copy of Jump, launching as v0.1 on **Friday 9 October**, with the January portal built on it. |
+| D5 | **Lewis Osako is Super Admin, Richard Kehinde admin** (v0.8.1, D5). |
 
 **Done**
 
@@ -166,13 +167,13 @@ The repository is **private**. No API keys, tokens or connection strings were fo
 |---|---|---|
 | D1 | ✅ **Decided:** IP Factory (Intellectual Property Factory). Product name still to set (concept note, 7 Oct). | Phase 1D copy |
 | D2 | Production domain and the programme mailbox (sender + reply-to) | Phase 1D, email cutover |
-| D3 | ✅ **Decided:** ipf-teal-navy. Typography still open. | Phase 1D (visual) |
+| D3 | ✅ **Decided:** ipf-gradient. Typography still open. | — |
 | D4 | Facilitator model. The concept note implies **IPF-institutional**: roles, not names, unless agreed (§15). Confirm. This drives roughly 60% of the copy. | Phase 2 copy |
-| D5 | Super Admin owner(s) at IPF, and Emmanuel's role after handover | Phase 1B governance |
+| D5 | ✅ **Decided:** Lewis is Super Admin, Richard admin. Set `OWNER_ADMIN_EMAIL` and `OWNER_OPEN_ID` accordingly. | Launch |
 | D6 | IPF payment entity: Paystack merchant and bank-transfer fallback. The price ladder itself is decided in the concept note (§8). Who signs client terms is open (concept note, 8 Nov). | Payments workstream |
 | D7 | ✅ **Decided:** start clean, so no participant data is transferred | — |
 | D8 | PII clean-up approach, including whether to rewrite git history | Phase 0 |
-| D9 | ✅ **Decided:** leave Manus; replatform (§9, workstream R) | — |
+| D9 | ✅ **Decided:** v0.1 on Manus from this code base; move off Manus afterwards (§9, workstream R) | — |
 
 ---
 
@@ -198,6 +199,8 @@ The remaining phases are replaced by the Phase 2 plan in §9. Data migration (ol
 
 ## 8. How the concept note maps onto the platform
 
+> Written against v0.6. v0.8.1 replaces the paid diagnostic with a **free AI business check** plus a paid **Current State**, the sprint with a **six-week fix**, and removes the priced retainer (ongoing support is unpriced). The structural mapping below still holds.
+
 Source: *IPF Business Support — Concept Note and Launch Blueprint v0.6 (final, 4 Oct 2026)*. The concept adds layers to the existing structure rather than replacing it.
 
 | Concept note | Existing platform | Change needed |
@@ -216,6 +219,8 @@ Source: *IPF Business Support — Concept Note and Launch Blueprint v0.6 (final,
 ---
 
 ## 9. Phase 2 plan: client area live on an IPF domain by 8 November 2026
+
+> Superseded in timing by v0.8.1: v0.1 launches on Manus on 9 October (see `LAUNCH_ON_MANUS.md` §4 for the v0.1 gaps). Workstream R now runs after the launch.
 
 Four workstreams. R and B can start now. P depends on the instrument and record content from the IPF team. A closes.
 
