@@ -40,6 +40,7 @@ pnpm dev               # http://localhost:3000
 | `pnpm check` | TypeScript typecheck |
 | `pnpm test` | Unit and UI tests (no network or secrets required) |
 | `pnpm build` | Production client + server bundle into `dist/` |
+| `pnpm build:preview` | Static, clickable preview of the site into `dist/preview` (simulated server; no hosting, database or secrets needed) |
 | `pnpm start` | Run the production bundle |
 | `pnpm db:push` | Generate and apply Drizzle migrations (requires `DATABASE_URL`) |
 
