@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const homeSource = readFileSync(resolve(process.cwd(), "client/src/pages/Home.tsx"), "utf8");
+const homeSource = ["client/src/pages/Home.tsx", "client/src/components/home/HomeSections.tsx"].map((file) => readFileSync(resolve(process.cwd(), file), "utf8")).join("\n");
 const portalSource = readFileSync(resolve(process.cwd(), "client/src/pages/ParticipantDashboard.tsx"), "utf8");
 const dialogSource = readFileSync(resolve(process.cwd(), "client/src/components/PricingRequestDialog.tsx"), "utf8");
 
 describe("Request Programme Pricing entry points", () => {
-  it("places the public request in the sign-up call-to-action group", () => {
-    expect(homeSource).toContain("Request programme pricing");
-    expect(homeSource).toContain('source="public"');
+  it("publishes the journey with its prices on the public page instead of a pricing request", () => {
+    expect(homeSource).toContain("JOURNEY.map");
+    expect(homeSource).not.toContain("PricingRequestDialog");
   });
 
   it("offers the authenticated portal request inside private payment guidance", () => {

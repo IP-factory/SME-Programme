@@ -1,19 +1,32 @@
 import type { NextFunction, Request, Response } from "express";
+import { BRAND } from "../shared/brand";
+import { ENV } from "./_core/env";
 
-const PRIMARY_ORIGIN = "https://emmanueltarfa.com";
-const WWW_ORIGIN = "https://www.emmanueltarfa.com";
+
 const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
-const MANUS_PREVIEW_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.manus\.space$/i;
-const MANUS_COMPUTER_PREVIEW_ORIGIN_PATTERN = /^https:\/\/\d+-[a-z0-9-]+\.[a-z0-9-]+\.manus\.computer$/i;
 
 export function getTrustedApplicationOrigin(nodeEnv = process.env.NODE_ENV) {
-  return nodeEnv === "production" ? PRIMARY_ORIGIN : "http://localhost:3000";
+  return nodeEnv === "production" ? ENV.appOrigin : "http://localhost:3000";
 }
 
 export function isTrustedBrowserOrigin(origin: string | undefined, nodeEnv = process.env.NODE_ENV) {
   if (!origin) return false;
-  if (nodeEnv !== "production") return LOCAL_ORIGIN_PATTERN.test(origin) || MANUS_COMPUTER_PREVIEW_ORIGIN_PATTERN.test(origin);
-  return origin === PRIMARY_ORIGIN || origin === WWW_ORIGIN || MANUS_PREVIEW_ORIGIN_PATTERN.test(origin);
+  if (nodeEnv !== "production") return LOCAL_ORIGIN_PATTERN.test(origin);
+  return origin === ENV.appOrigin || ENV.appAlternateOrigins.includes(origin);
+}
+
+/**
+ * True when the browser's Origin names the same host the request was sent to. A cross-site page
+ * cannot forge this, so it is safe on any domain the app is served from (custom or Manus) without
+ * trusting other sites that share a parent domain.
+ */
+export function isSameHostOrigin(origin: string | undefined, requestHost: string | undefined) {
+  if (!origin || !requestHost) return false;
+  try {
+    return new URL(origin).host.toLowerCase() === requestHost.trim().toLowerCase();
+  } catch {
+    return false;
+  }
 }
 
 export function normalizeStorageProxyKey(rawKey: string) {
@@ -35,6 +48,17 @@ export function participantCanReadPrivateStorageKey(key: string, registrationId:
   return key.startsWith(`participant-assignments/${registrationId}/`) || key.startsWith(`payment-receipts/${registrationId}/`);
 }
 
+/** Origin of the optional self-hosted analytics script (VITE_ANALYTICS_ENDPOINT), allowed by the CSP. */
+function analyticsCspSource() {
+  const endpoint = process.env.VITE_ANALYTICS_ENDPOINT;
+  if (!endpoint) return "";
+  try {
+    return ` ${new URL(endpoint).origin}`;
+  } catch {
+    return "";
+  }
+}
+
 export function applySecurityHeaders(req: Request, res: Response, next: NextFunction) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -43,9 +67,10 @@ export function applySecurityHeaders(req: Request, res: Response, next: NextFunc
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
 
   if (process.env.NODE_ENV === "production") {
+    const analyticsSource = analyticsCspSource();
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com; frame-src https://accounts.google.com https://www.instagram.com;",
+      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com;`,
     );
   }
 
@@ -63,10 +88,11 @@ export function requireTrustedBrowserOrigin(req: Request, res: Response, next: N
 
   const origin = req.get("origin");
   const fetchSite = req.get("sec-fetch-site");
-  if (isTrustedBrowserOrigin(origin) || (!origin && (fetchSite === "same-origin" || fetchSite === "none"))) {
+  const requestHost = req.get("x-forwarded-host")?.split(",")[0] || req.get("host");
+  if (isTrustedBrowserOrigin(origin) || isSameHostOrigin(origin, requestHost) || (!origin && (fetchSite === "same-origin" || fetchSite === "none"))) {
     next();
     return;
   }
 
-  res.status(403).json({ message: "This request was blocked by JUMP security controls." });
+  res.status(403).json({ message: `This request was blocked by ${BRAND.programmeShortName} security controls.` });
 }

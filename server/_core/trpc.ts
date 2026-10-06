@@ -8,6 +8,7 @@ import { getDb } from "../db";
 import { adminPermissionProfiles } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { type AdminPermission, parseAdminPermissions } from "../../shared/adminPermissions";
+import { BRAND } from "../../shared/brand";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -54,7 +55,7 @@ export const adminProcedure = t.procedure.use(
     }
 
     if (!(await hasVerifiedAdminAccess(ctx.req, ctx.user.id))) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Kindly verify your JUMP administrator password to continue." });
+      throw new TRPCError({ code: "FORBIDDEN", message: `Kindly verify your ${BRAND.programmeShortName} administrator password to continue.` });
     }
 
     return next({
@@ -69,7 +70,7 @@ export const adminProcedure = t.procedure.use(
 export const ownerAdminProcedure = adminProcedure.use(
   t.middleware(async ({ ctx, next }) => {
     if (!ctx.user || !isOwnerAdmin(ctx.user)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "This action is reserved for the JUMP super administrator." });
+      throw new TRPCError({ code: "FORBIDDEN", message: `This action is reserved for the ${BRAND.programmeShortName} super administrator.` });
     }
     return next({ ctx: { ...ctx, user: ctx.user } });
   }),
@@ -92,7 +93,7 @@ export function adminPermissionProcedure(permission: AdminPermission) {
         .where(eq(adminPermissionProfiles.userId, ctx.user.id))
         .limit(1))[0];
       if (!parseAdminPermissions(profile?.permissionsJson).includes(permission)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Your JUMP administrator role does not include this responsibility." });
+        throw new TRPCError({ code: "FORBIDDEN", message: `Your ${BRAND.programmeShortName} administrator role does not include this responsibility.` });
       }
       return next({ ctx: { ...ctx, user: ctx.user } });
     }),

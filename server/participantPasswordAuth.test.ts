@@ -11,8 +11,8 @@ import {
 
 describe("participant password authentication", () => {
   it("normalizes participant email addresses before lookup so stored casing does not block access", () => {
-    expect(normalizeParticipantEmail("  MarcelleCrownStudio@gmail.com ")).toBe("marcellecrownstudio@gmail.com");
-    expect(normalizeParticipantEmail("marcellecrownstudio@gmail.com")).toBe("marcellecrownstudio@gmail.com");
+    expect(normalizeParticipantEmail("  TobiBloomStudio@Example.com ")).toBe("tobibloomstudio@example.com");
+    expect(normalizeParticipantEmail("tobibloomstudio@example.com")).toBe("tobibloomstudio@example.com");
   });
 
   it("accepts any five-character password and rejects only shorter credentials", () => {

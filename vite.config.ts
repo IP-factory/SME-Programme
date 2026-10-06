@@ -150,7 +150,25 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+/** Adds the Umami analytics script only when an endpoint and site id are configured. */
+function analyticsPlugin(): Plugin {
+  let env: Record<string, string> = {};
+  return {
+    name: "optional-analytics",
+    configResolved(config) {
+      env = config.env;
+    },
+    transformIndexHtml() {
+      const endpoint = env.VITE_ANALYTICS_ENDPOINT;
+      const websiteId = env.VITE_ANALYTICS_WEBSITE_ID;
+      if (!endpoint || !websiteId) return [];
+      return [{ tag: "script", attrs: { defer: true, src: `${endpoint.replace(/\/+$/, "")}/umami`, "data-website-id": websiteId }, injectTo: "body" }];
+    },
+  };
+}
+
+// The Manus plugins keep the project editable and previewable inside Manus, where v0.1 is hosted.
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), analyticsPlugin()];
 
 export default defineConfig({
   plugins,

@@ -5,7 +5,10 @@ import { and, eq, gte, lt } from "drizzle-orm";
 import { deliverEmail } from "./email";
 import { buildBrandedEmailHtml } from "./emailTemplates";
 import { generateICS } from "./ics";
+import { createHash, timingSafeEqual } from "crypto";
+import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
+import { BRAND } from "../shared/brand";
 
 const HOUR = 60 * 60 * 1000;
 const REMINDER_WINDOW_EARLY_MS = 30 * 60 * 1000;
@@ -26,7 +29,7 @@ export function reminderDeliveryKey(bookingId: number) {
 export function automatedReminderPolicy() {
   return {
     automatedDispatchEnabled: !OWNER_APPROVAL_REQUIRED_FOR_REMINDERS,
-    message: "JUMP 24-hour session reminders require Emmanuel's explicit approval before delivery.",
+    message: `${BRAND.programmeShortName} 24-hour session reminders require ${BRAND.facilitatorFirstName}'s explicit approval before delivery.`,
   } as const;
 }
 
@@ -35,10 +38,29 @@ function isDuplicateReminderError(error: unknown) {
   return candidate?.code === "ER_DUP_ENTRY" || candidate?.errno === 1062;
 }
 
+/**
+ * Off Manus, scheduled endpoints are called by the host's cron with `Authorization: Bearer <CRON_SECRET>`.
+ * Without a configured secret this check refuses every call.
+ */
+export function isAuthorisedCronRequest(authorization: string | undefined, secret = ENV.cronSecret) {
+  if (!secret || !authorization?.startsWith("Bearer ")) return false;
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(authorization.slice("Bearer ".length)), digest(secret));
+}
+
+/** On Manus, scheduled tasks call in with a platform-issued cron session. */
+async function isManusScheduledTask(req: Request) {
+  try {
+    const caller = await sdk.authenticateRequest(req);
+    return Boolean(caller.isCron && caller.taskUid);
+  } catch {
+    return false;
+  }
+}
+
 export async function handleScheduledReminder(req: Request, res: Response) {
   try {
-    const user = await sdk.authenticateRequest(req);
-    if (!user.isCron || !user.taskUid) {
+    if (!isAuthorisedCronRequest(req.get("authorization")) && !(await isManusScheduledTask(req))) {
       return res.status(403).json({ error: "Cron execution required" });
     }
 
@@ -102,7 +124,7 @@ export async function handleScheduledReminder(req: Request, res: Response) {
         throw error;
       }
 
-      const sessionTitle = `JUMP 2026 ${booking.kind} session ${booking.sessionNumber}`;
+      const sessionTitle = `${BRAND.programmeName} ${booking.kind} session ${booking.sessionNumber}`;
       const dateLabel = new Intl.DateTimeFormat("en-GB", {
         dateStyle: "full",
         timeStyle: "short",
@@ -110,20 +132,20 @@ export async function handleScheduledReminder(req: Request, res: Response) {
       }).format(new Date(booking.startAt));
       const icsContent = generateICS({
         title: sessionTitle,
-        description: "Your JUMP 2026 session reminder. Please use the Google Calendar invitation already sent to you for joining details.",
+        description: `Your ${BRAND.programmeName} session reminder. Please use the Google Calendar invitation already sent to you for joining details.`,
         startTime: new Date(booking.startAt),
         endTime: new Date(booking.endAt),
         location: "Google Calendar invitation / Participant Portal",
       });
-      const subject = `JUMP 2026 — 24-hour reminder: ${booking.kind} session ${booking.sessionNumber}`;
-      const body = `Dear ${booking.fullName},\n\nThis is a kindly reminder that your JUMP 2026 ${booking.kind} session ${booking.sessionNumber} is scheduled for ${dateLabel}.\n\nYour Google Calendar invitation contains the joining details. A calendar file is also attached for your convenience. If you experience any difficulty, kindly reply directly to this email.\n\nWarm regards,\n\nEmmanuel Tarfa\nFacilitator, JUMP 2026 — Strategy & Innovation Genius Track`;
+      const subject = `${BRAND.programmeName} — 24-hour reminder: ${booking.kind} session ${booking.sessionNumber}`;
+      const body = `Dear ${booking.fullName},\n\nThis is a kindly reminder that your ${BRAND.programmeName} ${booking.kind} session ${booking.sessionNumber} is scheduled for ${dateLabel}.\n\nYour Google Calendar invitation contains the joining details. A calendar file is also attached for your convenience. If you experience any difficulty, kindly reply directly to this email.\n\nWarm regards,\n\n${BRAND.facilitatorName}\nFacilitator, ${BRAND.programmeName} — Strategy & Innovation Genius Track`;
       const firstName = booking.fullName.trim().split(/\s+/)[0] || booking.fullName;
       const html = buildBrandedEmailHtml({
         label: "24-hour session reminder",
         title: `${booking.kind} session ${booking.sessionNumber}`,
-        preheader: `Your JUMP 2026 session is scheduled for ${dateLabel}.`,
+        preheader: `Your ${BRAND.programmeName} session is scheduled for ${dateLabel}.`,
         greeting: `Dear ${firstName},`,
-        paragraphs: ["This is a kindly reminder that your JUMP 2026 session is approaching."],
+        paragraphs: [`This is a kindly reminder that your ${BRAND.programmeName} session is approaching.`],
         details: [{ label: "Scheduled for", value: dateLabel }],
         callout: "Your Google Calendar invitation contains the joining details. A calendar file is also attached for your convenience.",
         footerNote: "If you experience a difficulty, kindly reply directly to this email.",
@@ -134,7 +156,7 @@ export async function handleScheduledReminder(req: Request, res: Response) {
         body,
         html,
         icsContent,
-        icsFilename: `JUMP_2026_${booking.kind}_Session_${booking.sessionNumber}_Reminder.ics`,
+        icsFilename: `${BRAND.programmeName.replace(/\s+/g, "_")}_${booking.kind}_Session_${booking.sessionNumber}_Reminder.ics`,
       });
       const [emailResult] = await db.insert(emailLogs).values({
         registrationId: booking.registrationId,

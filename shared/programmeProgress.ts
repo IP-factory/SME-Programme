@@ -1,3 +1,4 @@
+import { BRAND } from "./brand";
 export type ProgrammeMilestoneState = "complete" | "available" | "locked";
 
 export type ProgrammeMilestone = {
@@ -11,7 +12,7 @@ export type ProgrammeSession = {
   focus: string;
 };
 
-export const participantTechnicalSupportNotice = "This portal was designed for JUMP 2026 and is continually being improved. If you encounter any technical issue, kindly take a screenshot and email Emmanuel directly. He reads every participant email and will have the technical team review it.";
+export const participantTechnicalSupportNotice = `This portal was designed for ${BRAND.programmeName} and is continually being improved. If you encounter any technical issue, kindly take a screenshot and email ${BRAND.facilitatorFirstName} directly. He reads every participant email and will have the technical team review it.`;
 
 export const programmeSessions: ProgrammeSession[] = [
   { title: "Class 1 · Clarity", focus: "Strategic intent and the decisions that matter now" },
@@ -23,7 +24,7 @@ export const programmeSessions: ProgrammeSession[] = [
 
 export const programmeFormat = {
   heading: "How the engagement works",
-  body: "The five sessions are one connected advisory journey. Start by completing your Current State Assessment after consent; this adds depth to your registration and helps Emmanuel focus the discussion. Payment guidance is available in parallel, while eligible calendar slots open once the 40% commitment is confirmed. Each live session includes focused questions, applied teaching and a deep-dive discussion; recordings are released afterwards.",
+  body: `The five sessions are one connected advisory journey. Start by completing your Current State Assessment after consent; this adds depth to your registration and helps ${BRAND.facilitatorFirstName} focus the discussion. Payment guidance is available in parallel, while eligible calendar slots open once the 40% commitment is confirmed. Each live session includes focused questions, applied teaching and a deep-dive discussion; recordings are released afterwards.`,
 };
 
 export type ProgrammePathway = "Foundation" | "Engine Room" | "Boardroom";

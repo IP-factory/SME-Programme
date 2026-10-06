@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BRAND } from "@shared/brand";
 
 declare global {
   interface Window {
@@ -10,9 +11,9 @@ declare global {
   }
 }
 
-const INSTAGRAM_REEL_URL = "https://www.instagram.com/reel/DbIe9w9s_1L/";
+const INSTAGRAM_REEL_URL = BRAND.facilitatorInstagramReelUrl;
 const INSTAGRAM_EMBED_SCRIPT_ID = "instagram-embed-script";
-const DEFAULT_FACILITATOR_POSTER = "/manus-storage/jump-emmanuel-tarfa-portrait_a3b21e44.jpeg";
+const DEFAULT_FACILITATOR_POSTER = BRAND.facilitatorPortraitUrl;
 
 type FacilitatorVideoProps = {
   mp4Url?: string;
@@ -62,7 +63,7 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
     <figure ref={sectionRef} className="w-full md:max-w-[380px]">
       {mp4Url ? (
         <video
-          className="aspect-[9/16] w-full bg-[#1A1A1A] object-cover"
+          className="aspect-[9/16] w-full bg-ink object-cover"
           controls
           playsInline
           preload="metadata"
@@ -72,7 +73,7 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
           Your browser does not support embedded video.
         </video>
       ) : isVisible ? (
-        <div className="aspect-[9/16] w-full overflow-hidden bg-[#F4F1E8]">
+        <div className="aspect-[9/16] w-full overflow-hidden bg-paper-sunken">
           <blockquote
             className="instagram-media"
             data-instgrm-captioned
@@ -81,17 +82,17 @@ export default function FacilitatorVideo({ mp4Url, posterUrl }: FacilitatorVideo
             style={{ background: "#FFF", border: 0, margin: "1px", maxWidth: "380px", minWidth: 0, padding: 0, width: "calc(100% - 2px)" }}
           >
             <a href={INSTAGRAM_REEL_URL} target="_blank" rel="noreferrer">
-              View Dr. Emmanuel Tarfa on Instagram
+              View {BRAND.facilitatorFormalName} on Instagram
             </a>
           </blockquote>
         </div>
       ) : (
-        <div className="aspect-[9/16] w-full bg-[#F4F1E8] border border-[#E6E2D8] flex items-center justify-center text-center px-8">
-          <p className="text-xs uppercase tracking-[0.18em] text-[#6A6760]">Loading facilitator video</p>
+        <div className="aspect-[9/16] w-full bg-paper-sunken border border-line flex items-center justify-center text-center px-8">
+          <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">Loading facilitator video</p>
         </div>
       )}
-      <figcaption className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-[#6A6760]">
-        Dr. Emmanuel Tarfa on JUMP 2026
+      <figcaption className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-ink-muted">
+        {BRAND.facilitatorFormalName} on {BRAND.programmeName}
       </figcaption>
     </figure>
   );

@@ -4,12 +4,14 @@ import type { Request, Response } from "express";
 import { adminAccessSessions, adminCredentials, type User } from "../drizzle/schema";
 import { getDb } from "./db";
 import { getAdminAccessCookieOptions } from "./_core/cookies";
+import { ENV } from "./_core/env";
+import { BRAND } from "../shared/brand";
 
 export const ADMIN_ACCESS_COOKIE = "jump_admin_access";
 export const ADMIN_PASSWORD_MIN_LENGTH = 12;
 export const ADMIN_SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 export const ADMIN_PASSWORD_LOCKOUT_MS = 15 * 60 * 1000;
-export const OWNER_ADMIN_EMAIL = "emmanueltarfa@gmail.com";
+export const OWNER_ADMIN_EMAIL = ENV.ownerAdminEmail;
 
 export function normalizeAdminEmail(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();
@@ -131,7 +133,7 @@ export async function verifyAndRecordAdminPassword(userId: number, password: str
   if (!db) throw new Error("Database not available");
   const credential = await db.select().from(adminCredentials).where(eq(adminCredentials.userId, userId)).limit(1);
   const current = credential[0];
-  if (!current) return { ok: false as const, reason: "No JUMP administrator password is enrolled for this account." };
+  if (!current) return { ok: false as const, reason: `No ${BRAND.programmeShortName} administrator password is enrolled for this account.` };
   if (current.lockedUntil && current.lockedUntil.getTime() > Date.now()) {
     return { ok: false as const, reason: "Too many attempts. Kindly try again in 15 minutes." };
   }
@@ -145,5 +147,5 @@ export async function verifyAndRecordAdminPassword(userId: number, password: str
     failedAttempts: lock ? 0 : nextAttempts,
     lockedUntil: lock,
   }).where(eq(adminCredentials.id, current.id));
-  return { ok: false as const, reason: lock ? "Too many attempts. Kindly try again in 15 minutes." : "The JUMP administrator password is not correct." };
+  return { ok: false as const, reason: lock ? "Too many attempts. Kindly try again in 15 minutes." : `The ${BRAND.programmeShortName} administrator password is not correct.` };
 }

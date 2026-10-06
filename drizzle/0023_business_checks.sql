@@ -1,0 +1,23 @@
+CREATE TABLE `business_checks` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`publicToken` varchar(64) NOT NULL,
+	`fullName` varchar(255) NOT NULL,
+	`email` varchar(320) NOT NULL,
+	`whatsapp` varchar(32),
+	`businessName` varchar(255),
+	`description` varchar(500),
+	`stage` varchar(16) NOT NULL,
+	`route` enum('advisory','programme','foundation','idea') NOT NULL,
+	`readiness` enum('advanced','intermediate','nascent') NOT NULL,
+	`primaryArea` int,
+	`answersJson` text NOT NULL,
+	`resultJson` text NOT NULL,
+	`summaryJson` text NOT NULL,
+	`summarySource` enum('AI','Rules') NOT NULL,
+	`notificationStatus` enum('Sent','Failed','Simulated') NOT NULL DEFAULT 'Simulated',
+	`callRequestedAt` timestamp,
+	`reportRequestedAt` timestamp,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `business_checks_id` PRIMARY KEY(`id`),
+	CONSTRAINT `business_checks_publicToken_unique` UNIQUE(`publicToken`)
+);

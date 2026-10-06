@@ -4,6 +4,7 @@ import { getDb } from "../db";
 import { deliverEmail, JUMP_ADMINISTRATION_MAILBOX } from "../email";
 import { participantProcedure, publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { BRAND } from "../../shared/brand";
 
 const PACKAGE_CHOICES = ["Foundation", "Engine Room", "Boardroom", "Not sure yet"] as const;
 const PUBLIC_REQUEST_WINDOW_MS = 15 * 60 * 1000;
@@ -43,9 +44,9 @@ function buildNotification(input: {
   preferredPackage?: string | null;
   note?: string | null;
 }) {
-  const subject = `JUMP 2026 — pricing request from ${input.fullName}`;
+  const subject = `${BRAND.programmeName} — pricing request from ${input.fullName}`;
   const body = [
-    "A JUMP 2026 programme pricing request has been received.",
+    `A ${BRAND.programmeName} programme pricing request has been received.`,
     "",
     `Source: ${input.source === "ParticipantPortal" ? "Authenticated participant portal" : "Public sign-up page"}`,
     `Name: ${input.fullName}`,
@@ -54,7 +55,7 @@ function buildNotification(input: {
     `Programme interest: ${input.preferredPackage || "Not specified"}`,
     `Note: ${input.note || "No additional note"}`,
     "",
-    "Please prepare any participant response from the approved JUMP communication workflow.",
+    `Please prepare any participant response from the approved ${BRAND.programmeShortName} communication workflow.`,
   ].join("\n");
   return { subject, body };
 }
@@ -69,7 +70,7 @@ async function persistAndNotify(input: {
   note?: string | null;
 }) {
   const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "JUMP is temporarily unable to record this pricing request." });
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${BRAND.programmeShortName} is temporarily unable to record this pricing request.` });
 
   const message = buildNotification(input);
   const delivery = await deliverEmail({

@@ -1,4 +1,5 @@
 import { ENV } from "./_core/env";
+import { BRAND } from "../shared/brand";
 export type GmailDeliveryResult =
   | { status: "Sent"; providerMessageId?: string }
   | { status: "Simulated"; reason: "missing_credentials" | "test_sender" }
@@ -176,7 +177,7 @@ export async function sendEmailViaGmail(input: {
       subject: input.subject,
       body: input.body,
       html: input.html,
-      replyTo: input.replyTo || ENV.emailReplyTo || "admin@emmanueltarfa.com",
+      replyTo: input.replyTo || ENV.emailReplyTo || BRAND.administrationMailbox,
       icsContent: input.icsContent,
       icsFilename: input.icsFilename,
       attachments: input.attachments,

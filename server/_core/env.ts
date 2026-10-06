@@ -1,3 +1,8 @@
+import { BRAND } from "../../shared/brand";
+function originOf(value: string) {
+  return new URL(value).origin;
+}
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
@@ -8,7 +13,7 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
-  emailFrom: process.env.EMAIL_FROM ?? "Emmanuel Tarfa | JUMP 2026 <admin@emmanueltarfa.com>",
+  emailFrom: process.env.EMAIL_FROM ?? `${BRAND.senderDisplayName} <${BRAND.administrationMailbox}>`,
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   googleRefreshToken: process.env.GOOGLE_REFRESH_TOKEN ?? "",
@@ -16,5 +21,17 @@ export const ENV = {
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID ?? "primary",
   paystackPublicKey: process.env.PAYSTACK_PUBLIC_KEY ?? "",
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
-  emailReplyTo: process.env.EMAIL_REPLY_TO ?? "admin@emmanueltarfa.com",
+  /** Canonical public origin (scheme + host) used for emailed links and CSRF checks in production. */
+  appOrigin: originOf(process.env.APP_ORIGIN ?? "https://emmanueltarfa.com"),
+  /** Further production origins accepted for browser requests, comma-separated (e.g. the www host). */
+  appAlternateOrigins: (process.env.APP_ALTERNATE_ORIGINS ?? "https://www.emmanueltarfa.com")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(originOf),
+  /** Shared secret the host's scheduler sends as a Bearer token to /api/scheduled/* endpoints. */
+  cronSecret: process.env.CRON_SECRET ?? "",
+  /** Email address of the permanent Super Admin. */
+  ownerAdminEmail: (process.env.OWNER_ADMIN_EMAIL ?? "emmanueltarfa@gmail.com").trim().toLowerCase(),
+  emailReplyTo: process.env.EMAIL_REPLY_TO ?? BRAND.administrationMailbox,
 };

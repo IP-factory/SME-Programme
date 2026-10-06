@@ -13,6 +13,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { buildBrandedEmailHtml } from "./emailTemplates";
 import { getTrustedApplicationOrigin } from "./security";
+import { BRAND } from "../shared/brand";
 
 export const PARTICIPANT_SESSION_COOKIE = "jump_participant_session";
 export const PARTICIPANT_PASSWORD_MIN_LENGTH = 5;
@@ -77,16 +78,16 @@ export function buildParticipantPasswordLinkEmail(fullName: string, passwordUrl:
   const isReset = purpose === "reset";
   const action = isReset ? "reset your password" : "set your participant password";
   return {
-    subject: isReset ? "Reset your JUMP 2026 participant password" : "Set your JUMP 2026 participant password",
-    body: `Dear ${fullName},\n\n${isReset ? "We received a request to reset your JUMP 2026 participant password." : "Your JUMP 2026 participant portal is ready. Please set a password so you can sign in normally whenever you return."}\n\nUse this secure link to ${action}:\n${passwordUrl}\n\nFor your protection, this link expires in 20 minutes and can only be used once. Once complete, return to the JUMP website and sign in with your registered email address and password. Your browser can remember your sign-in on this device for 30 days.\n\nIf you did not request this, you may safely ignore this email.\n\nWarm regards,\nEmmanuel Tarfa\nFacilitator, JUMP 2026 — Strategy & Innovation Genius Track`,
+    subject: isReset ? `Reset your ${BRAND.programmeName} participant password` : `Set your ${BRAND.programmeName} participant password`,
+    body: `Dear ${fullName},\n\n${isReset ? `We received a request to reset your ${BRAND.programmeName} participant password.` : `Your ${BRAND.programmeName} participant portal is ready. Please set a password so you can sign in normally whenever you return.`}\n\nUse this secure link to ${action}:\n${passwordUrl}\n\nFor your protection, this link expires in 20 minutes and can only be used once. Once complete, return to the ${BRAND.programmeShortName} website and sign in with your registered email address and password. Your browser can remember your sign-in on this device for 30 days.\n\nIf you did not request this, you may safely ignore this email.\n\nWarm regards,\n${BRAND.facilitatorName}\nFacilitator, ${BRAND.programmeName} — Strategy & Innovation Genius Track`,
     html: buildBrandedEmailHtml({
       label: isReset ? "Participant password reset" : "Participant account setup",
       title: isReset ? "Reset your portal password" : "Set your portal password",
-      preheader: isReset ? "Choose a new password for your private JUMP participant portal." : "Choose a password for your private JUMP participant portal.",
+      preheader: isReset ? `Choose a new password for your private ${BRAND.programmeShortName} participant portal.` : `Choose a password for your private ${BRAND.programmeShortName} participant portal.`,
       greeting: `Dear ${firstName},`,
       paragraphs: [
-        isReset ? "We received a request to reset your JUMP 2026 participant password." : "Your JUMP 2026 participant portal is ready. Please set a password so you can sign in normally whenever you return.",
-        "After setting your password, return to the JUMP website and sign in with your registered email address and password. Your browser can remember your sign-in on this device for 30 days.",
+        isReset ? `We received a request to reset your ${BRAND.programmeName} participant password.` : `Your ${BRAND.programmeName} participant portal is ready. Please set a password so you can sign in normally whenever you return.`,
+        `After setting your password, return to the ${BRAND.programmeShortName} website and sign in with your registered email address and password. Your browser can remember your sign-in on this device for 30 days.`,
       ],
       cta: { label: isReset ? "Reset my password" : "Set my password", url: passwordUrl },
       callout: "For your protection, this link expires in 20 minutes and can only be used once.",
@@ -263,7 +264,7 @@ export function clearParticipantSession(ctx: TrpcContext) {
 
 export async function getAuthenticatedParticipant(ctx: TrpcContext) {
   const rawSessionToken = readCookie(ctx.req.headers.cookie, PARTICIPANT_SESSION_COOKIE);
-  if (!rawSessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: "Please sign in with your JUMP participant email and password." });
+  if (!rawSessionToken) throw new TRPCError({ code: "UNAUTHORIZED", message: `Please sign in with your ${BRAND.programmeShortName} participant email and password.` });
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
   const session = (await db.select().from(participantAuthTokens).where(and(

@@ -17,6 +17,7 @@ import {
   type StructuredDiagnosticDraft,
 } from "../../shared/structuredDiagnostic";
 import { buildWorkingDiagnosticReport, renderWorkingDiagnosticReportPdf, type WorkingDiagnosticReport } from "../workingDiagnosticReport";
+import { BRAND } from "../../shared/brand";
 
 function buildParticipantBriefInput(applicant: Registration) {
   let diagnosticConstraint: string | undefined;
@@ -657,7 +658,7 @@ export const participantRouter = router({
       const pdf = await renderWorkingDiagnosticReportPdf(current.report);
       const safeBusinessName = applicant.businessName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "report";
       return {
-        filename: `JUMP-2026-working-diagnostic-${safeBusinessName}.pdf`,
+        filename: `${BRAND.programmeShortName}-2026-working-diagnostic-${safeBusinessName}.pdf`,
         dataUrl: `data:application/pdf;base64,${pdf.toString("base64")}`,
       };
     }),
@@ -676,14 +677,14 @@ export const participantRouter = router({
       const recipientEmail = input.recipientEmail || applicant.email;
       const pdf = await renderWorkingDiagnosticReportPdf(current.report);
       const safeBusinessName = applicant.businessName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "report";
-      const subject = "Your JUMP 2026 Current State Working Diagnostic";
-      const body = `Dear ${applicant.fullName},\n\nAttached is the current working diagnostic generated from the Current State Assessment you completed in your JUMP portal. It is designed to focus the advisory conversations ahead; it is not a final strategy, audit, valuation, or guarantee of business outcomes.\n\nYou initiated this delivery from your private portal${recipientEmail.toLowerCase() !== applicant.email.toLowerCase() ? ` to ${recipientEmail}` : ""}.\n\nKindly keep the report within your trusted working team.\n\nWarm regards,\nEmmanuel Tarfa`;
+      const subject = `Your ${BRAND.programmeName} Current State Working Diagnostic`;
+      const body = `Dear ${applicant.fullName},\n\nAttached is the current working diagnostic generated from the Current State Assessment you completed in your ${BRAND.programmeShortName} portal. It is designed to focus the advisory conversations ahead; it is not a final strategy, audit, valuation, or guarantee of business outcomes.\n\nYou initiated this delivery from your private portal${recipientEmail.toLowerCase() !== applicant.email.toLowerCase() ? ` to ${recipientEmail}` : ""}.\n\nKindly keep the report within your trusted working team.\n\nWarm regards,\n${BRAND.facilitatorName}`;
       const result = await deliverEmail({
         to: recipientEmail,
         bcc: JUMP_MONITORING_BCC,
         subject,
         body,
-        attachments: [{ filename: `JUMP-2026-working-diagnostic-${safeBusinessName}.pdf`, content: pdf, contentType: "application/pdf" }],
+        attachments: [{ filename: `${BRAND.programmeShortName}-2026-working-diagnostic-${safeBusinessName}.pdf`, content: pdf, contentType: "application/pdf" }],
       });
       await db.insert(emailLogs).values({
         registrationId: applicant.id,
@@ -839,15 +840,15 @@ export const participantRouter = router({
         doc.on("error", (err: Error) => reject(err));
 
         // PDF Header styling (McKinsey Blue theme)
-        doc.fillColor("#1F4E79").fontSize(20).font("Helvetica-Bold").text("JUMP 2026 Strategy & Innovation Genius Track", { align: "left" });
+        doc.fillColor(BRAND.colorBrand).fontSize(20).font("Helvetica-Bold").text(BRAND.programmeFullName, { align: "left" });
         doc.fontSize(12).fillColor("#555555").text("Current Status Assessment Summary Report", { align: "left" });
         doc.moveDown(0.5);
 
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#1F4E79").lineWidth(1.5).stroke();
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor(BRAND.colorBrand).lineWidth(1.5).stroke();
         doc.moveDown(1);
 
         // Participant Information block
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Participant & Business Profile");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Participant & Business Profile");
         doc.fontSize(10).font("Helvetica").fillColor("#333333");
         doc.text(`Full Name: ${applicant.fullName}`);
         doc.text(`Email: ${applicant.email}`);
@@ -859,7 +860,7 @@ export const participantRouter = router({
         doc.moveDown(1.5);
 
         // Assessment Responses
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Assessment Questionnaire Responses");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Assessment Questionnaire Responses");
         doc.moveDown(0.5);
 
         const sections = [
@@ -873,7 +874,7 @@ export const participantRouter = router({
         ];
 
         for (const sec of sections) {
-          doc.fontSize(11).font("Helvetica-Bold").fillColor("#1F4E79").text(sec.title);
+          doc.fontSize(11).font("Helvetica-Bold").fillColor(BRAND.colorBrand).text(sec.title);
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(sec.text || "Not provided.", {
             align: "justify",
           });
@@ -882,7 +883,7 @@ export const participantRouter = router({
 
         // Footer
         doc.moveDown(2);
-        doc.fontSize(8).fillColor("#888888").text("Generated securely via JUMP 2026 Portal (Dr. Emmanuel Tarfa Strategy & Innovation Genius Track)", { align: "center" });
+        doc.fontSize(8).fillColor("#888888").text(`Generated securely via ${BRAND.programmeName} Portal (${BRAND.facilitatorFormalName} Strategy & Innovation Genius Track)`, { align: "center" });
 
         doc.end();
       });
@@ -904,7 +905,7 @@ export const participantRouter = router({
 
       // If conversation is empty, initialize with AI welcoming the founder and asking Module 1 (Founder SWOT & DISC profile)
       if (messages.length === 0) {
-        const welcomeText = `Welcome, ${applicant.fullName}. I am your strategy & innovation AI consulting partner for JUMP 2026 (working alongside Dr. Emmanuel Tarfa).\n\nHaving reviewed your registration profile for **${applicant.businessName}** (${applicant.businessModel} model), we will now deep-dive into your strategic architecture without repeating what you already shared.\n\nLet us begin with **Module 1: The Founder & Leadership Blueprint**.\n\n**Question 1.1 (Founder SWOT & DISC Profile):**\nWhen leading through high-uncertainty execution or pivoting under cash pressure, what is your primary natural behavioral response, and what critical internal blind spot do you actively guard against?\n\n*Why we ask:* Big 4 and Y Combinator diligence shows that founder self-awareness and cognitive resilience under stress are the ultimate determinants of venture survival.\n\n*Examples:* \n• Analytical & Risk-Averse (High C): Thorough validation but slow speed to market.\n• Dominant & Direct (High D): Relentless execution speed but risk of alienating early team members.\n• Inspiring & Optimistic (High I): Strong vision and fundraising appeal but vulnerable to operational drift.`;
+        const welcomeText = `Welcome, ${applicant.fullName}. I am your strategy & innovation AI consulting partner for ${BRAND.programmeName} (working alongside ${BRAND.facilitatorFormalName}).\n\nHaving reviewed your registration profile for **${applicant.businessName}** (${applicant.businessModel} model), we will now deep-dive into your strategic architecture without repeating what you already shared.\n\nLet us begin with **Module 1: The Founder & Leadership Blueprint**.\n\n**Question 1.1 (Founder SWOT & DISC Profile):**\nWhen leading through high-uncertainty execution or pivoting under cash pressure, what is your primary natural behavioral response, and what critical internal blind spot do you actively guard against?\n\n*Why we ask:* Big 4 and Y Combinator diligence shows that founder self-awareness and cognitive resilience under stress are the ultimate determinants of venture survival.\n\n*Examples:* \n• Analytical & Risk-Averse (High C): Thorough validation but slow speed to market.\n• Dominant & Direct (High D): Relentless execution speed but risk of alienating early team members.\n• Inspiring & Optimistic (High I): Strong vision and fundraising appeal but vulnerable to operational drift.`;
 
         const initialOptions = JSON.stringify([
           "Dominant & Direct (High D) — Fast execution, risk of team friction",
@@ -1003,7 +1004,7 @@ export const participantRouter = router({
       } else {
         // Finalize consulting interview and generate inferred diagnostic report
         topicTag = "report_generated";
-        nextAiContent = `We have completed the core consulting diagnostic interview for **${applicant.businessName}**. Based on your responses across Founder DISC/SWOT, Business Model & Margins, and Market Defensibility, I have synthesized your strategic diagnostic report.\n\nYou can now review your inferred diagnostic findings, strategic hypotheses, and download your official JUMP Consulting Assessment PDF below.`;
+        nextAiContent = `We have completed the core consulting diagnostic interview for **${applicant.businessName}**. Based on your responses across Founder DISC/SWOT, Business Model & Margins, and Market Defensibility, I have synthesized your strategic diagnostic report.\n\nYou can now review your inferred diagnostic findings, strategic hypotheses, and download your official ${BRAND.programmeShortName} Consulting Assessment PDF below.`;
 
         // Generate and store consulting report summary JSON
         const summary = {
@@ -1020,7 +1021,7 @@ export const participantRouter = router({
             "Key-person dependency in service delivery"
           ],
           recommendations: [
-            "Prepare for 1-on-1 Decide session with Dr. Emmanuel Tarfa using this diagnostic baseline.",
+            `Prepare for 1-on-1 Decide session with ${BRAND.facilitatorFormalName} using this diagnostic baseline.`,
             "Complete assigned pre-read brief and submit diagnostic work via the portal."
           ]
         };
@@ -1077,15 +1078,15 @@ export const participantRouter = router({
         doc.on("error", (err: Error) => reject(err));
 
         // Header
-        doc.fillColor("#1F4E79").fontSize(20).font("Helvetica-Bold").text("JUMP 2026 Strategy & Innovation Genius Track");
+        doc.fillColor(BRAND.colorBrand).fontSize(20).font("Helvetica-Bold").text(BRAND.programmeFullName);
         doc.fontSize(12).fillColor("#555555").text("AI Management Consulting Inferred Diagnostic Report");
         doc.moveDown(0.5);
 
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#1F4E79").lineWidth(1.5).stroke();
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor(BRAND.colorBrand).lineWidth(1.5).stroke();
         doc.moveDown(1);
 
         // Profile
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Executive & Venture Profile");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Executive & Venture Profile");
         doc.fontSize(10).font("Helvetica").fillColor("#333333");
         doc.text(`Entrepreneur: ${applicant.fullName}`);
         doc.text(`Venture: ${applicant.businessName}`);
@@ -1094,7 +1095,7 @@ export const participantRouter = router({
         doc.moveDown(1.5);
 
         // Strategic Hypotheses
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Strategic Hypotheses & Value Driver Analysis");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Strategic Hypotheses & Value Driver Analysis");
         doc.moveDown(0.5);
         for (const hyp of summary.strategicHypotheses) {
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(`• ${hyp}`, { indent: 10 });
@@ -1103,7 +1104,7 @@ export const participantRouter = router({
         doc.moveDown(1);
 
         // Risks & Bottlenecks
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Identified Bottlenecks & Strategic Risks");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Identified Bottlenecks & Strategic Risks");
         doc.moveDown(0.5);
         for (const risk of summary.risksAndBottlenecks) {
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(`• ${risk}`, { indent: 10 });
@@ -1112,7 +1113,7 @@ export const participantRouter = router({
         doc.moveDown(1);
 
         // Recommendations
-        doc.fillColor("#1F4E79").fontSize(14).font("Helvetica-Bold").text("Consulting Recommendations for 1-on-1 Decide Session");
+        doc.fillColor(BRAND.colorBrand).fontSize(14).font("Helvetica-Bold").text("Consulting Recommendations for 1-on-1 Decide Session");
         doc.moveDown(0.5);
         for (const rec of summary.recommendations) {
           doc.fontSize(10).font("Helvetica").fillColor("#333333").text(`• ${rec}`, { indent: 10 });
@@ -1120,7 +1121,7 @@ export const participantRouter = router({
         }
 
         doc.moveDown(2);
-        doc.fontSize(8).fillColor("#888888").text("Generated securely via JUMP 2026 AI Consulting Engine (Dr. Emmanuel Tarfa Strategy & Innovation Genius Track)", { align: "center" });
+        doc.fontSize(8).fillColor("#888888").text(`Generated securely via ${BRAND.programmeName} AI Consulting Engine (${BRAND.facilitatorFormalName} Strategy & Innovation Genius Track)`, { align: "center" });
 
         doc.end();
       });

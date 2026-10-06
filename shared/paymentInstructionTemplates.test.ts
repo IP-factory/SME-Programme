@@ -11,10 +11,10 @@ describe("payment instruction templates", () => {
   });
 
   it("provides a Paystack-only North America route and private payment-tab guidance", () => {
-    const message = renderPaymentInstruction("north_america", "Catherine Udofia");
+    const message = renderPaymentInstruction("north_america", "Amaka Eze", "https://emmanueltarfa.com");
     expect(message.body).toContain("https://emmanueltarfa.com/portal?tab=payment");
     expect(message.body).toContain("approved commitment and full-payment amounts");
-    expect(message.body).toContain("Dear Catherine,");
+    expect(message.body).toContain("Dear Amaka,");
     expect(message.body).not.toContain("Western Union");
     expect(message.body).not.toContain("ABNGNGLA");
     expect(message.body).not.toContain("CITIUS33");
@@ -22,9 +22,9 @@ describe("payment instruction templates", () => {
   });
 
   it("personalises the U.K. template and distinguishes local from international transfer identifiers", () => {
-    const message = renderPaymentInstruction("uk_wise", "Marcelle Tiogo");
+    const message = renderPaymentInstruction("uk_wise", "Tobi Adeyemi", "https://emmanueltarfa.com");
     expect(message.subject).toContain("U.K.");
-    expect(message.body).toContain("Dear Marcelle,");
+    expect(message.body).toContain("Dear Tobi,");
     expect(message.body).toContain("Sort code: 60-84-64");
     expect(message.body).toContain("Swift/BIC: TRWIGB2LXXX");
   });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { getBusyRanges, isCalendarConfigured } from "./calendar";
 
-describe("Google Calendar credential readiness", () => {
+const shouldValidate = process.env.VALIDATE_GOOGLE_CALENDAR === "1";
+
+describe.skipIf(!shouldValidate)("Google Calendar credential readiness", () => {
   it("refreshes the configured credential and reads a narrow free-busy window", async () => {
     expect(isCalendarConfigured()).toBe(true);
 

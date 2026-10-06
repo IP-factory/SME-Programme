@@ -1,3 +1,4 @@
+import { BRAND } from "@shared/brand";
 export const PARTICIPANT_PASSWORD_HELP = "Use at least 5 characters. A simple word is fine.";
 
 export function validateParticipantPassword(password: string, confirmPassword: string): string | null {
@@ -20,8 +21,8 @@ export function getParticipantPasswordRecoveryMessage(message: string): string {
   }
 
   if (normalized.includes("expired") || normalized.includes("single-use") || normalized.includes("token") || normalized.includes("password link")) {
-    return "This secure password link is no longer valid. Return to JUMP sign in and request a new password link using your registered email address.";
+    return `This secure password link is no longer valid. Return to ${BRAND.programmeShortName} sign in and request a new password link using your registered email address.`;
   }
 
-  return "We could not set your password just now. Please check both fields and try again. If the issue continues, return to JUMP sign in and request a new secure password link.";
+  return `We could not set your password just now. Please check both fields and try again. If the issue continues, return to ${BRAND.programmeShortName} sign in and request a new secure password link.`;
 }

@@ -7,6 +7,7 @@ import { getDb } from "../db";
 import { adminProcedure, participantProcedure, publicProcedure, router } from "../_core/trpc";
 import { filterAvailableSlotRows, generateSlotDefinitions, getAvailabilityWindow, requiredMeetingsForPackage, type SlotKind } from "../scheduling";
 import { ENGAGEMENT_BRIEF_VERSION } from "../../shared/engagementBrief";
+import { BRAND } from "../../shared/brand";
 
 const slotKindSchema = z.enum(["Decide", "Learn", "Apply"]);
 
@@ -203,8 +204,8 @@ export const schedulingRouter = router({
       let googleCalendarEventId: string | undefined;
       try {
         const event = await createCalendarEvent({
-          summary: `JUMP 2026 ${booking.slot.kind} session — ${booking.applicant.businessName}`,
-          description: `JUMP 2026 ${booking.slot.kind} session for ${booking.applicant.fullName} and ${booking.applicant.businessName}.`,
+          summary: `${BRAND.programmeName} ${booking.slot.kind} session — ${booking.applicant.businessName}`,
+          description: `${BRAND.programmeName} ${booking.slot.kind} session for ${booking.applicant.fullName} and ${booking.applicant.businessName}.`,
           startAt: new Date(booking.slot.startAt),
           endAt: new Date(booking.slot.endAt),
           attendeeEmail: booking.applicant.email,

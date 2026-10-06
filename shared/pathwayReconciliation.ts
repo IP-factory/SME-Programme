@@ -1,3 +1,4 @@
+import { BRAND } from "./brand";
 export const JUMP_PATHWAYS = ["Foundation", "Engine Room", "Boardroom"] as const;
 
 export type JumpPathway = (typeof JUMP_PATHWAYS)[number];
@@ -33,7 +34,7 @@ export function sameParticipantIdentity(
 }
 
 export function selectHighestPathway(pathways: readonly JumpPathway[]) {
-  if (pathways.length === 0) throw new Error("At least one JUMP pathway is required");
+  if (pathways.length === 0) throw new Error(`At least one ${BRAND.programmeShortName} pathway is required`);
   return pathways.reduce((highest, pathway) =>
     pathwayRank[pathway] > pathwayRank[highest] ? pathway : highest,
   );

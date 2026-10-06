@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import type { Registration } from "../drizzle/schema";
 import type { StructuredDiagnosticDraft } from "../shared/structuredDiagnostic";
+import { BRAND } from "../shared/brand";
 
 export type WorkingDiagnosticReport = {
   type: "structured-working-report-v1";
@@ -39,7 +40,7 @@ export function buildWorkingDiagnosticReport(applicant: Registration, draft: Str
     type: "structured-working-report-v1",
     generatedAt: new Date().toISOString(),
     participant: { fullName: applicant.fullName, businessName, pathway: applicant.package },
-    executiveReadout: `${businessName} is entering JUMP at a point where the immediate advisory task is to convert the participant’s stated context into clearer decisions, sequenced priorities, and practical next actions. This working report reflects the initial Current State Assessment and will be refined through the engagement.`,
+    executiveReadout: `${businessName} is entering ${BRAND.programmeShortName} at a point where the immediate advisory task is to convert the participant’s stated context into clearer decisions, sequenced priorities, and practical next actions. This working report reflects the initial Current State Assessment and will be refined through the engagement.`,
     currentPosition: [
       { label: "Business stage", value: valueOrDeferred(draft.section1.businessAge) },
       { label: "Commercial model", value: valueOrDeferred(draft.section1.engine, applicant.businessModel) },
@@ -50,18 +51,18 @@ export function buildWorkingDiagnosticReport(applicant: Registration, draft: Str
       { label: "What success should improve", value: successMeasures },
     ],
     workingHypotheses: hypotheses.length ? hypotheses : ["A fuller working hypothesis will be shaped once the participant’s priorities are explored in the advisory sessions."],
-    decisionPriorities: priorities.length ? priorities : ["Clarify the highest-value decision to address first in the next JUMP working session."],
+    decisionPriorities: priorities.length ? priorities : [`Clarify the highest-value decision to address first in the next ${BRAND.programmeShortName} working session.`],
     advisoryFocus: [
       "Separate facts, estimates, and assumptions before using them to make commercial decisions.",
       "Translate the stated priority into a small number of sequenced decisions and owners.",
       "Use the participant’s success measures as the practical test for each recommendation.",
     ],
-    evidenceNote: "This is an initial working diagnostic, not an audit, valuation, medical or psychological assessment, or guarantee of a business outcome. It is based only on the participant’s registration and Current State Assessment responses, and is designed to improve the focus of the JUMP advisory conversations.",
+    evidenceNote: `This is an initial working diagnostic, not an audit, valuation, medical or psychological assessment, or guarantee of a business outcome. It is based only on the participant’s registration and Current State Assessment responses, and is designed to improve the focus of the ${BRAND.programmeShortName} advisory conversations.`,
   };
 }
 
 function writeSection(doc: PDFKit.PDFDocument, title: string, items: string[]) {
-  doc.moveDown(0.8).font("Helvetica-Bold").fontSize(13).fillColor("#163859").text(title);
+  doc.moveDown(0.8).font("Helvetica-Bold").fontSize(13).fillColor(BRAND.colorBrandDeep).text(title);
   doc.moveDown(0.3).font("Helvetica").fontSize(10).fillColor("#1E293B");
   for (const item of items) {
     doc.text(`• ${item}`, { indent: 10, lineGap: 3 });
@@ -70,18 +71,18 @@ function writeSection(doc: PDFKit.PDFDocument, title: string, items: string[]) {
 
 export function renderWorkingDiagnosticReportPdf(report: WorkingDiagnosticReport): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 54, info: { Title: `JUMP 2026 Working Diagnostic — ${report.participant.businessName}` } });
+    const doc = new PDFDocument({ size: "A4", margin: 54, info: { Title: `${BRAND.programmeName} Working Diagnostic — ${report.participant.businessName}` } });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.rect(0, 0, doc.page.width, 142).fill("#163859");
-    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(11).text("JUMP 2026", 54, 42);
+    doc.rect(0, 0, doc.page.width, 142).fill(BRAND.colorBrandDeep);
+    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(11).text(BRAND.programmeName, 54, 42);
     doc.fontSize(24).text("Current State Working Diagnostic", 54, 64, { width: 480 });
     doc.font("Helvetica").fontSize(10).text(`Prepared for ${report.participant.fullName} · ${report.participant.businessName}`, 54, 106);
     doc.fillColor("#1E293B").font("Helvetica").fontSize(10).text(`Generated ${new Date(report.generatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, 54, 168);
-    doc.moveDown(2.5).font("Helvetica-Bold").fontSize(13).fillColor("#163859").text("Executive readout");
+    doc.moveDown(2.5).font("Helvetica-Bold").fontSize(13).fillColor(BRAND.colorBrandDeep).text("Executive readout");
     doc.moveDown(0.4).font("Helvetica").fontSize(10).fillColor("#1E293B").text(report.executiveReadout, { lineGap: 4 });
     writeSection(doc, "Current position", report.currentPosition.map((item) => `${item.label}: ${item.value}`));
     writeSection(doc, "Working hypotheses to test", report.workingHypotheses);

@@ -1,4 +1,5 @@
 import { ENV } from "./_core/env";
+import { BRAND } from "../shared/brand";
 
 export type CalendarSyncStatus = "Created" | "Pending" | "Failed" | "NotConfigured";
 export type BusyRange = { start: Date; end: Date };
@@ -94,7 +95,7 @@ export async function createCalendarEvent(input: {
       guestsCanInviteOthers: false,
       guestsCanModify: false,
       guestsCanSeeOtherGuests: false,
-      extendedProperties: { private: { jumpProgramme: "JUMP-2026" } },
+      extendedProperties: { private: { jumpProgramme: `${BRAND.programmeShortName}-2026` } },
     }),
   });
   if (!response.ok) throw new Error(`Google Calendar event creation failed (${response.status})`);

@@ -1,5 +1,77 @@
 @import "tailwindcss";
 
+/*
+ * Colour tokens, named by role (IP Factory ipf-gradient palette). Utilities use them as bg-brand, text-ink-muted, border-line, etc.
+ * Rebranding is a change of values here; shared/brand.ts holds the email/PDF equivalents.
+ * Names deliberately avoid shadcn roles (primary, muted, accent, border, ...) used by components/ui.
+ */
+@theme {
+  /* Brand */
+  --color-brand: #1C4E7E; /* Primary brand colour: buttons, links, key text, rules */
+  --color-brand-ink: #1C4E7E; /* Brand-coloured body text */
+  --color-brand-deep: #12324F; /* Deep brand: text on tints, hover state of brand buttons */
+  --color-brand-deep-hover: #0D2540; /* Hover state of brand fills */
+  --color-brand-slate: #4A5E73; /* Brand-tinted secondary text */
+  --color-brand-slate-soft: #5C7183; /* Brand-tinted tertiary text */
+  --color-brand-tint: #EEF3F8; /* Brand call-out and selected backgrounds */
+  --color-brand-tint-soft: #F3F6FA; /* Soft brand background */
+  --color-brand-tint-softer: #F6F9FB; /* Softer brand background */
+  --color-brand-tint-softest: #F9FBFD; /* Softest brand background */
+  --color-brand-tint-line: #DCE5EF; /* Dividers inside brand-tinted areas */
+  --color-brand-line: #D3DEEA; /* Brand hairlines and borders */
+  --color-brand-line-strong: #B3C5D9; /* Stronger brand borders */
+
+  /* Highlight: the logo's cyan and crimson. Cyan is for fills and text on dark navy only; crimson is the readable accent on light backgrounds (labels, rules, icons). */
+  --color-highlight: #36B7E0; /* Cyan fills and text on dark navy */
+  --color-highlight-hover: #5CC6E8; /* Hover state of cyan fills */
+  --color-highlight-ink: #CB3756; /* Crimson accent on light backgrounds */
+  --color-brand-plum: #6C335C; /* Top of the navy-to-plum panel gradient that echoes the logo */
+
+  /* Surfaces */
+  --color-paper: #F7F9FA; /* Page background; text on dark fills */
+  --color-paper-raised: #FFFFFF; /* Raised card background */
+  --color-paper-neutral: #F6F8F9; /* Neutral panel background */
+  --color-paper-muted: #F2F5F7; /* Muted panel background */
+  --color-paper-sunken: #EEF2F5; /* Sunken section background */
+  --color-paper-deep: #E8EDF1; /* Deepest neutral background (quotes) */
+
+  /* Neutral lines */
+  --color-line: #DDE3E8; /* Default hairline and border */
+  --color-line-soft: #E1E6EA; /* Soft border */
+  --color-line-warm: #D6DDE3; /* Warm border */
+  --color-line-strong: #CED6DD; /* Strong border */
+  --color-line-stronger: #C9D2DA; /* Stronger border */
+  --color-line-strongest: #C4CED7; /* Strongest border (image frames) */
+  --color-on-dark-muted: #C9D3DC; /* Muted text on dark fills */
+
+  /* Text */
+  --color-ink: #12324F; /* Primary text and dark fills */
+  --color-ink-800: #26313D; /* Near-black text */
+  --color-ink-750: #2E3946; /* Dark text */
+  --color-ink-700: #36414D; /* Dark text */
+  --color-ink-600: #404B57; /* Strong secondary text */
+  --color-ink-soft: #4F5A66; /* Secondary text */
+  --color-ink-muted: #5F6B77; /* Muted text, labels */
+  --color-ink-faint: #76818C; /* Faint text */
+  --color-ink-fainter: #7D8893; /* Fainter text */
+  --color-charcoal: #1C4E7E; /* Hover state of dark fills */
+
+  /* Business outline (business check): clear, watch, stuck */
+  --color-health-clear: #2E7D4F; /* Clear: text, dots and borders */
+  --color-health-clear-tint: #E7F3EC; /* Clear: background */
+  --color-health-watch: #B26A00; /* Watch: text, dots and borders */
+  --color-health-watch-tint: #FBF0DD; /* Watch: background */
+  --color-health-stuck: #B42318; /* Stuck: text, dots and borders */
+  --color-health-stuck-tint: #FCE9E7; /* Stuck: background */
+
+  /* Feedback */
+  --color-danger: #A34739; /* Error text and borders */
+  --color-danger-strong: #8C3024; /* Strong error text */
+  --color-danger-tint: #FCE8E6; /* Error background */
+  --color-danger-line: #E2A7A0; /* Error border */
+  --color-danger-line-soft: #D6B2AD; /* Soft error border */
+}
+
 @layer base {
   :root {
     --background: 39 33% 97%;
@@ -25,8 +97,8 @@
   }
 
   body {
-    background-color: #FBF9F5;
-    color: #1A1A1A;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
     font-family: 'Plus Jakarta Sans', sans-serif;
   }
 

@@ -9,11 +9,13 @@ import { deliverEmail, JUMP_MONITORING_BCC } from "../email";
 import { adminPermissionProcedure, ownerAdminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { ENV } from "../_core/env";
+import { getTrustedApplicationOrigin } from "../security";
 import { buildParticipantPasswordLinkEmail, createParticipantPasswordLink, normalizeParticipantEmail, replaceParticipantPortalLink } from "../participantAuth";
 import { buildEngagementBriefInvitationEmail, buildRegistrationConfirmationEmail, buildSessionReminderEmail, buildWaitlistEmail } from "../emailTemplates";
 import { sameParticipantIdentity, selectHighestPathway, pathwaySupersedes, type JumpPathway } from "../../shared/pathwayReconciliation";
 import { archiveApplicationFields, isActiveApplication } from "../../shared/applicationArchive";
 import { deriveParticipantJourney } from "../../shared/participantJourney";
+import { BRAND } from "../../shared/brand";
 
 export const BOARDROOM_CAPACITY = 8;
 const PORTAL_LINK_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -159,7 +161,7 @@ export const registrationRouter = router({
       }
       const packageName = applicant.package as "Foundation" | "Engine Room" | "Boardroom";
       if (!(["Foundation", "Engine Room", "Boardroom"] as const).includes(packageName)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "The participant does not have a recognised JUMP pathway." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: `The participant does not have a recognised ${BRAND.programmeShortName} pathway.` });
       }
       const passwordLink = await createParticipantPasswordLink(applicant.id, ctx.req);
       const message = buildEngagementBriefInvitationEmail({
@@ -343,7 +345,7 @@ export const registrationRouter = router({
 
       // Notify owner
       await notifyOwner({
-        title: `New JUMP 2026 Registration: ${input.fullName} (${input.package})`,
+        title: `New ${BRAND.programmeName} Registration: ${input.fullName} (${input.package})`,
         content: `New registration received from ${input.fullName} (${input.email}, ${input.phone}) for ${input.businessName} (${input.businessModel}). Package: ${input.package}.\n\nPre-submitted Question: ${input.question || "None"}`,
       }).catch(() => {});
 
@@ -629,7 +631,7 @@ export const registrationRouter = router({
       const rows = await db.select().from(registrations);
       const applicant = rows.find((row) => normalizeParticipantEmail(row.email) === email);
       if (!applicant || applicant.status === "Rejected") {
-        return { success: true, message: "If this email is linked to an eligible JUMP registration, a secure password link will arrive shortly." };
+        return { success: true, message: `If this email is linked to an eligible ${BRAND.programmeShortName} registration, a secure password link will arrive shortly.` };
       }
 
       const passwordLink = await createParticipantPasswordLink(applicant.id, ctx.req);
@@ -661,10 +663,10 @@ export const registrationRouter = router({
       });
 
       if (delivery.status !== "Sent") {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "We could not deliver your password link. Please try again shortly or contact Emmanuel directly." });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `We could not deliver your password link. Please try again shortly or contact ${BRAND.facilitatorFirstName} directly.` });
       }
 
-      return { success: true, message: "If this email is linked to an eligible JUMP registration, a secure password link will arrive shortly." };
+      return { success: true, message: `If this email is linked to an eligible ${BRAND.programmeShortName} registration, a secure password link will arrive shortly.` };
     }),
 
   resendEmailLog: ownerAdminProcedure
@@ -729,7 +731,7 @@ export const registrationRouter = router({
       const { generateICS } = await import("../ics");
       const icsContent = generateICS({
         title: input.sessionTitle,
-        description: `JUMP 2026 Strategy & Innovation Genius Track\nSession: ${input.sessionTitle}\nNotes: ${input.messageNotes || "Please join on time."}`,
+        description: `${BRAND.programmeFullName}\nSession: ${input.sessionTitle}\nNotes: ${input.messageNotes || "Please join on time."}`,
         startTime,
         endTime,
         location: input.meetingUrl || "Google Meet (Link available in Participant Portal)",
@@ -803,7 +805,7 @@ export const registrationRouter = router({
         .where(eq(registrations.id, input.registrationId))
         .limit(1))[0];
       if (!applicant || applicant.status === "Rejected" || applicant.email.trim().toLowerCase() !== input.email.trim().toLowerCase() || applicant.package !== input.packageName) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "This payment request does not match an eligible JUMP registration." });
+        throw new TRPCError({ code: "FORBIDDEN", message: `This payment request does not match an eligible ${BRAND.programmeShortName} registration.` });
       }
       const expectedAmount = PAYSTACK_COMMITMENT_AMOUNTS[applicant.package];
       if (input.amountInNaira !== expectedAmount) {
@@ -820,7 +822,7 @@ export const registrationRouter = router({
           body: JSON.stringify({
             email: input.email,
             amount: Math.round(input.amountInNaira * 100), // Paystack uses kobo
-            callback_url: `https://jumpreg26-l8gnjmyo.manus.space/admin?payment=verified&reg=${input.registrationId}`,
+            callback_url: `${getTrustedApplicationOrigin()}/admin?payment=verified&reg=${input.registrationId}`,
             metadata: {
               registrationId: input.registrationId,
               packageName: input.packageName,

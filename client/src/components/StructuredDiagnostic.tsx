@@ -28,6 +28,7 @@ import {
   type StructuredDiagnosticDraft,
   type StructuredDiagnosticSectionId,
 } from "../../../shared/structuredDiagnostic";
+import { BRAND } from "@shared/brand";
 
 const BUSINESS_AGE_OPTIONS = ["Pre-launch", "Under 1 year", "1 to 3 years", "3 to 5 years", "More than 5 years"];
 const ENGINE_OPTIONS = ["Makers", "Traders", "Experts"];
@@ -53,16 +54,16 @@ function ChoiceGrid({
             key={option}
             type="button"
             onClick={() => onSelect(option)}
-            className={`flex min-h-12 items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F4E79] ${
+            className={`flex min-h-12 items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
               isSelected
-                ? "border-[#1F4E79] bg-[#EAF1F8] text-[#163859]"
-                : "border-slate-200 bg-white text-slate-700 hover:border-[#1F4E79]/50 hover:bg-[#F5F8FB]"
+                ? "border-brand bg-brand-tint text-brand-deep"
+                : "border-slate-200 bg-white text-slate-700 hover:border-brand/50 hover:bg-brand-tint-softer"
             }`}
             role={multiple ? "checkbox" : "radio"}
             aria-checked={isSelected}
           >
             <span>{option}</span>
-            {isSelected && <Check className="h-4 w-4 shrink-0 text-[#1F4E79]" />}
+            {isSelected && <Check className="h-4 w-4 shrink-0 text-brand" />}
           </button>
         );
       })}
@@ -83,13 +84,13 @@ function PrefilledField({
 }) {
   const [editing, setEditing] = useState(false);
   return (
-    <div className="rounded-xl border border-slate-200 bg-[#FBF9F5] p-4">
+    <div className="rounded-xl border border-slate-200 bg-paper p-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
         <button
           type="button"
           onClick={() => setEditing((current) => !current)}
-          className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#1F4E79] hover:text-[#163859]"
+          className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:text-brand-deep"
         >
           <Pencil className="h-3.5 w-3.5" /> {editing ? "Done" : "Amend"}
         </button>
@@ -117,9 +118,9 @@ function QuestionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-[#1F4E79]/15 bg-white p-5 shadow-sm sm:p-6">
+    <section className="space-y-4 rounded-2xl border border-brand/15 bg-white p-5 shadow-sm sm:p-6">
       <div>
-        <h3 className="font-serif text-xl leading-snug text-[#1F4E79]">{question}</h3>
+        <h3 className="font-serif text-xl leading-snug text-brand">{question}</h3>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{explainer}</p>
       </div>
       {children}
@@ -280,26 +281,26 @@ export function StructuredDiagnostic() {
   ), [draft]);
 
   if (isLoading) {
-    return <Card className="border-[#1F4E79]/20 bg-white"><CardContent className="p-6 text-sm text-slate-600">Preparing your diagnostic…</CardContent></Card>;
+    return <Card className="border-brand/20 bg-white"><CardContent className="p-6 text-sm text-slate-600">Preparing your diagnostic…</CardContent></Card>;
   }
   if (error || !draft) {
-    return <Card className="border-amber-300 bg-amber-50"><CardContent className="p-6 text-sm text-amber-950">We could not prepare the diagnostic just now. Kindly refresh the page; if the issue continues, please send Emmanuel a screenshot.</CardContent></Card>;
+    return <Card className="border-amber-300 bg-amber-50"><CardContent className="p-6 text-sm text-amber-950">We could not prepare the diagnostic just now. Kindly refresh the page; if the issue continues, please send {BRAND.facilitatorFirstName} a screenshot.</CardContent></Card>;
   }
 
   return (
-    <Card className="border-[#1F4E79]/20 bg-white shadow-sm" aria-labelledby="structured-diagnostic-heading">
+    <Card className="border-brand/20 bg-white shadow-sm" aria-labelledby="structured-diagnostic-heading">
       <CardHeader className="border-b border-slate-100 pb-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">{activeMeta.number} · Section {activeIndex} of {DIAGNOSTIC_SECTION_IDS.length}</p>
-            <CardTitle id="structured-diagnostic-heading" className="mt-1 font-serif text-2xl text-[#1F4E79]">{isComplete ? "Diagnostic saved" : activeMeta.title}</CardTitle>
-            <CardDescription className="mt-2 max-w-2xl leading-6">{isComplete ? "Your completed answers are available to Emmanuel for the next stage of the advisory work." : `${activeMeta.duration}. Select the closest answer first; only the optional context prompts require typing.`}</CardDescription>
+            <CardTitle id="structured-diagnostic-heading" className="mt-1 font-serif text-2xl text-brand">{isComplete ? "Diagnostic saved" : activeMeta.title}</CardTitle>
+            <CardDescription className="mt-2 max-w-2xl leading-6">{isComplete ? `Your completed answers are available to ${BRAND.facilitatorFirstName} for the next stage of the advisory work.` : `${activeMeta.duration}. Select the closest answer first; only the optional context prompts require typing.`}</CardDescription>
           </div>
-          <Badge className="w-fit border-[#1F4E79]/20 bg-[#EAF1F8] text-[#1F4E79]">{savedAt ? `Saved ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : saveMutation.isPending ? "Saving…" : "Private draft"}</Badge>
+          <Badge className="w-fit border-brand/20 bg-brand-tint text-brand">{savedAt ? `Saved ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : saveMutation.isPending ? "Saving…" : "Private draft"}</Badge>
         </div>
         <div className="mt-5" aria-label="Diagnostic section progress">
           <div className="mb-2 flex items-center justify-between text-xs text-slate-500"><span>{completed} of {DIAGNOSTIC_SECTION_IDS.length} sections complete</span><span>{progressPercent}%</span></div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#1F4E79] transition-[width] duration-300" style={{ width: `${progressPercent}%` }} /></div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand transition-[width] duration-300" style={{ width: `${progressPercent}%` }} /></div>
         </div>
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1" aria-label="Diagnostic sections">
           {DIAGNOSTIC_SECTION_IDS.map((section, index) => {
@@ -313,9 +314,9 @@ export function StructuredDiagnostic() {
                 onClick={() => updateDraft((current) => ({ ...current, activeSection: section }))}
                 className={`min-w-max rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   isActive
-                    ? "border-[#1F4E79] bg-[#1F4E79] text-white"
+                    ? "border-brand bg-brand text-white"
                     : isAvailable
-                      ? "border-[#1F4E79]/25 bg-[#F5F8FB] text-[#1F4E79] hover:bg-[#EAF1F8]"
+                      ? "border-brand/25 bg-brand-tint-softer text-brand hover:bg-brand-tint"
                       : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
                 }`}
               >
@@ -329,7 +330,7 @@ export function StructuredDiagnostic() {
       <CardContent className="space-y-5 pt-6">
         {activeSection === "confirm" && (
           <>
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">
+            <div className="rounded-xl border border-brand/15 bg-brand-tint p-4 text-sm leading-6 text-brand-deep">
               This is what you told us when you registered. Kindly confirm it is still accurate, or amend anything that has changed. This avoids asking you to start from blank boxes.
             </div>
             <PrefilledField label="Business name" value={draft.section1.businessName} onChange={(value) => updateDraft((current) => ({ ...current, section1: { ...current.section1, businessName: value } }))} />
@@ -343,7 +344,7 @@ export function StructuredDiagnostic() {
             <PrefilledField label="The main constraint you named" value={draft.section1.primaryConstraint} multiline onChange={(value) => updateDraft((current) => ({ ...current, section1: { ...current.section1, primaryConstraint: value } }))} />
             <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs leading-5 text-slate-500">Your registration context stays private to your participant file. It will be used only to shape the advisory work.</p>
-              <Button disabled={!sectionOneReady || saveMutation.isPending} onClick={() => markSectionComplete("confirm", "shape")} className="bg-[#1F4E79] text-white hover:bg-[#163859]">
+              <Button disabled={!sectionOneReady || saveMutation.isPending} onClick={() => markSectionComplete("confirm", "shape")} className="bg-brand text-white hover:bg-brand-deep">
                 Continue to business shape <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -353,7 +354,7 @@ export function StructuredDiagnostic() {
 
         {activeSection === "shape" && (
           <>
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">There is no need to type a long explanation here. Select the answers that best match the present shape of the business; you can amend them later.</div>
+            <div className="rounded-xl border border-brand/15 bg-brand-tint p-4 text-sm leading-6 text-brand-deep">There is no need to type a long explanation here. Select the answers that best match the present shape of the business; you can amend them later.</div>
             <QuestionCard question="Who pays you?" explainer="Select every payer that applies. This helps us understand your revenue relationship, not just your product.">
               <ChoiceGrid options={PAYERS} multiple selected={draft.section2.payers} onSelect={(value) => updateDraft((current) => {
                 const currentValues = current.section2.payers ?? [];
@@ -372,8 +373,8 @@ export function StructuredDiagnostic() {
               </div>
             </QuestionCard>
             <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <Button variant="ghost" onClick={goToPreviousSection} className="text-[#1F4E79]"><ChevronLeft className="mr-2 h-4 w-4" /> Review section 1</Button>
-              <Button disabled={!sectionTwoReady || saveMutation.isPending} onClick={() => markSectionComplete("shape", "numbers")} className="bg-[#1F4E79] text-white hover:bg-[#163859]">
+              <Button variant="ghost" onClick={goToPreviousSection} className="text-brand"><ChevronLeft className="mr-2 h-4 w-4" /> Review section 1</Button>
+              <Button disabled={!sectionTwoReady || saveMutation.isPending} onClick={() => markSectionComplete("shape", "numbers")} className="bg-brand text-white hover:bg-brand-deep">
                 Continue to the numbers <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -383,7 +384,7 @@ export function StructuredDiagnostic() {
 
         {activeSection === "numbers" && (
           <>
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">This is a directional financial picture, not an audit. Where exact figures are unavailable, use the closest band or choose “I do not know yet”. That answer is useful information too.</div>
+            <div className="rounded-xl border border-brand/15 bg-brand-tint p-4 text-sm leading-6 text-brand-deep">This is a directional financial picture, not an audit. Where exact figures are unavailable, use the closest band or choose “I do not know yet”. That answer is useful information too.</div>
             <QuestionCard question="What is the business’s current revenue stage?" explainer="Choose the statement that best reflects the present reality. The pre-launch option will shape our questions differently from an established trading business.">
               <ChoiceGrid options={REVENUE_STAGE_OPTIONS} selected={draft.section3.revenueStage} onSelect={(value) => updateDraft((current) => ({ ...current, section3: { ...current.section3, revenueStage: value } }))} />
             </QuestionCard>
@@ -403,8 +404,8 @@ export function StructuredDiagnostic() {
               <OptionalNote label="Optional numerical context" value={draft.section3.materialNumberNote} onChange={(value) => updateDraft((current) => ({ ...current, section3: { ...current.section3, materialNumberNote: value } }))} placeholder="For example: Our average monthly sales are about ₦1.2m, but this is seasonal." />
             </QuestionCard>
             <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <Button variant="ghost" onClick={goToPreviousSection} className="text-[#1F4E79]"><ChevronLeft className="mr-2 h-4 w-4" /> Review business shape</Button>
-              <Button disabled={!sectionThreeReady || saveMutation.isPending} onClick={() => markSectionComplete("numbers", "founder")} className="bg-[#1F4E79] text-white hover:bg-[#163859]">
+              <Button variant="ghost" onClick={goToPreviousSection} className="text-brand"><ChevronLeft className="mr-2 h-4 w-4" /> Review business shape</Button>
+              <Button disabled={!sectionThreeReady || saveMutation.isPending} onClick={() => markSectionComplete("numbers", "founder")} className="bg-brand text-white hover:bg-brand-deep">
                 Continue to founder context <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -414,7 +415,7 @@ export function StructuredDiagnostic() {
 
         {activeSection === "founder" && (
           <>
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">This section is about the operating reality around the founder—not a personality test. Choose the answer that feels closest today, not the answer you think a business should have. If a question feels premature or unclear, select “I would prefer to explore this in conversation”; it gives Emmanuel useful context without forcing an answer.</div>
+            <div className="rounded-xl border border-brand/15 bg-brand-tint p-4 text-sm leading-6 text-brand-deep">This section is about the operating reality around the founder—not a personality test. Choose the answer that feels closest today, not the answer you think a business should have. If a question feels premature or unclear, select “I would prefer to explore this in conversation”; it gives {BRAND.facilitatorFirstName} useful context without forcing an answer.</div>
             <QuestionCard question="How are you currently carrying the leadership load?" explainer="This helps distinguish a capacity constraint from a strategic or market constraint.">
               <ChoiceGrid options={FOUNDER_CAPACITY_OPTIONS} selected={draft.section4.founderCapacity} onSelect={(value) => updateDraft((current) => ({ ...current, section4: { ...current.section4, founderCapacity: value } }))} />
             </QuestionCard>
@@ -428,8 +429,8 @@ export function StructuredDiagnostic() {
               <OptionalNote label="Optional founder context" value={draft.section4.leadershipConstraint} onChange={(value) => updateDraft((current) => ({ ...current, section4: { ...current.section4, leadershipConstraint: value } }))} placeholder="For example: I need to be clearer about what to keep personally and what to delegate." />
             </QuestionCard>
             <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <Button variant="ghost" onClick={goToPreviousSection} className="text-[#1F4E79]"><ChevronLeft className="mr-2 h-4 w-4" /> Review the numbers</Button>
-              <Button disabled={!sectionFourReady || saveMutation.isPending} onClick={() => markSectionComplete("founder", "future")} className="bg-[#1F4E79] text-white hover:bg-[#163859]">
+              <Button variant="ghost" onClick={goToPreviousSection} className="text-brand"><ChevronLeft className="mr-2 h-4 w-4" /> Review the numbers</Button>
+              <Button disabled={!sectionFourReady || saveMutation.isPending} onClick={() => markSectionComplete("founder", "future")} className="bg-brand text-white hover:bg-brand-deep">
                 Continue to future direction <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -439,7 +440,7 @@ export function StructuredDiagnostic() {
 
         {activeSection === "future" && (
           <>
-            <div className="rounded-xl border border-[#1F4E79]/15 bg-[#EAF1F8] p-4 text-sm leading-6 text-[#163859]">This final section anchors the advisory work in the outcome that matters to you. It is not a promise of a particular business result; it helps Emmanuel shape the questions, priorities, and recommendations around the choices ahead. You may choose to explore an item in conversation where a direction is not yet clear.</div>
+            <div className="rounded-xl border border-brand/15 bg-brand-tint p-4 text-sm leading-6 text-brand-deep">This final section anchors the advisory work in the outcome that matters to you. It is not a promise of a particular business result; it helps {BRAND.facilitatorFirstName} shape the questions, priorities, and recommendations around the choices ahead. You may choose to explore an item in conversation where a direction is not yet clear.</div>
             <QuestionCard question="What planning horizon matters most right now?" explainer="Choose the period within which you most need greater clarity or progress.">
               <ChoiceGrid options={FUTURE_HORIZON_OPTIONS} selected={draft.section5.futureHorizon} onSelect={(value) => updateDraft((current) => ({ ...current, section5: { ...current.section5, futureHorizon: value } }))} />
             </QuestionCard>
@@ -457,8 +458,8 @@ export function StructuredDiagnostic() {
               <OptionalNote label="Optional success statement" value={draft.section5.successDescription} onChange={(value) => updateDraft((current) => ({ ...current, section5: { ...current.section5, successDescription: value } }))} placeholder="For example: I will know exactly which market to focus on and what to stop doing." />
             </QuestionCard>
             <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <Button variant="ghost" onClick={goToPreviousSection} className="text-[#1F4E79]"><ChevronLeft className="mr-2 h-4 w-4" /> Review founder context</Button>
-              <Button disabled={!sectionFiveReady || saveMutation.isPending} onClick={() => markSectionComplete("future", "future")} className="bg-[#1F4E79] text-white hover:bg-[#163859]">
+              <Button variant="ghost" onClick={goToPreviousSection} className="text-brand"><ChevronLeft className="mr-2 h-4 w-4" /> Review founder context</Button>
+              <Button disabled={!sectionFiveReady || saveMutation.isPending} onClick={() => markSectionComplete("future", "future")} className="bg-brand text-white hover:bg-brand-deep">
                 {isComplete ? "Diagnostic saved" : "Save completed diagnostic"} <Check className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -470,18 +471,18 @@ export function StructuredDiagnostic() {
                   <div>
                     <p className="font-semibold">Thank you. Your completed diagnostic has been saved.</p>
                     <p className="mt-1">You may revisit any completed section from the navigator above. When you are ready, use the portal tabs at the top of this page to view your programme, payment status, shared documents, or session information.</p>
-                    <p className="mt-2">Emmanuel will use this record to shape the next stage of your engagement. If you have a question or experience a technical glitch, kindly email him directly with a screenshot.</p>
+                    <p className="mt-2">{BRAND.facilitatorFirstName} will use this record to shape the next stage of your engagement. If you have a question or experience a technical glitch, kindly email him directly with a screenshot.</p>
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-emerald-200/80 bg-white/80 p-4 text-slate-800">
-                  <p className="font-semibold text-[#163859]">Your Current State Working Diagnostic</p>
+                  <p className="font-semibold text-brand-deep">Your Current State Working Diagnostic</p>
                   <p className="mt-1 text-sm leading-6 text-slate-600">Create a concise working report based only on the answers you supplied here and the registration context you confirmed. It highlights discussion priorities and questions for the advisory work; it is not a final strategy, audit, valuation, or promise of outcomes.</p>
 
                   {!workingReportQuery.data?.report ? (
                     <Button
                       type="button"
-                      className="mt-4 bg-[#1F4E79] text-white hover:bg-[#163859]"
+                      className="mt-4 bg-brand text-white hover:bg-brand-deep"
                       disabled={generateWorkingReportMutation.isPending}
                       onClick={() => {
                         setReportFeedback(null);
@@ -499,10 +500,10 @@ export function StructuredDiagnostic() {
                   ) : (
                     <div className="mt-4 space-y-4">
                       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <Button type="button" onClick={downloadCurrentWorkingReport} disabled={downloadWorkingReportQuery.isFetching} className="bg-[#1F4E79] text-white hover:bg-[#163859]">
+                        <Button type="button" onClick={downloadCurrentWorkingReport} disabled={downloadWorkingReportQuery.isFetching} className="bg-brand text-white hover:bg-brand-deep">
                           {downloadWorkingReportQuery.isFetching ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing PDF…</> : <><Download className="mr-2 h-4 w-4" /> Download PDF</>}
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => emailCurrentWorkingReport()} disabled={emailWorkingReportMutation.isPending} className="border-[#1F4E79]/30 text-[#1F4E79] hover:bg-[#EAF1F8]">
+                        <Button type="button" variant="outline" onClick={() => emailCurrentWorkingReport()} disabled={emailWorkingReportMutation.isPending} className="border-brand/30 text-brand hover:bg-brand-tint">
                           {emailWorkingReportMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…</> : <><Mail className="mr-2 h-4 w-4" /> Email me a copy</>}
                         </Button>
                       </div>
@@ -510,13 +511,13 @@ export function StructuredDiagnostic() {
                         <label htmlFor="working-report-team-email" className="text-sm font-semibold text-slate-700">Send to a trusted team recipient <span className="font-normal text-slate-500">(optional)</span></label>
                         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                           <Input id="working-report-team-email" type="email" value={teamRecipientEmail} onChange={(event) => setTeamRecipientEmail(event.target.value)} placeholder="colleague@company.com" className="bg-white" />
-                          <Button type="button" variant="outline" disabled={!teamRecipientEmail.trim() || emailWorkingReportMutation.isPending} onClick={() => emailCurrentWorkingReport(teamRecipientEmail)} className="shrink-0 border-[#1F4E79]/30 text-[#1F4E79] hover:bg-[#EAF1F8]">Send PDF</Button>
+                          <Button type="button" variant="outline" disabled={!teamRecipientEmail.trim() || emailWorkingReportMutation.isPending} onClick={() => emailCurrentWorkingReport(teamRecipientEmail)} className="shrink-0 border-brand/30 text-brand hover:bg-brand-tint">Send PDF</Button>
                         </div>
                         <p className="mt-2 text-xs leading-5 text-slate-500">Only send this private working document to someone you trust to work with your business information.</p>
                       </div>
                     </div>
                   )}
-                  {reportFeedback && <p role="status" className="mt-3 text-sm font-medium text-[#163859]">{reportFeedback}</p>}
+                  {reportFeedback && <p role="status" className="mt-3 text-sm font-medium text-brand-deep">{reportFeedback}</p>}
                 </div>
               </div>
             )}

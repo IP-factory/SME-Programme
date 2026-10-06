@@ -9,7 +9,7 @@ function senderDomain(value: string) {
 }
 
 describe("Resend secret configuration", () => {
-  it("authenticates the configured API key against the domains endpoint", async () => {
+  it.skipIf(process.env.VALIDATE_RESEND_CREDENTIALS !== "1")("authenticates the configured API key against the domains endpoint", async () => {
     const apiKey = process.env.RESEND_API_KEY;
     expect(apiKey, "RESEND_API_KEY must be configured").toBeTruthy();
 
