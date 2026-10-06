@@ -27,7 +27,7 @@
 | Security | `229bab1` | The public admin sign-in page no longer discloses the Super Admin email |
 | B1–B2 Brand | `926ee23` | ipf-teal-navy palette, IP Factory logo in the headers, favicon |
 | R1 Manus removal | `ccf6cbe` | Unused Manus code and plugins removed; `*.manus.*` no longer trusted; production `index.html` 368 kB → 1 kB |
-| R4–R5 | next commit | Desk notifications by email; scheduled reminders authenticated by `CRON_SECRET` |
+| R4–R5 | `9570ed3` | Desk notifications by email; scheduled reminders authenticated by `CRON_SECRET` |
 
 ---
 
