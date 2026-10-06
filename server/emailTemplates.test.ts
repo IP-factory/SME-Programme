@@ -53,8 +53,8 @@ describe("Engagement Brief invitation presentation", () => {
 
   it("reconciles duplicate pathway entries into one clear Boardroom-only participant instruction", () => {
     const email = buildDuplicatePathwayClarificationEmail({
-      fullName: "Marcelle Tiogo",
-      businessName: "Marcelle Crown Studio",
+      fullName: "Tobi Adeyemi",
+      businessName: "Tobi Bloom Studio",
       packageName: "Boardroom",
       portalUrl: "https://emmanueltarfa.com/portal/access?token=boardroom-only",
     });

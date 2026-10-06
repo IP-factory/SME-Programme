@@ -35,14 +35,16 @@ function createFakeDb(input: {
   const inserts: Array<{ table: unknown; values: Record<string, unknown> }> = [];
   const fakeDb = {
     select: () => ({
-      from: (table: unknown) => ({
-        where: () => {
-          if (table === registrations) return queryResult([registration()]);
-          if (table === participantCredentials) return queryResult(input.credential ? [input.credential] : []);
-          if (table === participantPasswordTokens) return queryResult(input.passwordToken ? [input.passwordToken] : []);
-          return queryResult([]);
-        },
-      }),
+      // Awaitable directly (full-table reads) and via `.where()` (filtered reads).
+      from: (table: unknown) => {
+        const rows = () => {
+          if (table === registrations) return [registration()];
+          if (table === participantCredentials) return input.credential ? [input.credential] : [];
+          if (table === participantPasswordTokens) return input.passwordToken ? [input.passwordToken] : [];
+          return [];
+        };
+        return Object.assign(queryResult(rows()), { where: () => queryResult(rows()) });
+      },
     }),
     update: (table: unknown) => ({
       set: (values: Record<string, unknown>) => ({

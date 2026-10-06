@@ -15,10 +15,10 @@ describe("participant pathway reconciliation", () => {
   });
 
   it("recognises an existing participant despite casing, punctuation, spacing, or a second email address", () => {
-    expect(normaliseParticipantIdentity("Marcelle Crown Studio 🍀👑")).toBe("marcellecrownstudio");
+    expect(normaliseParticipantIdentity("Tobi Bloom Studio 🍀👑")).toBe("tobibloomstudio");
     expect(sameParticipantIdentity(
-      { email: "marcellecrownstudio@gmail.com", fullName: "Marcelle  Tiogo", businessName: "Marcelle Crown Studio 🍀👑" },
-      { email: "different-address@example.com", fullName: "Marcelle Tiogo", businessName: "Marcelle Crown Studio" },
+      { email: "tobibloomstudio@example.com", fullName: "Tobi  Adeyemi", businessName: "Tobi Bloom Studio 🍀👑" },
+      { email: "different-address@example.com", fullName: "Tobi Adeyemi", businessName: "Tobi Bloom Studio" },
     )).toBe(true);
   });
 });
