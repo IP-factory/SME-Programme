@@ -113,11 +113,11 @@ export default function Home() {
 
       <Hero onStart={handleStartCheck} />
 
-      {/* The problem, in your words */}
+      {/* What business owners tell us */}
       <section id="problem" className="py-24 border-b border-line">
         <div className="container max-w-5xl mx-auto">
           <Reveal>
-            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-6 text-center">The problem, in your words</span>
+            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-6 text-center">What business owners tell us</span>
           </Reveal>
           <Stagger className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
             {["I'm busy but not making money.", "Nothing moves unless I'm there.", "How do I get more customers, every month?", "Cash is always tight and my prices are guesses."].map((quote) => (
