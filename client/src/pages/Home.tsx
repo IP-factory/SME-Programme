@@ -2,14 +2,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { ArrowRight, CheckCircle2, KeyRound, MailCheck } from "lucide-react";
+import { CtaButton, Faq, Hero, Journey, NAV, StuckPicker, useActiveSection, useScrolled } from "@/components/home/HomeSections";
+import { Reveal, ScrollProgress, Stagger, staggerChild } from "@/components/motion";
+import { motion } from "framer-motion";
+import { ArrowRight, CheckCircle2, KeyRound, MailCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { BRAND } from "@shared/brand";
-import { JOURNEY, PROBLEM_AREAS, PROMISE } from "@shared/businessSupport";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const scrolled = useScrolled();
+  const active = useActiveSection(NAV.map((item) => item.id));
   const [isParticipantSignInOpen, setIsParticipantSignInOpen] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
@@ -75,17 +79,20 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-paper text-ink font-sans flex flex-col selection:bg-brand selection:text-paper">
       {/* Copy: concept note v0.8.1, section 16 ("lift as is"). [NAME] is BRAND.productName. */}
-      <header className="border-b border-line bg-paper/90 backdrop-blur sticky top-0 z-50">
-        <div className="container flex items-center justify-between h-20">
+      <ScrollProgress />
+      <header className={`border-b bg-paper/85 backdrop-blur-md sticky top-0 z-50 transition-[box-shadow,border-color] duration-300 ${scrolled ? "border-line shadow-[0_8px_30px_-12px_rgba(18,50,79,0.25)]" : "border-transparent"}`}>
+        <div className={`container flex items-center justify-between transition-[height] duration-300 ${scrolled ? "h-16" : "h-20"}`}>
           <a href="#top" className="flex items-center gap-3" aria-label={`${BRAND.organisationName} ${BRAND.productName}`}>
             <img src={BRAND.markUrl} alt={BRAND.organisationName} className="h-10 w-auto shrink-0" />
             <span className="hidden sm:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.productName}</span>
           </a>
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-ink-600">
-            <a href="#how" className="hover:text-brand transition-colors">How it works</a>
-            <a href="#stuck" className="hover:text-brand transition-colors">Where you're stuck</a>
-            <a href="#for" className="hover:text-brand transition-colors">Who it's for</a>
-            <a href="#questions" className="hover:text-brand transition-colors">Questions</a>
+            {NAV.map((item) => (
+              <a key={item.id} href={`#${item.id}`} className={`relative py-1 transition-colors hover:text-brand ${active === item.id ? "text-brand" : ""}`}>
+                {item.label}
+                {active === item.id && <motion.span layoutId="nav-underline" className="absolute inset-x-0 -bottom-0.5 h-0.5 bg-highlight-ink" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
+              </a>
+            ))}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
@@ -96,117 +103,74 @@ export default function Home() {
             >
               Client sign in
             </Button>
-            <Button onClick={handleStartCheck} className="hidden sm:inline-flex bg-ink text-paper hover:bg-charcoal font-medium text-xs uppercase tracking-widest px-5 py-2.5 rounded-none">
-              Free business check
+            <Button onClick={handleStartCheck} className="group hidden sm:inline-flex bg-ink text-paper hover:bg-charcoal font-medium text-xs uppercase tracking-widest px-5 py-2.5 rounded-none transition-transform active:scale-95">
+              Free business check <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section id="top" className="relative pt-20 pb-20 md:pt-28 md:pb-24 border-b border-line">
-        <div className="container max-w-4xl mx-auto text-center px-4">
-          <p className="mb-6 text-xs sm:text-sm font-semibold uppercase tracking-[0.3em] text-highlight-ink">{PROMISE.join(" ")}</p>
-          <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.08] text-ink mb-8">
-            You know what your business needs.
-          </h1>
-          <p className="font-serif italic text-xl sm:text-2xl text-ink-soft max-w-3xl mx-auto mb-6 leading-relaxed">
-            You just can&apos;t get it done, with everything else on your plate.
-          </p>
-          <p className="text-lg text-ink-600 max-w-2xl mx-auto mb-12 leading-relaxed">
-            {BRAND.productName} gets in with you, names the real problem, shows you exactly what to do, gives you the tools, and checks your work every week until the number moves.
-          </p>
-          <div className="flex flex-col items-center gap-3">
-            <Button onClick={handleStartCheck} className="h-14 w-full max-w-sm bg-ink text-paper hover:bg-charcoal text-sm uppercase tracking-wider sm:tracking-widest px-6 sm:px-8 rounded-none font-semibold shadow-lg">
-              Start with a free business check <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-            <p className="text-sm text-ink-muted">Ten minutes, on your phone.</p>
-          </div>
-        </div>
-      </section>
+      <Hero onStart={handleStartCheck} />
 
       {/* The problem, in your words */}
       <section id="problem" className="py-24 border-b border-line">
         <div className="container max-w-5xl mx-auto">
-          <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-6 text-center">The problem, in your words</span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
+          <Reveal>
+            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-6 text-center">The problem, in your words</span>
+          </Reveal>
+          <Stagger className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
             {["I'm busy but not making money.", "Nothing moves unless I'm there.", "How do I get more customers, every month?", "Cash is always tight and my prices are guesses."].map((quote) => (
-              <div key={quote} className="p-6 bg-paper-sunken border border-line">
+              <motion.button
+                key={quote}
+                type="button"
+                variants={staggerChild}
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleStartCheck}
+                className="group relative overflow-hidden p-6 text-left bg-paper-sunken border border-line hover:border-brand hover:shadow-lg transition-[border-color,box-shadow] duration-300"
+              >
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1 origin-bottom scale-y-0 bg-highlight-ink transition-transform duration-300 group-hover:scale-y-100" />
                 <p className="font-serif italic text-xl text-ink-750 leading-snug">&ldquo;{quote}&rdquo;</p>
-              </div>
+                <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-brand opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0">
+                  That&apos;s me <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </motion.button>
             ))}
-          </div>
-          <p className="font-serif text-2xl sm:text-3xl text-center text-ink max-w-3xl mx-auto leading-snug">
-            If one of those is you, you don&apos;t need another course. You need someone who stays with you while you fix it.
-          </p>
+          </Stagger>
+          <Reveal>
+            <p className="font-serif text-2xl sm:text-3xl text-center text-ink max-w-3xl mx-auto leading-snug">
+              If one of those is you, you don&apos;t need another course. You need someone who stays with you while you fix it.
+            </p>
+          </Reveal>
         </div>
       </section>
 
       {/* What we are, and are not */}
       <section id="what" className="py-24 border-b border-line bg-paper-sunken/50">
         <div className="container max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
-          <div>
+          <Reveal>
             <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">What we are, and are not</span>
             <h2 className="font-serif text-4xl font-bold tracking-tight mb-6">We don&apos;t run your business; you do.</h2>
             <ul className="space-y-2 text-ink-600">
-              <li>We are not a course.</li>
-              <li>We are not a consultant who writes a report and leaves.</li>
+              <li className="flex items-center gap-3"><X className="h-4 w-4 text-highlight-ink" />We are not a course.</li>
+              <li className="flex items-center gap-3"><X className="h-4 w-4 text-highlight-ink" />We are not a consultant who writes a report and leaves.</li>
             </ul>
-          </div>
-          <div className="space-y-5 text-lg text-ink-600 leading-relaxed">
+          </Reveal>
+          <Reveal delay={0.12} className="space-y-5 text-lg text-ink-600 leading-relaxed">
             <p>We work out what is really wrong, tell you what to do about it, hand you the tools, and meet you every week until it is done.</p>
             <p className="p-5 border border-brand-line bg-brand-tint text-base text-brand-deep">Our analysts and AI do the heavy lifting, under a named {BRAND.organisationName} consultant. We say so up front.</p>
-          </div>
+          </Reveal>
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how" className="py-24 border-b border-line">
-        <div className="container max-w-4xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight">How it works</h2>
-          </div>
-          <ol className="space-y-4">
-            {JOURNEY.map((step, index) => (
-              <li key={step.id} className="flex gap-5 bg-paper-raised border border-line p-6">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center bg-brand text-paper font-mono text-sm font-semibold">{index + 1}</span>
-                <div>
-                  <p className="font-serif font-bold text-xl mb-1">{step.name}</p>
-                  <p className="text-ink-soft leading-relaxed">{step.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+      <Journey />
 
-      {/* Where businesses get stuck */}
-      <section id="stuck" className="py-24 border-b border-line bg-paper-sunken/50">
-        <div className="container max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Where businesses get stuck</span>
-            <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight">Pick yours.</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {PROBLEM_AREAS.filter((area) => area.siteSentence).map((area) => (
-              <button
-                key={area.number}
-                type="button"
-                onClick={handleStartCheck}
-                className="group flex items-center justify-between gap-4 text-left bg-paper border border-line p-5 hover:border-brand hover:bg-brand-tint transition-colors"
-              >
-                <span className="font-serif italic text-lg text-ink-750 leading-snug">&ldquo;{area.siteSentence}&rdquo;</span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-ink-faint group-hover:text-brand" />
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
+      <StuckPicker onStart={handleStartCheck} />
 
       {/* Who it is for / who you work with */}
       <section id="for" className="py-24 border-b border-line">
         <div className="container max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12">
-          <div>
+          <Reveal>
             <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Who it is for</span>
             <p className="text-lg text-ink-600 leading-relaxed mb-4">
               Business owners who already trade, at about ₦5 million a month or more, and who can give two to four hours a week for six weeks.
@@ -214,54 +178,29 @@ export default function Home() {
             <p className="text-ink-soft leading-relaxed">
               If you are smaller, start with the free check and our training timetable. If you are much larger, we will point you to {BRAND.organisationName} Advisory.
             </p>
-          </div>
+          </Reveal>
           <div>
-            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Who you work with</span>
-            <ul className="space-y-3 text-lg text-ink-600">
-              <li className="flex items-start gap-3"><CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-highlight-ink" />A named {BRAND.organisationName} consultant leads your work.</li>
-              <li className="flex items-start gap-3"><CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-highlight-ink" />Analysts prepare every call.</li>
-              <li className="flex items-start gap-3"><CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-highlight-ink" />A partner joins for larger businesses.</li>
-              <li className="flex items-start gap-3"><CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-highlight-ink" />We use AI for analysis and say so.</li>
-            </ul>
+            <Reveal><span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Who you work with</span></Reveal>
+            <Stagger as="ul" className="space-y-3 text-lg text-ink-600">
+              {[`A named ${BRAND.organisationName} consultant leads your work.`, "Analysts prepare every call.", "A partner joins for larger businesses.", "We use AI for analysis and say so."].map((line) => (
+                <motion.li key={line} variants={staggerChild} className="flex items-start gap-3"><CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-highlight-ink" />{line}</motion.li>
+              ))}
+            </Stagger>
           </div>
         </div>
       </section>
 
-      {/* Questions */}
-      <section id="questions" className="py-24 border-b border-line bg-paper-sunken/50">
-        <div className="container max-w-3xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="font-serif text-4xl font-bold tracking-tight">Questions business owners ask</h2>
-          </div>
-          <div className="divide-y divide-line border-y border-line">
-            {[
-              { q: "Do you do the work for me?", a: "No. You do; we make sure you know what to do and that it gets done." },
-              { q: "What if the number doesn't move in six weeks?", a: "We extend, at no charge, for up to two weeks before anything else is paid." },
-              { q: "What do you do with my information?", a: `It stays between you and your ${BRAND.organisationName} team. We only use anonymised cases, and only with your consent.` },
-              { q: "What happens after the fix?", a: "You have a plan. If you want us to stay, we agree what that looks like and what it costs." },
-            ].map((item) => (
-              <details key={item.q} className="group py-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-ink">
-                  {item.q}
-                  <span className="text-brand transition-transform group-open:rotate-45 text-xl leading-none" aria-hidden="true">+</span>
-                </summary>
-                <p className="mt-3 text-ink-soft leading-relaxed">{item.a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
+      <Faq />
 
       {/* The ask */}
-      <section className="py-20 bg-linear-to-t from-brand to-brand-plum text-paper">
-        <div className="container max-w-3xl mx-auto text-center">
+      <section className="relative overflow-hidden py-20 bg-linear-to-t from-brand to-brand-plum text-paper">
+        <motion.div aria-hidden className="pointer-events-none absolute -top-40 left-1/2 h-96 w-[48rem] -translate-x-1/2 rounded-full bg-highlight/20 blur-3xl" animate={{ x: ["-55%", "-45%", "-55%"], opacity: [0.5, 0.9, 0.5] }} transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }} />
+        <Reveal className="relative container max-w-3xl mx-auto text-center">
           <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mx-auto mb-8 h-28 w-auto" />
           <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">Start with the free business check.</h2>
           <p className="text-on-dark-muted max-w-xl mx-auto mb-8">Ten minutes. No card. You&apos;ll know where you stand before you decide anything.</p>
-          <Button onClick={handleStartCheck} className="bg-highlight text-brand-deep hover:bg-highlight-hover rounded-none px-10 h-14 text-sm uppercase tracking-widest font-semibold">
-            Start with a free business check <ArrowRight className="ml-2 w-4 h-4" />
-          </Button>
-        </div>
+          <CtaButton onClick={handleStartCheck} tone="light">Start with a free business check</CtaButton>
+        </Reveal>
       </section>
 
       {/* Participant Sign In Modal */}

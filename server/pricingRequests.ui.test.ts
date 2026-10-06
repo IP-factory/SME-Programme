@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const homeSource = readFileSync(resolve(process.cwd(), "client/src/pages/Home.tsx"), "utf8");
+const homeSource = ["client/src/pages/Home.tsx", "client/src/components/home/HomeSections.tsx"].map((file) => readFileSync(resolve(process.cwd(), file), "utf8")).join("\n");
 const portalSource = readFileSync(resolve(process.cwd(), "client/src/pages/ParticipantDashboard.tsx"), "utf8");
 const dialogSource = readFileSync(resolve(process.cwd(), "client/src/components/PricingRequestDialog.tsx"), "utf8");
 

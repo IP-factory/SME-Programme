@@ -3,7 +3,17 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MotionGlobalConfig } from "framer-motion";
 import { evaluate } from "../shared/businessCheck/engine";
+
+MotionGlobalConfig.skipAnimations = true;
+// jsdom has no IntersectionObserver; scroll-triggered motion just needs it to exist.
+globalThis.IntersectionObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() { return []; }
+} as unknown as typeof IntersectionObserver;
 
 const submit = { isPending: false, mutate: vi.fn(), reset: vi.fn() };
 const requestNext = { isPending: false, mutate: vi.fn(), error: null };
@@ -34,7 +44,7 @@ describe("business check page", () => {
   it("walks an idea-stage founder through founder readiness and the idea, never the trading questions", async () => {
     render(React.createElement(BusinessCheck));
     await pick(/take the check/i);
-    expect(screen.getByText("What this means")).toBeTruthy();
+    expect(await screen.findByText("What this means")).toBeTruthy();
     await pick(/questions/i);
 
     await pick(/An idea: I haven't started trading yet/);
