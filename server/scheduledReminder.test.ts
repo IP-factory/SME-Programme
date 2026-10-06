@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   automatedReminderPolicy,
+  isAuthorisedCronRequest,
   OWNER_APPROVAL_REQUIRED_FOR_REMINDERS,
   reminderDeliveryKey,
   reminderWindow,
 } from "./scheduledReminder";
 
 describe("scheduled 24-hour reminders", () => {
+  it("accepts only the configured cron secret, and nothing when no secret is set", () => {
+    expect(isAuthorisedCronRequest("Bearer s3cret-value", "s3cret-value")).toBe(true);
+    expect(isAuthorisedCronRequest("Bearer wrong", "s3cret-value")).toBe(false);
+    expect(isAuthorisedCronRequest("s3cret-value", "s3cret-value")).toBe(false);
+    expect(isAuthorisedCronRequest(undefined, "s3cret-value")).toBe(false);
+    expect(isAuthorisedCronRequest("Bearer ", "")).toBe(false);
+  });
+
   it("uses a stable delivery key for exactly one reminder per booking", () => {
     expect(reminderDeliveryKey(42)).toBe("booking:42:24h");
   });

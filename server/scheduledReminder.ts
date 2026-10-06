@@ -5,7 +5,8 @@ import { and, eq, gte, lt } from "drizzle-orm";
 import { deliverEmail } from "./email";
 import { buildBrandedEmailHtml } from "./emailTemplates";
 import { generateICS } from "./ics";
-import { sdk } from "./_core/sdk";
+import { createHash, timingSafeEqual } from "crypto";
+import { ENV } from "./_core/env";
 import { BRAND } from "../shared/brand";
 
 const HOUR = 60 * 60 * 1000;
@@ -36,10 +37,19 @@ function isDuplicateReminderError(error: unknown) {
   return candidate?.code === "ER_DUP_ENTRY" || candidate?.errno === 1062;
 }
 
+/**
+ * Scheduled endpoints are called by the host's cron with `Authorization: Bearer <CRON_SECRET>`.
+ * Without a configured secret every call is refused.
+ */
+export function isAuthorisedCronRequest(authorization: string | undefined, secret = ENV.cronSecret) {
+  if (!secret || !authorization?.startsWith("Bearer ")) return false;
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(authorization.slice("Bearer ".length)), digest(secret));
+}
+
 export async function handleScheduledReminder(req: Request, res: Response) {
   try {
-    const user = await sdk.authenticateRequest(req);
-    if (!user.isCron || !user.taskUid) {
+    if (!isAuthorisedCronRequest(req.get("authorization"))) {
       return res.status(403).json({ error: "Cron execution required" });
     }
 

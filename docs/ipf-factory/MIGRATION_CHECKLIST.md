@@ -25,6 +25,9 @@
 | 1B Deployment identity | `dfb55ba` | `APP_ORIGIN`, `APP_ALTERNATE_ORIGINS` and `OWNER_ADMIN_EMAIL` drive links, origin checks and Super Admin; the Paystack callback no longer points at a Manus preview host |
 | 1C Colour tokens | `712fc9c` | 1,002 hard-coded colours become 41 role-named tokens; 0 pixels changed on 18 screenshots |
 | Security | `229bab1` | The public admin sign-in page no longer discloses the Super Admin email |
+| B1–B2 Brand | `926ee23` | ipf-teal-navy palette, IP Factory logo in the headers, favicon |
+| R1 Manus removal | `ccf6cbe` | Unused Manus code and plugins removed; `*.manus.*` no longer trusted; production `index.html` 368 kB → 1 kB |
+| R4–R5 | next commit | Desk notifications by email; scheduled reminders authenticated by `CRON_SECRET` |
 
 ---
 
@@ -217,17 +220,17 @@ Source: *IPF Business Support — Concept Note and Launch Blueprint v0.6 (final,
 Four workstreams. R and B can start now. P depends on the instrument and record content from the IPF team. A closes.
 
 **R. Replatform off Manus (target: by 23 Oct)**
-- [ ] R1 Delete unused Manus code: LLM, image, voice, map and data API helpers, `ManusDialog`, `ComponentShowcase`, the Manus Vite plugins and debug collector, the `*.manus.*` allowed hosts and origin trust.
+- [x] R1 Delete unused Manus code: LLM, image, voice, map and data API helpers, `ManusDialog`, `ComponentShowcase`, the Manus Vite plugins and debug collector, the `*.manus.*` allowed hosts and origin trust.
 - [ ] R2 Admin sign-in: replace Manus OAuth with Google sign-in on IPF's Workspace, keeping the existing admin password second factor. *Needs an IPF Google Cloud OAuth client.*
 - [ ] R3 File storage: S3-compatible bucket (Cloudflare R2 or AWS S3; the SDK is already a dependency). Replace `/manus-storage/` and move the facilitator and brand assets into the repo.
-- [ ] R4 Owner notifications: replace Manus `notifyOwner` with email to the desk mailbox via the existing sender.
-- [ ] R5 Scheduled reminders: replace Manus heartbeat authentication with a shared-secret cron call (`CRON_SECRET`) from the host.
+- [x] R4 Owner notifications: replace Manus `notifyOwner` with email to the desk mailbox via the existing sender.
+- [x] R5 Scheduled reminders: replace Manus heartbeat authentication with a shared-secret cron call (`CRON_SECRET`) from the host.
 - [ ] R6 Hosting and deploy: Node host plus managed MySQL, deploying from GitHub; staging and production. *Needs a hosting choice and an IPF-owned account.*
 - [ ] R7 Secrets under IPF ownership: database, `JWT_SECRET`, Resend (IPF sending domain), Google, Paystack, storage, cron.
 
 **B. Brand and copy (visual by 16 Oct, copy once the name is set)**
-- [ ] B1 ipf-teal-navy palette into the colour tokens (brand-kit roles: primary `#174579`, deep `#0F2E52`, accent `#23807B`, teal `#57C3BD` for fills only, tint `#EDF7F6`, line `#CFE6E4`, body `#404040`).
-- [ ] B2 Logo files into `client/public/brand/` (full, mark, white and mono; used as supplied, never recoloured).
+- [x] B1 ipf-teal-navy palette into the colour tokens (brand-kit roles: primary `#174579`, deep `#0F2E52`, accent `#23807B`, teal `#57C3BD` for fills only, tint `#EDF7F6`, line `#CFE6E4`, body `#404040`).
+- [x] B2 Logo files into `client/public/brand/` (full, mark, white and mono; used as supplied, never recoloured).
 - [ ] B3 `shared/brand.ts` values: organisation, product name (7 Oct), desk mailbox and sender (D2), and an institutional voice (D4).
 - [ ] B4 Email templates and PDF footers in the IPF voice; AI disclosure line.
 

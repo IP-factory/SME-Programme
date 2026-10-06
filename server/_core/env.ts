@@ -29,6 +29,8 @@ export const ENV = {
     .map((value) => value.trim())
     .filter(Boolean)
     .map(originOf),
+  /** Shared secret the host's scheduler sends as a Bearer token to /api/scheduled/* endpoints. */
+  cronSecret: process.env.CRON_SECRET ?? "",
   /** Email address of the permanent Super Admin. */
   ownerAdminEmail: (process.env.OWNER_ADMIN_EMAIL ?? "emmanueltarfa@gmail.com").trim().toLowerCase(),
   emailReplyTo: process.env.EMAIL_REPLY_TO ?? BRAND.administrationMailbox,
