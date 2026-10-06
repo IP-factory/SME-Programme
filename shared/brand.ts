@@ -5,8 +5,9 @@
  * client, server and email templates reads from here, so a rebrand is a change to
  * this file (plus matching test expectations) rather than a codebase-wide edit.
  *
- * Values intentionally still describe the JUMP 2026 programme until the IP Factory
- * identity is approved (see docs/ipf-factory/MIGRATION_CHECKLIST.md, decisions D1–D4).
+ * The organisation identity and palette are IP Factory's. Programme names, facilitator and
+ * mailbox values still describe JUMP 2026 until the product name and desk mailbox are set
+ * (see docs/ipf-factory/MIGRATION_CHECKLIST.md, decisions D1–D4).
  *
  * Not covered here, by design:
  * - Stored identifiers (database enum values, cookie names, storage keys), which
@@ -20,6 +21,14 @@ const programmeTrack = "Strategy & Innovation Genius Track";
 const facilitatorName = "Emmanuel Tarfa";
 
 export const BRAND = {
+  /** The organisation that owns and runs the programme. */
+  organisationName: "IP Factory",
+  organisationLegalName: "Intellectual Property Factory",
+  /** Logo files in client/public/brand (ipf-teal-navy). Use as supplied: never recolour or stretch. */
+  logoUrl: "/brand/ipf-logo-teal-navy.webp",
+  logoOnDarkUrl: "/brand/ipf-logo-white.webp",
+  markUrl: "/brand/ipf-mark-teal-navy.webp",
+
   /** Short programme name used in compounds such as "JUMP portal" or "JUMP administrator". */
   programmeShortName,
   /** Programme name with edition, e.g. in email subjects and headings. */
@@ -46,8 +55,8 @@ export const BRAND = {
    * Brand colours for email HTML and PDFs, which cannot read CSS variables.
    * Must match --color-brand / --color-brand-deep in client/src/index.css (enforced by brand.test.ts).
    */
-  colorBrand: "#1F4E79",
-  colorBrandDeep: "#163859",
+  colorBrand: "#174579",
+  colorBrandDeep: "#0F2E52",
 } as const;
 
 export type Brand = typeof BRAND;

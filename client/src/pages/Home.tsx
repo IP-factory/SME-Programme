@@ -126,7 +126,9 @@ export default function Home() {
       <header className="border-b border-line bg-paper/80 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-20">
           <div className="flex items-center gap-3">
-            <span className="font-serif font-bold text-xl tracking-wider uppercase">{BRAND.programmeName}</span>
+            <img src={BRAND.markUrl} alt={BRAND.organisationName} className="h-9 w-auto shrink-0 sm:hidden" />
+            <img src={BRAND.logoUrl} alt={BRAND.organisationName} className="hidden h-10 w-auto shrink-0 sm:block" />
+            <span className="hidden sm:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.programmeName}</span>
             <span className="hidden sm:inline-block text-xs uppercase tracking-widest px-2.5 py-1 bg-brand text-paper rounded-full">Cohort 2</span>
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-ink-600">

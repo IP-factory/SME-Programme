@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
           <button onClick={() => setLocation("/")} className="flex items-center gap-2 text-xs uppercase tracking-widest text-brand hover:underline">
             <ArrowLeft className="w-4 h-4" /> Back to Public Home
           </button>
-          <span className="text-xs uppercase tracking-[0.22em] text-ink-muted">{BRAND.programmeName}</span>
+          <img src={BRAND.logoUrl} alt={BRAND.organisationName} className="h-8 w-auto shrink-0" />
         </div>
         <Card className="border-line-soft bg-white shadow-sm rounded-none">
           <CardHeader className="space-y-3 pb-6">

@@ -152,7 +152,8 @@ export default function ParticipantDashboard() {
       <div className="min-h-screen bg-paper text-slate-900">
         <header className="bg-brand px-6 py-7 text-white shadow-md md:px-12">
           <div className="mx-auto max-w-5xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">{BRAND.programmeName} · Private participant portal</p>
+            <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mb-5 h-9 w-auto max-w-full shrink-0 object-contain" />
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-highlight">{BRAND.programmeName} · Private participant portal</p>
             <h1 className="mt-2 font-serif text-3xl">Your engagement brief</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">Review your personalised brief and payment guidance. Acknowledging the brief unlocks the assessment, document sharing, and eligible session selection.</p>
           </div>
@@ -206,7 +207,7 @@ export default function ParticipantDashboard() {
 
           <Card className="border-brand/20 bg-white shadow-sm">
             <CardHeader>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-600">Your selected pathway · {brief.selectedPackage}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-highlight-ink">Your selected pathway · {brief.selectedPackage}</p>
               <CardTitle className="font-serif text-xl text-brand">{brief.package.heading}</CardTitle>
               <CardDescription className="leading-6">{brief.package.summary}</CardDescription>
             </CardHeader>
@@ -258,7 +259,7 @@ export default function ParticipantDashboard() {
               <Button
                 disabled={!hasReadBrief || acknowledgeBriefMutation.isPending}
                 onClick={() => acknowledgeBriefMutation.mutate({ confirmed: true })}
-                className="w-full bg-amber-400 py-6 text-sm font-semibold text-brand hover:bg-amber-300"
+                className="w-full bg-highlight py-6 text-sm font-semibold text-brand hover:bg-highlight-hover"
               >
                 {acknowledgeBriefMutation.isPending ? "Recording your acknowledgement…" : "I have read and consent to the terms"}
                 {!acknowledgeBriefMutation.isPending && <ArrowRight className="ml-2 h-4 w-4" />}
@@ -277,20 +278,21 @@ export default function ParticipantDashboard() {
       <header className="bg-brand text-white py-6 px-6 md:px-12 shadow-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <div className="flex items-center gap-2 text-amber-300 text-xs tracking-widest uppercase font-semibold mb-1">
+            <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mb-4 h-8 w-auto max-w-full shrink-0 object-contain" />
+            <div className="flex items-center gap-2 text-highlight text-xs tracking-widest uppercase font-semibold mb-1">
               <Sparkles className="w-3.5 h-3.5" /> {BRAND.programmeFullName}
             </div>
             <h1 className="font-serif text-3xl font-normal tracking-tight">
               Welcome, {applicant.fullName}
             </h1>
             <p className="text-blue-100 text-sm mt-1">
-              {applicant.businessName} • <span className="text-amber-200 font-medium">{applicant.package} Track</span> ({applicant.businessModel})
+              {applicant.businessName} • <span className="text-highlight font-medium">{applicant.package} Track</span> ({applicant.businessModel})
             </p>
           </div>
           <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-lg border border-white/20">
             <div className="text-right">
               <p className="text-xs text-blue-200 uppercase tracking-wider">Status</p>
-              <p className="font-medium text-sm text-amber-300">{applicant.status}</p>
+              <p className="font-medium text-sm text-highlight">{applicant.status}</p>
             </div>
             <div className="h-8 w-px bg-white/20 mx-1" />
             <div>
@@ -627,7 +629,7 @@ export default function ParticipantDashboard() {
           </div>
 
           <Card className="overflow-hidden border-brand/25 bg-white shadow-sm">
-            <div className="h-1.5 bg-amber-400" />
+            <div className="h-1.5 bg-highlight" />
             <CardHeader className="pb-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>

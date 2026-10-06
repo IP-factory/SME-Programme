@@ -1,54 +1,59 @@
 @import "tailwindcss";
 
 /*
- * Colour tokens, named by role. Utilities use them as bg-brand, text-ink-muted, border-line, etc.
+ * Colour tokens, named by role (IP Factory ipf-teal-navy palette). Utilities use them as bg-brand, text-ink-muted, border-line, etc.
  * Rebranding is a change of values here; shared/brand.ts holds the email/PDF equivalents.
  * Names deliberately avoid shadcn roles (primary, muted, accent, border, ...) used by components/ui.
  */
 @theme {
   /* Brand */
-  --color-brand: #1F4E79; /* Primary brand colour: buttons, links, key text, rules */
-  --color-brand-ink: #254B6A; /* Brand-coloured body text */
-  --color-brand-deep: #163859; /* Deep brand: text on tints, hover state of brand buttons */
-  --color-brand-deep-hover: #153554; /* Hover state of brand fills */
-  --color-brand-slate: #4A5F73; /* Brand-tinted secondary text */
+  --color-brand: #174579; /* Primary brand colour: buttons, links, key text, rules */
+  --color-brand-ink: #174579; /* Brand-coloured body text */
+  --color-brand-deep: #0F2E52; /* Deep brand: text on tints, hover state of brand buttons */
+  --color-brand-deep-hover: #0B2541; /* Hover state of brand fills */
+  --color-brand-slate: #4A5E73; /* Brand-tinted secondary text */
   --color-brand-slate-soft: #5C7183; /* Brand-tinted tertiary text */
-  --color-brand-tint: #EAF1F8; /* Brand call-out and selected backgrounds */
-  --color-brand-tint-soft: #F2F6FA; /* Soft brand background */
-  --color-brand-tint-softer: #F5F8FB; /* Softer brand background */
-  --color-brand-tint-softest: #F8FBFE; /* Softest brand background */
-  --color-brand-tint-line: #DCE8F2; /* Dividers inside brand-tinted areas */
-  --color-brand-line: #C6D7E6; /* Brand hairlines and borders */
-  --color-brand-line-strong: #A9C1D7; /* Stronger brand borders */
+  --color-brand-tint: #EDF7F6; /* Brand call-out and selected backgrounds */
+  --color-brand-tint-soft: #F3FAF9; /* Soft brand background */
+  --color-brand-tint-softer: #F6FBFB; /* Softer brand background */
+  --color-brand-tint-softest: #F9FCFC; /* Softest brand background */
+  --color-brand-tint-line: #D8EEEC; /* Dividers inside brand-tinted areas */
+  --color-brand-line: #CFE6E4; /* Brand hairlines and borders */
+  --color-brand-line-strong: #A9D6D2; /* Stronger brand borders */
+
+  /* Highlight: IPF teal. The fill colour is too light for text on white; use highlight-ink there. */
+  --color-highlight: #57C3BD; /* Teal fills, rules and text on dark navy */
+  --color-highlight-hover: #79D0CB; /* Hover state of teal fills */
+  --color-highlight-ink: #23807B; /* Readable teal text on light backgrounds */
 
   /* Surfaces */
-  --color-paper: #FBF9F5; /* Page background; text on dark fills */
-  --color-paper-raised: #FFFEFC; /* Raised card background */
-  --color-paper-neutral: #F8F8F7; /* Neutral panel background */
-  --color-paper-muted: #F7F4EE; /* Muted panel background */
-  --color-paper-sunken: #F4F1E8; /* Sunken section background */
-  --color-paper-deep: #EFECE4; /* Deepest neutral background (quotes) */
+  --color-paper: #F7F9FA; /* Page background; text on dark fills */
+  --color-paper-raised: #FFFFFF; /* Raised card background */
+  --color-paper-neutral: #F6F8F9; /* Neutral panel background */
+  --color-paper-muted: #F2F5F7; /* Muted panel background */
+  --color-paper-sunken: #EEF2F5; /* Sunken section background */
+  --color-paper-deep: #E8EDF1; /* Deepest neutral background (quotes) */
 
   /* Neutral lines */
-  --color-line: #E6E2D8; /* Default hairline and border */
-  --color-line-soft: #E5E0D5; /* Soft border */
-  --color-line-warm: #E1D9CB; /* Warm border */
-  --color-line-strong: #D9D4C8; /* Strong border */
-  --color-line-stronger: #D7D1C6; /* Stronger border */
-  --color-line-strongest: #D6D0C4; /* Strongest border (image frames) */
-  --color-on-dark-muted: #D8D2C8; /* Muted text on dark fills */
+  --color-line: #DDE3E8; /* Default hairline and border */
+  --color-line-soft: #E1E6EA; /* Soft border */
+  --color-line-warm: #D6DDE3; /* Warm border */
+  --color-line-strong: #CED6DD; /* Strong border */
+  --color-line-stronger: #C9D2DA; /* Stronger border */
+  --color-line-strongest: #C4CED7; /* Strongest border (image frames) */
+  --color-on-dark-muted: #C9D3DC; /* Muted text on dark fills */
 
   /* Text */
-  --color-ink: #1A1A1A; /* Primary text and dark fills */
-  --color-ink-800: #34322D; /* Near-black text */
-  --color-ink-750: #3A3730; /* Dark text */
-  --color-ink-700: #3F3B34; /* Dark text */
-  --color-ink-600: #4A4740; /* Strong secondary text */
-  --color-ink-soft: #5A5750; /* Secondary text */
-  --color-ink-muted: #6A6760; /* Muted text, labels */
-  --color-ink-faint: #858481; /* Faint text */
-  --color-ink-fainter: #8A867E; /* Fainter text */
-  --color-charcoal: #333333; /* Hover state of dark fills */
+  --color-ink: #0F2E52; /* Primary text and dark fills */
+  --color-ink-800: #26313D; /* Near-black text */
+  --color-ink-750: #2E3946; /* Dark text */
+  --color-ink-700: #36414D; /* Dark text */
+  --color-ink-600: #404B57; /* Strong secondary text */
+  --color-ink-soft: #4F5A66; /* Secondary text */
+  --color-ink-muted: #5F6B77; /* Muted text, labels */
+  --color-ink-faint: #76818C; /* Faint text */
+  --color-ink-fainter: #7D8893; /* Fainter text */
+  --color-charcoal: #174579; /* Hover state of dark fills */
 
   /* Feedback */
   --color-danger: #A34739; /* Error text and borders */
