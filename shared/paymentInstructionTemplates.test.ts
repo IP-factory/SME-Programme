@@ -11,7 +11,7 @@ describe("payment instruction templates", () => {
   });
 
   it("provides a Paystack-only North America route and private payment-tab guidance", () => {
-    const message = renderPaymentInstruction("north_america", "Amaka Eze");
+    const message = renderPaymentInstruction("north_america", "Amaka Eze", "https://emmanueltarfa.com");
     expect(message.body).toContain("https://emmanueltarfa.com/portal?tab=payment");
     expect(message.body).toContain("approved commitment and full-payment amounts");
     expect(message.body).toContain("Dear Amaka,");
@@ -22,7 +22,7 @@ describe("payment instruction templates", () => {
   });
 
   it("personalises the U.K. template and distinguishes local from international transfer identifiers", () => {
-    const message = renderPaymentInstruction("uk_wise", "Tobi Adeyemi");
+    const message = renderPaymentInstruction("uk_wise", "Tobi Adeyemi", "https://emmanueltarfa.com");
     expect(message.subject).toContain("U.K.");
     expect(message.body).toContain("Dear Tobi,");
     expect(message.body).toContain("Sort code: 60-84-64");

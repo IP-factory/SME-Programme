@@ -4,6 +4,7 @@ import { emailLogs, registrations } from "../../drizzle/schema";
 import { PAYMENT_INSTRUCTION_TEMPLATE_IDS, renderPaymentInstruction, paymentInstructionTemplateLibrary } from "../../shared/paymentInstructionTemplates";
 import { getDb } from "../db";
 import { deliverEmail, JUMP_MONITORING_BCC } from "../email";
+import { getTrustedApplicationOrigin } from "../security";
 import { ownerAdminProcedure, router } from "../_core/trpc";
 
 const paymentInstructionInput = z.object({
@@ -29,7 +30,7 @@ export const paymentInstructionsRouter = router({
     return {
       recipientName: registration.fullName,
       recipientEmail: registration.email,
-      ...renderPaymentInstruction(input.templateId, registration.fullName),
+      ...renderPaymentInstruction(input.templateId, registration.fullName, getTrustedApplicationOrigin()),
     };
   }),
 
@@ -37,7 +38,7 @@ export const paymentInstructionsRouter = router({
     .input(paymentInstructionInput.extend({ ownerApproval: z.literal(true) }))
     .mutation(async ({ input }) => {
       const { db, registration } = await getEligibleRegistration(input.registrationId);
-      const message = renderPaymentInstruction(input.templateId, registration.fullName);
+      const message = renderPaymentInstruction(input.templateId, registration.fullName, getTrustedApplicationOrigin());
       const delivery = await deliverEmail({
         to: registration.email,
         bcc: JUMP_MONITORING_BCC,

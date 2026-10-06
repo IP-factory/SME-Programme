@@ -1,4 +1,8 @@
 import { BRAND } from "../../shared/brand";
+function originOf(value: string) {
+  return new URL(value).origin;
+}
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
@@ -17,5 +21,15 @@ export const ENV = {
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID ?? "primary",
   paystackPublicKey: process.env.PAYSTACK_PUBLIC_KEY ?? "",
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
+  /** Canonical public origin (scheme + host) used for emailed links and CSRF checks in production. */
+  appOrigin: originOf(process.env.APP_ORIGIN ?? "https://emmanueltarfa.com"),
+  /** Further production origins accepted for browser requests, comma-separated (e.g. the www host). */
+  appAlternateOrigins: (process.env.APP_ALTERNATE_ORIGINS ?? "https://www.emmanueltarfa.com")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(originOf),
+  /** Email address of the permanent Super Admin. */
+  ownerAdminEmail: (process.env.OWNER_ADMIN_EMAIL ?? "emmanueltarfa@gmail.com").trim().toLowerCase(),
   emailReplyTo: process.env.EMAIL_REPLY_TO ?? BRAND.administrationMailbox,
 };

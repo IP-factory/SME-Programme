@@ -1,19 +1,20 @@
 import type { NextFunction, Request, Response } from "express";
+import { BRAND } from "../shared/brand";
+import { ENV } from "./_core/env";
 
-const PRIMARY_ORIGIN = "https://emmanueltarfa.com";
-const WWW_ORIGIN = "https://www.emmanueltarfa.com";
+
 const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
 const MANUS_PREVIEW_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.manus\.space$/i;
 const MANUS_COMPUTER_PREVIEW_ORIGIN_PATTERN = /^https:\/\/\d+-[a-z0-9-]+\.[a-z0-9-]+\.manus\.computer$/i;
 
 export function getTrustedApplicationOrigin(nodeEnv = process.env.NODE_ENV) {
-  return nodeEnv === "production" ? PRIMARY_ORIGIN : "http://localhost:3000";
+  return nodeEnv === "production" ? ENV.appOrigin : "http://localhost:3000";
 }
 
 export function isTrustedBrowserOrigin(origin: string | undefined, nodeEnv = process.env.NODE_ENV) {
   if (!origin) return false;
   if (nodeEnv !== "production") return LOCAL_ORIGIN_PATTERN.test(origin) || MANUS_COMPUTER_PREVIEW_ORIGIN_PATTERN.test(origin);
-  return origin === PRIMARY_ORIGIN || origin === WWW_ORIGIN || MANUS_PREVIEW_ORIGIN_PATTERN.test(origin);
+  return origin === ENV.appOrigin || ENV.appAlternateOrigins.includes(origin) || MANUS_PREVIEW_ORIGIN_PATTERN.test(origin);
 }
 
 export function normalizeStorageProxyKey(rawKey: string) {
@@ -68,5 +69,5 @@ export function requireTrustedBrowserOrigin(req: Request, res: Response, next: N
     return;
   }
 
-  res.status(403).json({ message: "This request was blocked by JUMP security controls." });
+  res.status(403).json({ message: `This request was blocked by ${BRAND.programmeShortName} security controls.` });
 }

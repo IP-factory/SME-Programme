@@ -9,6 +9,7 @@ import { deliverEmail, JUMP_MONITORING_BCC } from "../email";
 import { adminPermissionProcedure, ownerAdminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { ENV } from "../_core/env";
+import { getTrustedApplicationOrigin } from "../security";
 import { buildParticipantPasswordLinkEmail, createParticipantPasswordLink, normalizeParticipantEmail, replaceParticipantPortalLink } from "../participantAuth";
 import { buildEngagementBriefInvitationEmail, buildRegistrationConfirmationEmail, buildSessionReminderEmail, buildWaitlistEmail } from "../emailTemplates";
 import { sameParticipantIdentity, selectHighestPathway, pathwaySupersedes, type JumpPathway } from "../../shared/pathwayReconciliation";
@@ -821,7 +822,7 @@ export const registrationRouter = router({
           body: JSON.stringify({
             email: input.email,
             amount: Math.round(input.amountInNaira * 100), // Paystack uses kobo
-            callback_url: `https://jumpreg26-l8gnjmyo.manus.space/admin?payment=verified&reg=${input.registrationId}`,
+            callback_url: `${getTrustedApplicationOrigin()}/admin?payment=verified&reg=${input.registrationId}`,
             metadata: {
               registrationId: input.registrationId,
               packageName: input.packageName,

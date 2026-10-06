@@ -4,13 +4,14 @@ import type { Request, Response } from "express";
 import { adminAccessSessions, adminCredentials, type User } from "../drizzle/schema";
 import { getDb } from "./db";
 import { getAdminAccessCookieOptions } from "./_core/cookies";
+import { ENV } from "./_core/env";
 import { BRAND } from "../shared/brand";
 
 export const ADMIN_ACCESS_COOKIE = "jump_admin_access";
 export const ADMIN_PASSWORD_MIN_LENGTH = 12;
 export const ADMIN_SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 export const ADMIN_PASSWORD_LOCKOUT_MS = 15 * 60 * 1000;
-export const OWNER_ADMIN_EMAIL = "emmanueltarfa@gmail.com";
+export const OWNER_ADMIN_EMAIL = ENV.ownerAdminEmail;
 
 export function normalizeAdminEmail(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();

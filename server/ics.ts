@@ -1,4 +1,5 @@
 import { BRAND } from "../shared/brand";
+import { ENV } from "./_core/env";
 export interface ICSOptions {
   title: string;
   description: string;
@@ -18,7 +19,7 @@ export function generateICS(options: ICSOptions): string {
   const now = formatDate(new Date());
   const dtstart = formatDate(options.startTime);
   const dtend = formatDate(options.endTime);
-  const uid = `jump-2026-${Date.now()}-${Math.random().toString(36).substring(2, 9)}@jumpreg26.manus.space`;
+  const uid = `${BRAND.programmeName.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}@${new URL(ENV.appOrigin).hostname}`;
   
   const description = options.description.replace(/\n/g, "\\n");
 

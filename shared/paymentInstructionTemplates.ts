@@ -8,7 +8,7 @@ type PaymentInstructionTemplate = {
   label: string;
   routeLabel: string;
   subject: string;
-  render: (firstName: string) => string;
+  render: (firstName: string, appOrigin: string) => string;
 };
 
 const NIGERIA_ACCESS_BANK_TEMPLATE: PaymentInstructionTemplate = {
@@ -39,7 +39,7 @@ const NORTH_AMERICA_TEMPLATE: PaymentInstructionTemplate = {
   label: "North America — USD via Paystack",
   routeLabel: "USD / North America",
   subject: `${BRAND.programmeName} — North America payment instructions`,
-  render: (firstName) => `Dear ${firstName},
+  render: (firstName, appOrigin) => `Dear ${firstName},
 
 I trust this meets you well.
 
@@ -47,7 +47,7 @@ Thank you for your decision to move forward with ${BRAND.programmeName}. I am de
 
 For North America, kindly use the approved Paystack checkout route in the secure ${BRAND.programmeShortName} Payment tab:
 
-https://emmanueltarfa.com/portal?tab=payment
+${appOrigin}/portal?tab=payment
 
 Select the Paystack row that matches your pathway and payment option. The table includes the approved commitment and full-payment amounts, including the 10% full-payment discount. Kindly confirm the amount and currency at checkout before paying. If you experience any difficulty or restriction, please pause and email ${BRAND.facilitatorFirstName} before continuing.
 
@@ -104,7 +104,8 @@ export function firstNameFromFullName(fullName: string) {
   return fullName.trim().split(/\s+/)[0] || "there";
 }
 
-export function renderPaymentInstruction(templateId: PaymentInstructionTemplateId, fullName: string) {
+/** `appOrigin` is the deployment's public origin, used for portal links in the message. */
+export function renderPaymentInstruction(templateId: PaymentInstructionTemplateId, fullName: string, appOrigin: string) {
   const template = getPaymentInstructionTemplate(templateId);
-  return { subject: template.subject, body: template.render(firstNameFromFullName(fullName)) };
+  return { subject: template.subject, body: template.render(firstNameFromFullName(fullName), appOrigin) };
 }

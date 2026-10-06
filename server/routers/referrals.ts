@@ -6,13 +6,14 @@ import { participantReferralProfiles, participantReferrals, registrations } from
 import { REFERRAL_CREDIT_PERCENTAGE, REFERRAL_MAX_APPROVED_CREDITS, REFERRAL_POLICY_SUMMARY, referralCreditIsAvailable, referralIsEligibleForQualification } from "../../shared/referrals";
 import { ownerAdminProcedure, participantProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { ENV } from "../_core/env";
 import { z } from "zod";
 
 function shareOrigin(req: { headers: Record<string, string | string[] | undefined> }) {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || "https";
   const forwardedHost = req.headers["x-forwarded-host"];
-  const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.headers.host || "emmanueltarfa.com";
+  const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.headers.host || new URL(ENV.appOrigin).host;
   return `${proto}://${host}`;
 }
 
