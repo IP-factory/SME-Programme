@@ -19,7 +19,8 @@ describe("JUMP defensive security controls", () => {
     expect(getTrustedApplicationOrigin("production")).toBe("https://emmanueltarfa.com");
     expect(isTrustedBrowserOrigin("https://emmanueltarfa.com", "production")).toBe(true);
     expect(isTrustedBrowserOrigin("https://attacker.example", "production")).toBe(false);
-    expect(isTrustedBrowserOrigin("https://3000-example.us2.manus.computer", "development")).toBe(true);
+    expect(isTrustedBrowserOrigin("https://3000-example.us2.manus.computer", "development")).toBe(false);
+    expect(isTrustedBrowserOrigin("https://any-site.manus.space", "production")).toBe(false);
     expect(isTrustedBrowserOrigin("https://attacker.example", "development")).toBe(false);
     expect(adminRouterSource).toContain("getTrustedApplicationOrigin()");
     expect(adminRouterSource).not.toContain("ctx.req.get(\"host\")");

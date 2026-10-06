@@ -4,8 +4,6 @@ import { ENV } from "./_core/env";
 
 
 const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
-const MANUS_PREVIEW_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.manus\.space$/i;
-const MANUS_COMPUTER_PREVIEW_ORIGIN_PATTERN = /^https:\/\/\d+-[a-z0-9-]+\.[a-z0-9-]+\.manus\.computer$/i;
 
 export function getTrustedApplicationOrigin(nodeEnv = process.env.NODE_ENV) {
   return nodeEnv === "production" ? ENV.appOrigin : "http://localhost:3000";
@@ -13,8 +11,8 @@ export function getTrustedApplicationOrigin(nodeEnv = process.env.NODE_ENV) {
 
 export function isTrustedBrowserOrigin(origin: string | undefined, nodeEnv = process.env.NODE_ENV) {
   if (!origin) return false;
-  if (nodeEnv !== "production") return LOCAL_ORIGIN_PATTERN.test(origin) || MANUS_COMPUTER_PREVIEW_ORIGIN_PATTERN.test(origin);
-  return origin === ENV.appOrigin || ENV.appAlternateOrigins.includes(origin) || MANUS_PREVIEW_ORIGIN_PATTERN.test(origin);
+  if (nodeEnv !== "production") return LOCAL_ORIGIN_PATTERN.test(origin);
+  return origin === ENV.appOrigin || ENV.appAlternateOrigins.includes(origin);
 }
 
 export function normalizeStorageProxyKey(rawKey: string) {
@@ -36,6 +34,17 @@ export function participantCanReadPrivateStorageKey(key: string, registrationId:
   return key.startsWith(`participant-assignments/${registrationId}/`) || key.startsWith(`payment-receipts/${registrationId}/`);
 }
 
+/** Origin of the optional self-hosted analytics script (VITE_ANALYTICS_ENDPOINT), allowed by the CSP. */
+function analyticsCspSource() {
+  const endpoint = process.env.VITE_ANALYTICS_ENDPOINT;
+  if (!endpoint) return "";
+  try {
+    return ` ${new URL(endpoint).origin}`;
+  } catch {
+    return "";
+  }
+}
+
 export function applySecurityHeaders(req: Request, res: Response, next: NextFunction) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -44,9 +53,10 @@ export function applySecurityHeaders(req: Request, res: Response, next: NextFunc
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
 
   if (process.env.NODE_ENV === "production") {
+    const analyticsSource = analyticsCspSource();
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com; frame-src https://accounts.google.com https://www.instagram.com;",
+      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://www.instagram.com${analyticsSource}; connect-src 'self' https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com;`,
     );
   }
 
