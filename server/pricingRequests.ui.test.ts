@@ -7,8 +7,8 @@ const portalSource = readFileSync(resolve(process.cwd(), "client/src/pages/Parti
 const dialogSource = readFileSync(resolve(process.cwd(), "client/src/components/PricingRequestDialog.tsx"), "utf8");
 
 describe("Request Programme Pricing entry points", () => {
-  it("publishes the price ladder on the public page instead of a pricing request", () => {
-    expect(homeSource).toContain("PRICE_LADDER.map");
+  it("publishes the journey with its prices on the public page instead of a pricing request", () => {
+    expect(homeSource).toContain("JOURNEY.map");
     expect(homeSource).not.toContain("PricingRequestDialog");
   });
 
