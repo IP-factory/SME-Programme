@@ -20,6 +20,7 @@ import { getDb } from "../db";
 import { deliverEmail, JUMP_MONITORING_BCC } from "../email";
 import { ownerAdminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getTrustedApplicationOrigin } from "../security";
+import { emailEquals } from "../dbHelpers";
 import { ADMIN_PERMISSION_IDS, isAdminPermission, parseAdminPermissions, serializeAdminPermissions } from "../../shared/adminPermissions";
 import { BRAND } from "../../shared/brand";
 
@@ -102,8 +103,8 @@ export const adminAccessRouter = router({
       tokenHash: sha256(token),
       expiresAt,
       deliveryStatus: "Simulated",
-    });
-    const resetId = Number(inserted[0].insertId);
+    }).returning({ id: adminPasswordResetTokens.id });
+    const resetId = Number(inserted[0].id);
     const baseUrl = getTrustedApplicationOrigin();
     const resetUrl = `${baseUrl}/admin/reset?token=${encodeURIComponent(token)}`;
     const delivery = await deliverEmail({
@@ -180,7 +181,7 @@ export const adminAccessRouter = router({
       const email = normalizeAdminEmail(input.email);
       if (email === OWNER_ADMIN_EMAIL) throw new TRPCError({ code: "BAD_REQUEST", message: "The super administrator already has permanent access." });
 
-      const existingAdmin = await db.select({ id: users.id }).from(users).where(and(eq(users.email, email), eq(users.role, "admin"))).limit(1);
+      const existingAdmin = await db.select({ id: users.id }).from(users).where(and(emailEquals(users.email, email), eq(users.role, "admin"))).limit(1);
       if (existingAdmin.length) throw new TRPCError({ code: "CONFLICT", message: `That email is already an active ${BRAND.programmeShortName} administrator.` });
 
       const token = randomBytes(32).toString("base64url");
@@ -194,8 +195,8 @@ export const adminAccessRouter = router({
         createdByUserId: ctx.user.id,
         expiresAt,
         proposedPermissionsJson: serializeAdminPermissions(permissions),
-      });
-      const invitationId = Number(inserted[0].insertId);
+      }).returning({ id: adminInvitations.id });
+      const invitationId = Number(inserted[0].id);
       const baseUrl = getTrustedApplicationOrigin();
       const invitationUrl = `${baseUrl}/admin/invite?token=${encodeURIComponent(token)}`;
       const name = input.inviteeName ? ` ${input.inviteeName}` : "";

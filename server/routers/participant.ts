@@ -209,8 +209,8 @@ export const participantRouter = router({
           const created = await db.insert(participantProgrammeRecords).values({
             registrationId: applicant.id,
             registrationSnapshot,
-          });
-          const programmeRecordId = Number(created[0].insertId);
+          }).returning({ id: participantProgrammeRecords.id });
+          const programmeRecordId = Number(created[0].id);
           await db.insert(participantProgrammeMilestoneEvents).values({
             programmeRecordId,
             phase: 0,
@@ -357,8 +357,8 @@ export const participantRouter = router({
         packageName: applicant.package,
         consentStatement: brief.consentStatement,
         acknowledgedAt,
-      });
-      const consentId = Number(insertResult[0].insertId);
+      }).returning({ id: participantEngagementConsents.id });
+      const consentId = Number(insertResult[0].id);
 
       const confirmation = buildConsentConfirmationEmail({
         ...buildParticipantBriefInput(applicant),

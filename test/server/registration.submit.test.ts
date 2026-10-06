@@ -38,7 +38,7 @@ function createDb(existingRows: Array<{
   package: "Foundation" | "Engine Room" | "Boardroom";
   supersededByRegistrationId: number | null;
 }> = []) {
-  const registrationInsertValues = vi.fn().mockResolvedValue([{ insertId: 77 }]);
+  const registrationInsertValues = vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([{ id: 77 }]) });
   const emailLogInsertValues = vi.fn().mockResolvedValue(undefined);
   const insert = vi
     .fn()

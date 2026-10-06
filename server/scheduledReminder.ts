@@ -33,9 +33,12 @@ export function automatedReminderPolicy() {
   } as const;
 }
 
-function isDuplicateReminderError(error: unknown) {
-  const candidate = error as { code?: string; errno?: number } | undefined;
-  return candidate?.code === "ER_DUP_ENTRY" || candidate?.errno === 1062;
+const PG_UNIQUE_VIOLATION = "23505";
+
+/** True for a PostgreSQL unique violation, whether raised directly or wrapped by Drizzle (`cause`). */
+export function isDuplicateReminderError(error: unknown) {
+  const candidate = error as { code?: string; cause?: { code?: string } } | undefined;
+  return candidate?.code === PG_UNIQUE_VIOLATION || candidate?.cause?.code === PG_UNIQUE_VIOLATION;
 }
 
 /**
@@ -164,8 +167,8 @@ export async function handleScheduledReminder(req: Request, res: Response) {
         subject,
         body,
         status: delivery.status,
-      });
-      const emailLogId = Number(emailResult.insertId);
+      }).returning({ id: emailLogs.id });
+      const emailLogId = Number(emailResult.id);
       const sent = delivery.status === "Sent";
       await db.update(scheduledReminderDeliveries).set({
         status: sent ? "Sent" : "Failed",

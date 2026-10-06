@@ -205,94 +205,101 @@ import { parse as parseCookieHeader2 } from "cookie";
 
 // server/db.ts
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 // drizzle/schema.ts
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
-var users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+var usersRoleEnum = pgEnum("users_role", ["user", "admin"]);
+var users = pgTable("users", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull()
+  role: usersRoleEnum("role").default("user").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull(),
+  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull()
 });
-var adminCredentials = mysqlTable("admin_credentials", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+var adminCredentials = pgTable("admin_credentials", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 512 }).notNull(),
-  failedAttempts: int("failedAttempts").default(0).notNull(),
-  lockedUntil: timestamp("lockedUntil"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  failedAttempts: integer("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var adminPermissionProfiles = mysqlTable("admin_permission_profiles", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+var adminPermissionProfiles = pgTable("admin_permission_profiles", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().unique(),
   permissionsJson: text("permissionsJson").notNull(),
-  updatedByUserId: int("updatedByUserId"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedByUserId: integer("updatedByUserId"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var adminAccessSessions = mysqlTable("admin_access_sessions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+var adminAccessSessions = pgTable("admin_access_sessions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  revokedAt: timestamp("revokedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var adminPasswordResetTokens = mysqlTable("admin_password_reset_tokens", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+var adminPasswordResetTokensDeliveryStatusEnum = pgEnum("admin_password_reset_tokens_delivery_status", ["Sent", "Failed", "Simulated"]);
+var adminPasswordResetTokens = pgTable("admin_password_reset_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  consumedAt: timestamp("consumedAt"),
-  revokedAt: timestamp("revokedAt"),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumedAt", { withTimezone: true }),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  deliveryStatus: adminPasswordResetTokensDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
   deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var adminInvitations = mysqlTable("admin_invitations", {
-  id: int("id").autoincrement().primaryKey(),
+var adminInvitationsStatusEnum = pgEnum("admin_invitations_status", ["Pending", "Accepted", "Revoked", "Expired"]);
+var adminInvitationsDeliveryStatusEnum = pgEnum("admin_invitations_delivery_status", ["Sent", "Failed", "Simulated"]);
+var adminInvitations = pgTable("admin_invitations", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   email: varchar("email", { length: 320 }).notNull(),
   inviteeName: varchar("inviteeName", { length: 255 }),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  status: mysqlEnum("status", ["Pending", "Accepted", "Revoked", "Expired"]).default("Pending").notNull(),
-  createdByUserId: int("createdByUserId").notNull(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  acceptedByUserId: int("acceptedByUserId"),
-  acceptedAt: timestamp("acceptedAt"),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  status: adminInvitationsStatusEnum("status").default("Pending").notNull(),
+  createdByUserId: integer("createdByUserId").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  acceptedByUserId: integer("acceptedByUserId"),
+  acceptedAt: timestamp("acceptedAt", { withTimezone: true }),
+  deliveryStatus: adminInvitationsDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
   deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
   /** Immutable proposed capability set selected by Emmanuel when the invitation is issued. */
   proposedPermissionsJson: text("proposedPermissionsJson"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var adminAccessAuditEvents = mysqlTable("admin_access_audit_events", {
-  id: int("id").autoincrement().primaryKey(),
-  actorUserId: int("actorUserId"),
+var adminAccessAuditEvents = pgTable("admin_access_audit_events", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  actorUserId: integer("actorUserId"),
   action: varchar("action", { length: 128 }).notNull(),
   targetEmail: varchar("targetEmail", { length: 320 }),
   details: text("details"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var emailLogs = mysqlTable("email_logs", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var emailLogsStatusEnum = pgEnum("email_logs_status", ["Sent", "Failed", "Simulated"]);
+var emailLogs = pgTable("email_logs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   recipientEmail: varchar("recipientEmail", { length: 320 }).notNull(),
   subject: varchar("subject", { length: 255 }).notNull(),
   body: text("body").notNull(),
-  status: mysqlEnum("status", ["Sent", "Failed", "Simulated"]).default("Sent").notNull(),
-  sentAt: timestamp("sentAt").defaultNow().notNull()
+  status: emailLogsStatusEnum("status").default("Sent").notNull(),
+  sentAt: timestamp("sentAt", { withTimezone: true }).defaultNow().notNull()
 });
-var inboundEmailReplies = mysqlTable("inbound_email_replies", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var inboundEmailRepliesStatusEnum = pgEnum("inbound_email_replies_status", ["New", "Reviewed", "Follow-up", "Closed"]);
+var inboundEmailReplies = pgTable("inbound_email_replies", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   mailboxMessageId: varchar("mailboxMessageId", { length: 255 }).notNull().unique(),
   mailboxThreadId: varchar("mailboxThreadId", { length: 255 }),
   senderEmail: varchar("senderEmail", { length: 320 }).notNull(),
@@ -300,213 +307,243 @@ var inboundEmailReplies = mysqlTable("inbound_email_replies", {
   subject: varchar("subject", { length: 255 }).notNull(),
   preview: text("preview").notNull(),
   body: text("body").notNull(),
-  receivedAt: timestamp("receivedAt").notNull(),
-  status: mysqlEnum("status", ["New", "Reviewed", "Follow-up", "Closed"]).default("New").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  receivedAt: timestamp("receivedAt", { withTimezone: true }).notNull(),
+  status: inboundEmailRepliesStatusEnum("status").default("New").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var pricingRequests = mysqlTable("pricing_requests", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId"),
-  source: mysqlEnum("source", ["Public", "ParticipantPortal"]).notNull(),
+var pricingRequestsSourceEnum = pgEnum("pricing_requests_source", ["Public", "ParticipantPortal"]);
+var pricingRequestsNotificationStatusEnum = pgEnum("pricing_requests_notification_status", ["Sent", "Failed", "Simulated"]);
+var pricingRequests = pgTable("pricing_requests", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId"),
+  source: pricingRequestsSourceEnum("source").notNull(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   businessName: varchar("businessName", { length: 255 }),
   preferredPackage: varchar("preferredPackage", { length: 64 }),
   note: text("note"),
-  notificationStatus: mysqlEnum("notificationStatus", ["Sent", "Failed", "Simulated"]).default("Sent").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  notificationStatus: pricingRequestsNotificationStatusEnum("notificationStatus").default("Sent").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var registrations = mysqlTable("registrations", {
-  id: int("id").autoincrement().primaryKey(),
+var registrationsBusinessModelEnum = pgEnum("registrations_business_model", ["Maker", "Trader", "Expert"]);
+var registrationsPackageEnum = pgEnum("registrations_package", ["Foundation", "Engine Room", "Boardroom"]);
+var registrationsStatusEnum = pgEnum("registrations_status", ["Pending", "Accepted", "Rejected", "Waitlisted"]);
+var registrationsCohortGroupEnum = pgEnum("registrations_cohort_group", ["Unassigned", "Makers", "Traders", "Experts"]);
+var registrationsDepositPaidEnum = pgEnum("registrations_deposit_paid", ["Pending", "Paid"]);
+var registrationsInstalment1Enum = pgEnum("registrations_instalment1", ["Pending", "Paid"]);
+var registrationsInstalment2Enum = pgEnum("registrations_instalment2", ["Pending", "Paid"]);
+var registrations = pgTable("registrations", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 50 }).notNull(),
   businessName: varchar("businessName", { length: 255 }).notNull(),
   businessDescription: text("businessDescription").notNull(),
-  businessModel: mysqlEnum("businessModel", ["Maker", "Trader", "Expert"]).notNull(),
-  package: mysqlEnum("package", ["Foundation", "Engine Room", "Boardroom"]).notNull(),
+  businessModel: registrationsBusinessModelEnum("businessModel").notNull(),
+  package: registrationsPackageEnum("package").notNull(),
   question: text("question"),
-  status: mysqlEnum("status", ["Pending", "Accepted", "Rejected", "Waitlisted"]).default("Pending").notNull(),
-  cohortGroup: mysqlEnum("cohortGroup", ["Unassigned", "Makers", "Traders", "Experts"]).default("Unassigned").notNull(),
-  depositPaid: mysqlEnum("depositPaid", ["Pending", "Paid"]).default("Pending").notNull(),
-  instalment1: mysqlEnum("instalment1", ["Pending", "Paid"]).default("Pending").notNull(),
-  instalment2: mysqlEnum("instalment2", ["Pending", "Paid"]).default("Pending").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  status: registrationsStatusEnum("status").default("Pending").notNull(),
+  cohortGroup: registrationsCohortGroupEnum("cohortGroup").default("Unassigned").notNull(),
+  depositPaid: registrationsDepositPaidEnum("depositPaid").default("Pending").notNull(),
+  instalment1: registrationsInstalment1Enum("instalment1").default("Pending").notNull(),
+  instalment2: registrationsInstalment2Enum("instalment2").default("Pending").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull(),
   bookingToken: varchar("bookingToken", { length: 64 }),
   diagnosticData: text("diagnosticData"),
   diagnosticStage: varchar("diagnosticStage", { length: 64 }),
   diagnosticEngineRoom: varchar("diagnosticEngineRoom", { length: 128 }),
   diagnosticClasses: varchar("diagnosticClasses", { length: 255 }),
   /** Points to the retained highest-pathway registration when an earlier pathway entry is superseded. */
-  supersededByRegistrationId: int("supersededByRegistrationId"),
+  supersededByRegistrationId: integer("supersededByRegistrationId"),
   /** Non-destructive removal from the active owner desk; the original engagement record remains intact. */
-  archivedAt: timestamp("archivedAt"),
-  archivedByUserId: int("archivedByUserId")
+  archivedAt: timestamp("archivedAt", { withTimezone: true }),
+  archivedByUserId: integer("archivedByUserId")
 });
-var participantReferralProfiles = mysqlTable("participant_referral_profiles", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+var participantReferralProfiles = pgTable("participant_referral_profiles", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   referralCode: varchar("referralCode", { length: 64 }).notNull().unique(),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var participantReferrals = mysqlTable("participant_referrals", {
-  id: int("id").autoincrement().primaryKey(),
-  referrerRegistrationId: int("referrerRegistrationId").notNull(),
-  referredRegistrationId: int("referredRegistrationId").notNull().unique(),
+var participantReferralsStatusEnum = pgEnum("participant_referrals_status", ["Registered", "Qualified", "Approved", "Declined"]);
+var participantReferrals = pgTable("participant_referrals", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  referrerRegistrationId: integer("referrerRegistrationId").notNull(),
+  referredRegistrationId: integer("referredRegistrationId").notNull().unique(),
   referralCode: varchar("referralCode", { length: 64 }).notNull(),
-  status: mysqlEnum("status", ["Registered", "Qualified", "Approved", "Declined"]).default("Registered").notNull(),
-  creditPercentage: int("creditPercentage").default(0).notNull(),
-  reviewedByUserId: int("reviewedByUserId"),
-  reviewedAt: timestamp("reviewedAt"),
+  status: participantReferralsStatusEnum("status").default("Registered").notNull(),
+  creditPercentage: integer("creditPercentage").default(0).notNull(),
+  reviewedByUserId: integer("reviewedByUserId"),
+  reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var participantProgrammeRecords = mysqlTable("participant_programme_records", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+var participantProgrammeRecordsPaymentStructureEnum = pgEnum("participant_programme_records_payment_structure", ["instalments_40_30_30", "full_upfront_10pc_discount"]);
+var participantProgrammeRecordsPaymentMethodEnum = pgEnum("participant_programme_records_payment_method", ["bank_transfer", "paystack", "wants_to_discuss"]);
+var participantProgrammeRecordsPaymentStatusEnum = pgEnum("participant_programme_records_payment_status", ["awaiting", "partial", "complete"]);
+var participantProgrammeRecords = pgTable("participant_programme_records", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   registrationSnapshot: text("registrationSnapshot").notNull(),
-  paymentStructure: mysqlEnum("paymentStructure", ["instalments_40_30_30", "full_upfront_10pc_discount"]),
-  paymentMethod: mysqlEnum("paymentMethod", ["bank_transfer", "paystack", "wants_to_discuss"]),
-  paymentStatus: mysqlEnum("paymentStatus", ["awaiting", "partial", "complete"]).default("awaiting").notNull(),
-  currentPhase: int("currentPhase").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  paymentStructure: participantProgrammeRecordsPaymentStructureEnum("paymentStructure"),
+  paymentMethod: participantProgrammeRecordsPaymentMethodEnum("paymentMethod"),
+  paymentStatus: participantProgrammeRecordsPaymentStatusEnum("paymentStatus").default("awaiting").notNull(),
+  currentPhase: integer("currentPhase").default(0).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var participantProgrammeMilestoneEvents = mysqlTable("participant_programme_milestone_events", {
-  id: int("id").autoincrement().primaryKey(),
-  programmeRecordId: int("programmeRecordId").notNull(),
-  phase: int("phase").notNull(),
+var participantProgrammeMilestoneEventsStatusEnum = pgEnum("participant_programme_milestone_events_status", ["locked", "available", "in_progress", "complete"]);
+var participantProgrammeMilestoneEventsSourceEnum = pgEnum("participant_programme_milestone_events_source", ["system", "participant", "admin"]);
+var participantProgrammeMilestoneEvents = pgTable("participant_programme_milestone_events", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  programmeRecordId: integer("programmeRecordId").notNull(),
+  phase: integer("phase").notNull(),
   milestone: varchar("milestone", { length: 128 }).notNull(),
-  status: mysqlEnum("status", ["locked", "available", "in_progress", "complete"]).notNull(),
-  source: mysqlEnum("source", ["system", "participant", "admin"]).default("system").notNull(),
-  recordedAt: timestamp("recordedAt").defaultNow().notNull()
+  status: participantProgrammeMilestoneEventsStatusEnum("status").notNull(),
+  source: participantProgrammeMilestoneEventsSourceEnum("source").default("system").notNull(),
+  recordedAt: timestamp("recordedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var scheduleSlots = mysqlTable("schedule_slots", {
-  id: int("id").autoincrement().primaryKey(),
-  kind: mysqlEnum("kind", ["Decide", "Learn", "Apply"]).notNull(),
-  sessionNumber: int("sessionNumber").default(1).notNull(),
-  startAt: timestamp("startAt").notNull(),
-  endAt: timestamp("endAt").notNull(),
+var scheduleSlotsKindEnum = pgEnum("schedule_slots_kind", ["Decide", "Learn", "Apply"]);
+var scheduleSlotsStatusEnum = pgEnum("schedule_slots_status", ["Open", "Booked", "Blocked"]);
+var scheduleSlots = pgTable("schedule_slots", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  kind: scheduleSlotsKindEnum("kind").notNull(),
+  sessionNumber: integer("sessionNumber").default(1).notNull(),
+  startAt: timestamp("startAt", { withTimezone: true }).notNull(),
+  endAt: timestamp("endAt", { withTimezone: true }).notNull(),
   timezone: varchar("timezone", { length: 64 }).default("Africa/Lagos").notNull(),
-  capacity: int("capacity").default(1).notNull(),
-  bookedCount: int("bookedCount").default(0).notNull(),
-  status: mysqlEnum("status", ["Open", "Booked", "Blocked"]).default("Open").notNull(),
+  capacity: integer("capacity").default(1).notNull(),
+  bookedCount: integer("bookedCount").default(0).notNull(),
+  status: scheduleSlotsStatusEnum("status").default("Open").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var scheduleBookings = mysqlTable("schedule_bookings", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
-  slotId: int("slotId").notNull(),
-  kind: mysqlEnum("kind", ["Decide", "Learn", "Apply"]).notNull(),
-  status: mysqlEnum("status", ["Confirmed", "Cancelled"]).default("Confirmed").notNull(),
-  calendarStatus: mysqlEnum("calendarStatus", ["Created", "Pending", "Failed", "NotConfigured"]).default("NotConfigured").notNull(),
+var scheduleBookingsKindEnum = pgEnum("schedule_bookings_kind", ["Decide", "Learn", "Apply"]);
+var scheduleBookingsStatusEnum = pgEnum("schedule_bookings_status", ["Confirmed", "Cancelled"]);
+var scheduleBookingsCalendarStatusEnum = pgEnum("schedule_bookings_calendar_status", ["Created", "Pending", "Failed", "NotConfigured"]);
+var scheduleBookings = pgTable("schedule_bookings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
+  slotId: integer("slotId").notNull(),
+  kind: scheduleBookingsKindEnum("kind").notNull(),
+  status: scheduleBookingsStatusEnum("status").default("Confirmed").notNull(),
+  calendarStatus: scheduleBookingsCalendarStatusEnum("calendarStatus").default("NotConfigured").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var scheduledReminderDeliveries = mysqlTable("scheduled_reminder_deliveries", {
-  id: int("id").autoincrement().primaryKey(),
-  bookingId: int("bookingId").notNull(),
-  reminderType: mysqlEnum("reminderType", ["24h"]).notNull(),
+var scheduledReminderDeliveriesReminderTypeEnum = pgEnum("scheduled_reminder_deliveries_reminder_type", ["24h"]);
+var scheduledReminderDeliveriesStatusEnum = pgEnum("scheduled_reminder_deliveries_status", ["Pending", "Sent", "Failed"]);
+var scheduledReminderDeliveries = pgTable("scheduled_reminder_deliveries", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  bookingId: integer("bookingId").notNull(),
+  reminderType: scheduledReminderDeliveriesReminderTypeEnum("reminderType").notNull(),
   deliveryKey: varchar("deliveryKey", { length: 255 }).notNull().unique(),
-  status: mysqlEnum("status", ["Pending", "Sent", "Failed"]).default("Pending").notNull(),
-  emailLogId: int("emailLogId"),
-  attemptedAt: timestamp("attemptedAt").defaultNow().notNull(),
-  sentAt: timestamp("sentAt"),
+  status: scheduledReminderDeliveriesStatusEnum("status").default("Pending").notNull(),
+  emailLogId: integer("emailLogId"),
+  attemptedAt: timestamp("attemptedAt", { withTimezone: true }).defaultNow().notNull(),
+  sentAt: timestamp("sentAt", { withTimezone: true }),
   errorMessage: text("errorMessage")
 });
-var participantBriefs = mysqlTable("participant_briefs", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var participantBriefs = pgTable("participant_briefs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   fileUrl: text("fileUrl").notNull(),
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   fileType: varchar("fileType", { length: 64 }).default("pdf").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var participantEngagementConsents = mysqlTable("participant_engagement_consents", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var participantEngagementConsentsPackageNameEnum = pgEnum("participant_engagement_consents_package_name", ["Foundation", "Engine Room", "Boardroom"]);
+var participantEngagementConsentsConfirmationEmailStatusEnum = pgEnum("participant_engagement_consents_confirmation_email_status", ["Sent", "Failed", "Simulated"]);
+var participantEngagementConsents = pgTable("participant_engagement_consents", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   briefVersion: varchar("briefVersion", { length: 32 }).notNull(),
-  packageName: mysqlEnum("packageName", ["Foundation", "Engine Room", "Boardroom"]).notNull(),
+  packageName: participantEngagementConsentsPackageNameEnum("packageName").notNull(),
   consentStatement: text("consentStatement").notNull(),
-  acknowledgedAt: timestamp("acknowledgedAt").notNull(),
-  confirmationEmailStatus: mysqlEnum("confirmationEmailStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  acknowledgedAt: timestamp("acknowledgedAt", { withTimezone: true }).notNull(),
+  confirmationEmailStatus: participantEngagementConsentsConfirmationEmailStatusEnum("confirmationEmailStatus").default("Simulated").notNull(),
   confirmationEmailMessageId: varchar("confirmationEmailMessageId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var participantAuthTokens = mysqlTable("participant_auth_tokens", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var participantAuthTokensPurposeEnum = pgEnum("participant_auth_tokens_purpose", ["magic_link", "session"]);
+var participantAuthTokens = pgTable("participant_auth_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  purpose: mysqlEnum("purpose", ["magic_link", "session"]).notNull(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  usedAt: timestamp("usedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  purpose: participantAuthTokensPurposeEnum("purpose").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  usedAt: timestamp("usedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var participantCredentials = mysqlTable("participant_credentials", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+var participantCredentials = pgTable("participant_credentials", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 512 }).notNull(),
-  failedAttempts: int("failedAttempts").default(0).notNull(),
-  lockedUntil: timestamp("lockedUntil"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  failedAttempts: integer("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var participantPasswordTokens = mysqlTable("participant_password_tokens", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var participantPasswordTokensPurposeEnum = pgEnum("participant_password_tokens_purpose", ["setup", "reset"]);
+var participantPasswordTokensDeliveryStatusEnum = pgEnum("participant_password_tokens_delivery_status", ["Sent", "Failed", "Simulated"]);
+var participantPasswordTokens = pgTable("participant_password_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  purpose: mysqlEnum("purpose", ["setup", "reset"]).notNull(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  consumedAt: timestamp("consumedAt"),
-  revokedAt: timestamp("revokedAt"),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  purpose: participantPasswordTokensPurposeEnum("purpose").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumedAt", { withTimezone: true }),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  deliveryStatus: participantPasswordTokensDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
   deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var participantPortalLinks = mysqlTable("participant_portal_links", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+var participantPortalLinks = pgTable("participant_portal_links", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  revokedAt: timestamp("revokedAt"),
-  lastUsedAt: timestamp("lastUsedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  lastUsedAt: timestamp("lastUsedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var participantAssignments = mysqlTable("participant_assignments", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var participantAssignments = pgTable("participant_assignments", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   fileName: varchar("fileName", { length: 255 }).notNull(),
   fileUrl: text("fileUrl").notNull(),
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var participantPaymentReceipts = mysqlTable("participant_payment_receipts", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
-  paymentMilestone: mysqlEnum("paymentMilestone", ["deposit", "instalment_1", "instalment_2", "full_upfront"]).notNull(),
+var participantPaymentReceiptsPaymentMilestoneEnum = pgEnum("participant_payment_receipts_payment_milestone", ["deposit", "instalment_1", "instalment_2", "full_upfront"]);
+var participantPaymentReceiptsStatusEnum = pgEnum("participant_payment_receipts_status", ["Submitted", "Confirmed", "Declined"]);
+var participantPaymentReceipts = pgTable("participant_payment_receipts", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
+  paymentMilestone: participantPaymentReceiptsPaymentMilestoneEnum("paymentMilestone").notNull(),
   fileName: varchar("fileName", { length: 255 }).notNull(),
   fileUrl: text("fileUrl").notNull(),
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   participantNote: text("participantNote"),
-  status: mysqlEnum("status", ["Submitted", "Confirmed", "Declined"]).default("Submitted").notNull(),
-  reviewedByUserId: int("reviewedByUserId"),
-  reviewedAt: timestamp("reviewedAt"),
+  status: participantPaymentReceiptsStatusEnum("status").default("Submitted").notNull(),
+  reviewedByUserId: integer("reviewedByUserId"),
+  reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   reviewNote: text("reviewNote"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var currentStatusAssessments = mysqlTable("current_status_assessments", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var currentStatusAssessmentsStatusEnum = pgEnum("current_status_assessments_status", ["Draft", "Submitted"]);
+var currentStatusAssessments = pgTable("current_status_assessments", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   businessModelSummary: text("businessModelSummary"),
   currentRevenueStage: varchar("currentRevenueStage", { length: 100 }),
   primaryBottleNeck: text("primaryBottleNeck"),
@@ -516,31 +553,37 @@ var currentStatusAssessments = mysqlTable("current_status_assessments", {
   additionalNotes: text("additionalNotes"),
   /** Versioned JSON state for the staged, tap-first diagnostic. Legacy fields remain intact for existing records. */
   structuredDiagnostic: text("structuredDiagnostic"),
-  diagnosticVersion: int("diagnosticVersion").default(1).notNull(),
+  diagnosticVersion: integer("diagnosticVersion").default(1).notNull(),
   activeSection: varchar("activeSection", { length: 32 }),
-  status: mysqlEnum("status", ["Draft", "Submitted"]).default("Draft").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  status: currentStatusAssessmentsStatusEnum("status").default("Draft").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var consultingChatMessages = mysqlTable("consulting_chat_messages", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
-  sender: mysqlEnum("sender", ["ai", "participant"]).notNull(),
+var consultingChatMessagesSenderEnum = pgEnum("consulting_chat_messages_sender", ["ai", "participant"]);
+var consultingChatMessages = pgTable("consulting_chat_messages", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
+  sender: consultingChatMessagesSenderEnum("sender").notNull(),
   content: text("content").notNull(),
   topicTag: varchar("topicTag", { length: 100 }),
   structuredData: text("structuredData"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var consultingReports = mysqlTable("consulting_reports", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+var consultingReportsStatusEnum = pgEnum("consulting_reports_status", ["Draft", "Ready"]);
+var consultingReports = pgTable("consulting_reports", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   summaryJson: text("summaryJson").notNull(),
-  status: mysqlEnum("status", ["Draft", "Ready"]).default("Ready").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  status: consultingReportsStatusEnum("status").default("Ready").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
 });
-var businessChecks = mysqlTable("business_checks", {
-  id: int("id").autoincrement().primaryKey(),
+var businessChecksRouteEnum = pgEnum("business_checks_route", ["advisory", "programme", "foundation", "idea"]);
+var businessChecksReadinessEnum = pgEnum("business_checks_readiness", ["advanced", "intermediate", "nascent"]);
+var businessChecksSummarySourceEnum = pgEnum("business_checks_summary_source", ["AI", "Rules"]);
+var businessChecksNotificationStatusEnum = pgEnum("business_checks_notification_status", ["Sent", "Failed", "Simulated"]);
+var businessChecks = pgTable("business_checks", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   publicToken: varchar("publicToken", { length: 64 }).notNull().unique(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
@@ -548,26 +591,38 @@ var businessChecks = mysqlTable("business_checks", {
   businessName: varchar("businessName", { length: 255 }),
   description: varchar("description", { length: 500 }),
   stage: varchar("stage", { length: 16 }).notNull(),
-  route: mysqlEnum("route", ["advisory", "programme", "foundation", "idea"]).notNull(),
-  readiness: mysqlEnum("readiness", ["advanced", "intermediate", "nascent"]).notNull(),
-  primaryArea: int("primaryArea"),
+  route: businessChecksRouteEnum("route").notNull(),
+  readiness: businessChecksReadinessEnum("readiness").notNull(),
+  primaryArea: integer("primaryArea"),
   answersJson: text("answersJson").notNull(),
   resultJson: text("resultJson").notNull(),
   summaryJson: text("summaryJson").notNull(),
-  summarySource: mysqlEnum("summarySource", ["AI", "Rules"]).notNull(),
-  notificationStatus: mysqlEnum("notificationStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
-  callRequestedAt: timestamp("callRequestedAt"),
-  reportRequestedAt: timestamp("reportRequestedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
+  summarySource: businessChecksSummarySourceEnum("summarySource").notNull(),
+  notificationStatus: businessChecksNotificationStatusEnum("notificationStatus").default("Simulated").notNull(),
+  callRequestedAt: timestamp("callRequestedAt", { withTimezone: true }),
+  reportRequestedAt: timestamp("reportRequestedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
 
 // server/db.ts
 init_env();
 var _db = null;
+var POOL_MAX_CONNECTIONS = 3;
+function createPostgresClient(connectionString) {
+  const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(connectionString);
+  return postgres(connectionString, {
+    // Transaction pooling (Supabase port 6543) does not support prepared statements.
+    prepare: false,
+    max: POOL_MAX_CONNECTIONS,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    ssl: isLocal ? false : "require"
+  });
+}
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(createPostgresClient(process.env.DATABASE_URL));
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -615,8 +670,9 @@ async function upsertUser(user) {
     if (Object.keys(updateSet).length === 0) {
       updateSet.lastSignedIn = /* @__PURE__ */ new Date();
     }
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: { ...updateSet, updatedAt: /* @__PURE__ */ new Date() }
     });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
@@ -1274,9 +1330,10 @@ function automatedReminderPolicy() {
     message: `${BRAND.programmeShortName} 24-hour session reminders require ${BRAND.facilitatorFirstName}'s explicit approval before delivery.`
   };
 }
+var PG_UNIQUE_VIOLATION = "23505";
 function isDuplicateReminderError(error) {
   const candidate = error;
-  return candidate?.code === "ER_DUP_ENTRY" || candidate?.errno === 1062;
+  return candidate?.code === PG_UNIQUE_VIOLATION || candidate?.cause?.code === PG_UNIQUE_VIOLATION;
 }
 function isAuthorisedCronRequest(authorization, secret = ENV.cronSecret) {
   if (!secret || !authorization?.startsWith("Bearer ")) return false;
@@ -1396,8 +1453,8 @@ Facilitator, ${BRAND.programmeName} \u2014 Strategy & Innovation Genius Track`;
         subject,
         body,
         status: delivery.status
-      });
-      const emailLogId = Number(emailResult.insertId);
+      }).returning({ id: emailLogs.id });
+      const emailLogId = Number(emailResult.id);
       const sent = delivery.status === "Sent";
       await db.update(scheduledReminderDeliveries).set({
         status: sent ? "Sent" : "Failed",
@@ -1653,11 +1710,11 @@ async function createParticipantPasswordLink(registrationId, req) {
     tokenHash: hashToken(token),
     purpose,
     expiresAt: new Date(Date.now() + PARTICIPANT_PASSWORD_LINK_TTL_MS)
-  });
+  }).returning({ id: participantPasswordTokens.id });
   return {
     applicant,
     purpose,
-    tokenId: Number(inserted[0].insertId),
+    tokenId: Number(inserted[0].id),
     passwordUrl: buildParticipantPasswordUrl(getPortalOrigin(req), token)
   };
 }
@@ -1697,7 +1754,8 @@ async function completeParticipantPassword(ctx, input) {
     passwordHash: hashParticipantPassword(input.password),
     failedAttempts: 0,
     lockedUntil: null
-  }).onDuplicateKeyUpdate({
+  }).onConflictDoUpdate({
+    target: participantCredentials.registrationId,
     set: {
       passwordHash: hashParticipantPassword(input.password),
       failedAttempts: 0,
@@ -1852,7 +1910,8 @@ async function setAdminPassword(userId, password) {
     passwordHash: hashAdminPassword(password),
     failedAttempts: 0,
     lockedUntil: null
-  }).onDuplicateKeyUpdate({
+  }).onConflictDoUpdate({
+    target: adminCredentials.userId,
     set: {
       passwordHash: hashAdminPassword(password),
       failedAttempts: 0,
@@ -2501,19 +2560,19 @@ var registrationRouter = router({
           depositPaid: "Pending",
           instalment1: "Pending",
           instalment2: "Pending"
-        });
+        }).returning({ id: registrations.id });
         await supersedeDuplicatePathways(
           db,
           relatedActiveRegistrations.map((registration) => registration.id),
-          Number(waitlistInsertResult.insertId)
+          Number(waitlistInsertResult.id)
         );
-        await recordReferralAttribution(db, input.referralCode, Number(waitlistInsertResult.insertId), input.email);
+        await recordReferralAttribution(db, input.referralCode, Number(waitlistInsertResult.id), input.email);
         const waitlistEmail = buildWaitlistEmail(input.fullName);
         const waitlistSubject = waitlistEmail.subject;
         const waitlistBody = waitlistEmail.body;
         const waitlistDelivery = await deliverEmail({ to: input.email, subject: waitlistSubject, body: waitlistBody, html: waitlistEmail.html });
         await db.insert(emailLogs).values({
-          registrationId: Number(waitlistInsertResult.insertId),
+          registrationId: Number(waitlistInsertResult.id),
           recipientEmail: input.email,
           subject: waitlistSubject,
           body: waitlistBody,
@@ -2544,8 +2603,8 @@ Business Model: ${input.businessModel}`
       depositPaid: "Pending",
       instalment1: "Pending",
       instalment2: "Pending"
-    });
-    const newId = insertResult.insertId;
+    }).returning({ id: registrations.id });
+    const newId = insertResult.id;
     await supersedeDuplicatePathways(
       db,
       relatedActiveRegistrations.map((registration) => registration.id),
@@ -3479,11 +3538,12 @@ var schedulingRouter = router({
           throw new TRPCError5({ code: "CONFLICT", message: "You already have a confirmed session booked that overlaps with this time." });
         }
       }
-      const updateResult = await tx.update(scheduleSlots).set({
+      const claimedSlots = await tx.update(scheduleSlots).set({
         bookedCount: sql2`${scheduleSlots.bookedCount} + 1`,
-        status: sql2`CASE WHEN ${scheduleSlots.bookedCount} + 1 >= ${scheduleSlots.capacity} THEN 'Booked' ELSE 'Open' END`
-      }).where(and5(eq7(scheduleSlots.id, slot.id), eq7(scheduleSlots.status, "Open"), sql2`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`));
-      if (Number(updateResult.affectedRows ?? 0) !== 1) {
+        // PostgreSQL does not coerce a text CASE result into an enum column, so the result is cast explicitly.
+        status: sql2`(CASE WHEN ${scheduleSlots.bookedCount} + 1 >= ${scheduleSlots.capacity} THEN 'Booked' ELSE 'Open' END)::${sql2.identifier(scheduleSlotsStatusEnum.enumName)}`
+      }).where(and5(eq7(scheduleSlots.id, slot.id), eq7(scheduleSlots.status, "Open"), sql2`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`)).returning({ id: scheduleSlots.id });
+      if (claimedSlots.length !== 1) {
         throw new TRPCError5({ code: "CONFLICT", message: "That slot has just been taken. Please choose another available time." });
       }
       const [insertResult] = await tx.insert(scheduleBookings).values({
@@ -3492,8 +3552,8 @@ var schedulingRouter = router({
         kind: slot.kind,
         status: "Confirmed",
         calendarStatus: "Pending"
-      });
-      return { bookingId: Number(insertResult.insertId), applicant, slot };
+      }).returning({ id: scheduleBookings.id });
+      return { bookingId: Number(insertResult.id), applicant, slot };
     });
     let calendarStatus = "NotConfigured";
     let googleCalendarEventId;
@@ -3906,8 +3966,8 @@ var participantRouter = router({
         const created = await db.insert(participantProgrammeRecords).values({
           registrationId: applicant.id,
           registrationSnapshot
-        });
-        const programmeRecordId = Number(created[0].insertId);
+        }).returning({ id: participantProgrammeRecords.id });
+        const programmeRecordId = Number(created[0].id);
         await db.insert(participantProgrammeMilestoneEvents).values({
           programmeRecordId,
           phase: 0,
@@ -4013,8 +4073,8 @@ var participantRouter = router({
       packageName: applicant.package,
       consentStatement: brief.consentStatement,
       acknowledgedAt
-    });
-    const consentId = Number(insertResult[0].insertId);
+    }).returning({ id: participantEngagementConsents.id });
+    const consentId = Number(insertResult[0].id);
     const confirmation = buildConsentConfirmationEmail({
       ...buildParticipantBriefInput(applicant),
       acknowledgedAt
@@ -4622,6 +4682,14 @@ import { TRPCError as TRPCError7 } from "@trpc/server";
 import { and as and7, desc as desc4, eq as eq9, gt as gt3, isNull as isNull3 } from "drizzle-orm";
 import { randomBytes as randomBytes3 } from "crypto";
 import { z as z7 } from "zod";
+
+// server/dbHelpers.ts
+import { sql as sql3 } from "drizzle-orm";
+function emailEquals(column, normalisedEmail) {
+  return sql3`lower(${column}) = ${normalisedEmail.trim().toLowerCase()}`;
+}
+
+// server/routers/adminAccess.ts
 init_brand();
 var passwordSchema = z7.string().min(12).max(160);
 var PASSWORD_RESET_TOKEN_MAX_AGE_MS = 20 * 60 * 1e3;
@@ -4692,8 +4760,8 @@ var adminAccessRouter = router({
       tokenHash: sha256(token),
       expiresAt,
       deliveryStatus: "Simulated"
-    });
-    const resetId = Number(inserted[0].insertId);
+    }).returning({ id: adminPasswordResetTokens.id });
+    const resetId = Number(inserted[0].id);
     const baseUrl = getTrustedApplicationOrigin();
     const resetUrl = `${baseUrl}/admin/reset?token=${encodeURIComponent(token)}`;
     const delivery = await deliverEmail({
@@ -4770,7 +4838,7 @@ ${BRAND.senderDisplayName}`
     if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const email = normalizeAdminEmail(input.email);
     if (email === OWNER_ADMIN_EMAIL) throw new TRPCError7({ code: "BAD_REQUEST", message: "The super administrator already has permanent access." });
-    const existingAdmin = await db.select({ id: users.id }).from(users).where(and7(eq9(users.email, email), eq9(users.role, "admin"))).limit(1);
+    const existingAdmin = await db.select({ id: users.id }).from(users).where(and7(emailEquals(users.email, email), eq9(users.role, "admin"))).limit(1);
     if (existingAdmin.length) throw new TRPCError7({ code: "CONFLICT", message: `That email is already an active ${BRAND.programmeShortName} administrator.` });
     const token = randomBytes3(32).toString("base64url");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3);
@@ -4783,8 +4851,8 @@ ${BRAND.senderDisplayName}`
       createdByUserId: ctx.user.id,
       expiresAt,
       proposedPermissionsJson: serializeAdminPermissions(permissions)
-    });
-    const invitationId = Number(inserted[0].insertId);
+    }).returning({ id: adminInvitations.id });
+    const invitationId = Number(inserted[0].id);
     const baseUrl = getTrustedApplicationOrigin();
     const invitationUrl = `${baseUrl}/admin/invite?token=${encodeURIComponent(token)}`;
     const name = input.inviteeName ? ` ${input.inviteeName}` : "";
@@ -4919,8 +4987,8 @@ ${BRAND.senderDisplayName}`
 
 // server/routers/referrals.ts
 import { TRPCError as TRPCError8 } from "@trpc/server";
-import { and as and8, desc as desc5, eq as eq10, sql as sql3 } from "drizzle-orm";
-import { alias } from "drizzle-orm/mysql-core/alias";
+import { and as and8, desc as desc5, eq as eq10, sql as sql4 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { nanoid as nanoid2 } from "nanoid";
 
 // shared/referrals.ts
@@ -5005,7 +5073,7 @@ var referralsRouter = router({
     }
     if (input.decision === "Approved") {
       if (referral.status !== "Qualified") throw new TRPCError8({ code: "PRECONDITION_FAILED", message: "Mark the referral Qualified before approving a credit." });
-      const countRow = (await db.select({ count: sql3`count(*)` }).from(participantReferrals).where(and8(eq10(participantReferrals.referrerRegistrationId, referral.referrerRegistrationId), eq10(participantReferrals.status, "Approved"))))[0];
+      const countRow = (await db.select({ count: sql4`count(*)` }).from(participantReferrals).where(and8(eq10(participantReferrals.referrerRegistrationId, referral.referrerRegistrationId), eq10(participantReferrals.status, "Approved"))))[0];
       if (!referralCreditIsAvailable(Number(countRow?.count ?? 0))) {
         throw new TRPCError8({ code: "PRECONDITION_FAILED", message: `The referrer has reached the maximum of ${REFERRAL_MAX_APPROVED_CREDITS} approved referral credits.` });
       }
@@ -5382,8 +5450,10 @@ var inboundRepliesRouter = router({
         preview: message.preview,
         body: message.body,
         receivedAt: message.receivedAt
-      }).onDuplicateKeyUpdate({
+      }).onConflictDoUpdate({
+        target: inboundEmailReplies.mailboxMessageId,
         set: {
+          updatedAt: /* @__PURE__ */ new Date(),
           preview: message.preview,
           body: message.body,
           receivedAt: message.receivedAt,

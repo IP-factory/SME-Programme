@@ -269,20 +269,20 @@ export const registrationRouter = router({
             depositPaid: "Pending",
             instalment1: "Pending",
             instalment2: "Pending",
-          });
+          }).returning({ id: registrations.id });
           await supersedeDuplicatePathways(
             db,
             relatedActiveRegistrations.map((registration) => registration.id),
-            Number(waitlistInsertResult.insertId),
+            Number(waitlistInsertResult.id),
           );
-          await recordReferralAttribution(db, input.referralCode, Number(waitlistInsertResult.insertId), input.email);
+          await recordReferralAttribution(db, input.referralCode, Number(waitlistInsertResult.id), input.email);
 
           const waitlistEmail = buildWaitlistEmail(input.fullName);
           const waitlistSubject = waitlistEmail.subject;
           const waitlistBody = waitlistEmail.body;
           const waitlistDelivery = await deliverEmail({ to: input.email, subject: waitlistSubject, body: waitlistBody, html: waitlistEmail.html });
           await db.insert(emailLogs).values({
-            registrationId: Number(waitlistInsertResult.insertId),
+            registrationId: Number(waitlistInsertResult.id),
             recipientEmail: input.email,
             subject: waitlistSubject,
             body: waitlistBody,
@@ -314,9 +314,9 @@ export const registrationRouter = router({
         depositPaid: "Pending",
         instalment1: "Pending",
         instalment2: "Pending",
-      });
+      }).returning({ id: registrations.id });
 
-      const newId = insertResult.insertId;
+      const newId = insertResult.id;
       await supersedeDuplicatePathways(
         db,
         relatedActiveRegistrations.map((registration) => registration.id),

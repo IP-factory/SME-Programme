@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/mysql-core/alias";
+import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";
 import { participantReferralProfiles, participantReferrals, registrations } from "../../drizzle/schema";
 import { REFERRAL_CREDIT_PERCENTAGE, REFERRAL_MAX_APPROVED_CREDITS, REFERRAL_POLICY_SUMMARY, referralCreditIsAvailable, referralIsEligibleForQualification } from "../../shared/referrals";

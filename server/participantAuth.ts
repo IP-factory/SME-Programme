@@ -172,11 +172,11 @@ export async function createParticipantPasswordLink(registrationId: number, req:
     tokenHash: hashToken(token),
     purpose,
     expiresAt: new Date(Date.now() + PARTICIPANT_PASSWORD_LINK_TTL_MS),
-  });
+  }).returning({ id: participantPasswordTokens.id });
   return {
     applicant,
     purpose,
-    tokenId: Number(inserted[0].insertId),
+    tokenId: Number(inserted[0].id),
     passwordUrl: buildParticipantPasswordUrl(getPortalOrigin(req), token),
   };
 }
@@ -219,7 +219,8 @@ export async function completeParticipantPassword(ctx: TrpcContext, input: { tok
     passwordHash: hashParticipantPassword(input.password),
     failedAttempts: 0,
     lockedUntil: null,
-  }).onDuplicateKeyUpdate({
+  }).onConflictDoUpdate({
+    target: participantCredentials.registrationId,
     set: {
       passwordHash: hashParticipantPassword(input.password),
       failedAttempts: 0,

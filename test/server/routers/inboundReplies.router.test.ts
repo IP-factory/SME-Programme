@@ -15,6 +15,6 @@ describe("inbound reply tracker router", () => {
     expect(source).toContain("registrationByEmail");
     expect(source).toContain("getJumpMailboxMessages(Array.from(registrationByEmail.keys()))");
     expect(source).toContain("inboundEmailReplies");
-    expect(source).toContain("onDuplicateKeyUpdate");
+    expect(source).toContain("onConflictDoUpdate");
   });
 });

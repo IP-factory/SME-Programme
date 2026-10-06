@@ -54,8 +54,10 @@ export const inboundRepliesRouter = router({
         preview: message.preview,
         body: message.body,
         receivedAt: message.receivedAt,
-      }).onDuplicateKeyUpdate({
+      }).onConflictDoUpdate({
+        target: inboundEmailReplies.mailboxMessageId,
         set: {
+          updatedAt: new Date(),
           preview: message.preview,
           body: message.body,
           receivedAt: message.receivedAt,

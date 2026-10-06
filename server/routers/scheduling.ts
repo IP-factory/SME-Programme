@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { participantEngagementConsents, registrations, scheduleBookings, scheduleSlots } from "../../drizzle/schema";
+import { participantEngagementConsents, registrations, scheduleBookings, scheduleSlots, scheduleSlotsStatusEnum } from "../../drizzle/schema";
 import { getBusyRanges, isCalendarConfigured, createCalendarEvent } from "../calendar";
 import { getDb } from "../db";
 import { adminProcedure, participantProcedure, publicProcedure, router } from "../_core/trpc";
@@ -181,13 +181,15 @@ export const schedulingRouter = router({
           }
         }
 
-        const updateResult = await tx.update(scheduleSlots)
+        const claimedSlots = await tx.update(scheduleSlots)
           .set({
             bookedCount: sql`${scheduleSlots.bookedCount} + 1`,
-            status: sql`CASE WHEN ${scheduleSlots.bookedCount} + 1 >= ${scheduleSlots.capacity} THEN 'Booked' ELSE 'Open' END`,
+            // PostgreSQL does not coerce a text CASE result into an enum column, so the result is cast explicitly.
+            status: sql`(CASE WHEN ${scheduleSlots.bookedCount} + 1 >= ${scheduleSlots.capacity} THEN 'Booked' ELSE 'Open' END)::${sql.identifier(scheduleSlotsStatusEnum.enumName)}`,
           })
-          .where(and(eq(scheduleSlots.id, slot.id), eq(scheduleSlots.status, "Open"), sql`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`));
-        if (Number((updateResult as { affectedRows?: number }).affectedRows ?? 0) !== 1) {
+          .where(and(eq(scheduleSlots.id, slot.id), eq(scheduleSlots.status, "Open"), sql`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`))
+          .returning({ id: scheduleSlots.id });
+        if (claimedSlots.length !== 1) {
           throw new TRPCError({ code: "CONFLICT", message: "That slot has just been taken. Please choose another available time." });
         }
         const [insertResult] = await tx.insert(scheduleBookings).values({
@@ -196,8 +198,8 @@ export const schedulingRouter = router({
           kind: slot.kind,
           status: "Confirmed",
           calendarStatus: "Pending",
-        });
-        return { bookingId: Number(insertResult.insertId), applicant, slot };
+        }).returning({ id: scheduleBookings.id });
+        return { bookingId: Number(insertResult.id), applicant, slot };
       });
 
       let calendarStatus: "Created" | "Failed" | "NotConfigured" = "NotConfigured";

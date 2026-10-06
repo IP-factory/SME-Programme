@@ -1,15 +1,31 @@
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+// Serverless clients stay small: Supabase's Transaction Pooler multiplexes the real connections.
+const POOL_MAX_CONNECTIONS = 3;
+
+export function createPostgresClient(connectionString: string) {
+  const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(connectionString);
+  return postgres(connectionString, {
+    // Transaction pooling (Supabase port 6543) does not support prepared statements.
+    prepare: false,
+    max: POOL_MAX_CONNECTIONS,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    ssl: isLocal ? false : "require",
+  });
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(createPostgresClient(process.env.DATABASE_URL));
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -68,8 +84,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
+    // onConflictDoUpdate does not apply $onUpdate, so updatedAt is set explicitly.
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: { ...updateSet, updatedAt: new Date() },
     });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);

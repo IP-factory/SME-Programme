@@ -1,127 +1,138 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 /**
  * Users provisioned through Manus OAuth. The live database is authoritative;
  * this model mirrors it exactly so role-gated admin access remains reliable.
  */
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const usersRoleEnum = pgEnum("users_role", ["user", "admin"]);
+
+export const users = pgTable("users", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  role: usersRoleEnum("role").default("user").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /** A second, JUMP-specific password factor for an already verified administrator identity. */
-export const adminCredentials = mysqlTable("admin_credentials", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+export const adminCredentials = pgTable("admin_credentials", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 512 }).notNull(),
-  failedAttempts: int("failedAttempts").default(0).notNull(),
-  lockedUntil: timestamp("lockedUntil"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  failedAttempts: integer("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type AdminCredential = typeof adminCredentials.$inferSelect;
 
 /** Owner-selected capabilities for a verified administrator. The Super Admin is intentionally not represented here. */
-export const adminPermissionProfiles = mysqlTable("admin_permission_profiles", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+export const adminPermissionProfiles = pgTable("admin_permission_profiles", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().unique(),
   permissionsJson: text("permissionsJson").notNull(),
-  updatedByUserId: int("updatedByUserId"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedByUserId: integer("updatedByUserId"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type AdminPermissionProfile = typeof adminPermissionProfiles.$inferSelect;
 
 /** Short-lived, revocable server-side sessions created after the JUMP admin password is verified. */
-export const adminAccessSessions = mysqlTable("admin_access_sessions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const adminAccessSessions = pgTable("admin_access_sessions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  revokedAt: timestamp("revokedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type AdminAccessSession = typeof adminAccessSessions.$inferSelect;
 
 /** Single-use password-reset credentials. Only a token hash is retained; reset links themselves are never stored. */
-export const adminPasswordResetTokens = mysqlTable("admin_password_reset_tokens", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const adminPasswordResetTokensDeliveryStatusEnum = pgEnum("admin_password_reset_tokens_delivery_status", ["Sent", "Failed", "Simulated"]);
+
+export const adminPasswordResetTokens = pgTable("admin_password_reset_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  consumedAt: timestamp("consumedAt"),
-  revokedAt: timestamp("revokedAt"),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumedAt", { withTimezone: true }),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  deliveryStatus: adminPasswordResetTokensDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
   deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type AdminPasswordResetToken = typeof adminPasswordResetTokens.$inferSelect;
 
 /** Email-bound, expiring invitations for additional JUMP administrators. */
-export const adminInvitations = mysqlTable("admin_invitations", {
-  id: int("id").autoincrement().primaryKey(),
+export const adminInvitationsStatusEnum = pgEnum("admin_invitations_status", ["Pending", "Accepted", "Revoked", "Expired"]);
+export const adminInvitationsDeliveryStatusEnum = pgEnum("admin_invitations_delivery_status", ["Sent", "Failed", "Simulated"]);
+
+export const adminInvitations = pgTable("admin_invitations", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   email: varchar("email", { length: 320 }).notNull(),
   inviteeName: varchar("inviteeName", { length: 255 }),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  status: mysqlEnum("status", ["Pending", "Accepted", "Revoked", "Expired"]).default("Pending").notNull(),
-  createdByUserId: int("createdByUserId").notNull(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  acceptedByUserId: int("acceptedByUserId"),
-  acceptedAt: timestamp("acceptedAt"),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  status: adminInvitationsStatusEnum("status").default("Pending").notNull(),
+  createdByUserId: integer("createdByUserId").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  acceptedByUserId: integer("acceptedByUserId"),
+  acceptedAt: timestamp("acceptedAt", { withTimezone: true }),
+  deliveryStatus: adminInvitationsDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
   deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
   /** Immutable proposed capability set selected by Emmanuel when the invitation is issued. */
   proposedPermissionsJson: text("proposedPermissionsJson"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type AdminInvitation = typeof adminInvitations.$inferSelect;
 
 /** Append-only access-management audit events for invitations, role changes, and password enrolment. */
-export const adminAccessAuditEvents = mysqlTable("admin_access_audit_events", {
-  id: int("id").autoincrement().primaryKey(),
-  actorUserId: int("actorUserId"),
+export const adminAccessAuditEvents = pgTable("admin_access_audit_events", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  actorUserId: integer("actorUserId"),
   action: varchar("action", { length: 128 }).notNull(),
   targetEmail: varchar("targetEmail", { length: 320 }),
   details: text("details"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type AdminAccessAuditEvent = typeof adminAccessAuditEvents.$inferSelect;
 
 /** Email audit log for automated and manually triggered communications. */
-export const emailLogs = mysqlTable("email_logs", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const emailLogsStatusEnum = pgEnum("email_logs_status", ["Sent", "Failed", "Simulated"]);
+
+export const emailLogs = pgTable("email_logs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   recipientEmail: varchar("recipientEmail", { length: 320 }).notNull(),
   subject: varchar("subject", { length: 255 }).notNull(),
   body: text("body").notNull(),
-  status: mysqlEnum("status", ["Sent", "Failed", "Simulated"]).default("Sent").notNull(),
-  sentAt: timestamp("sentAt").defaultNow().notNull(),
+  status: emailLogsStatusEnum("status").default("Sent").notNull(),
+  sentAt: timestamp("sentAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type EmailLog = typeof emailLogs.$inferSelect;
 export type InsertEmailLog = typeof emailLogs.$inferInsert;
 
 /** Participant replies retrieved from the dedicated JUMP mailbox; never exposed outside authorised administration. */
-export const inboundEmailReplies = mysqlTable("inbound_email_replies", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const inboundEmailRepliesStatusEnum = pgEnum("inbound_email_replies_status", ["New", "Reviewed", "Follow-up", "Closed"]);
+
+export const inboundEmailReplies = pgTable("inbound_email_replies", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   mailboxMessageId: varchar("mailboxMessageId", { length: 255 }).notNull().unique(),
   mailboxThreadId: varchar("mailboxThreadId", { length: 255 }),
   senderEmail: varchar("senderEmail", { length: 320 }).notNull(),
@@ -129,86 +140,99 @@ export const inboundEmailReplies = mysqlTable("inbound_email_replies", {
   subject: varchar("subject", { length: 255 }).notNull(),
   preview: text("preview").notNull(),
   body: text("body").notNull(),
-  receivedAt: timestamp("receivedAt").notNull(),
-  status: mysqlEnum("status", ["New", "Reviewed", "Follow-up", "Closed"]).default("New").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  receivedAt: timestamp("receivedAt", { withTimezone: true }).notNull(),
+  status: inboundEmailRepliesStatusEnum("status").default("New").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type InboundEmailReply = typeof inboundEmailReplies.$inferSelect;
 
 /** Pricing enquiries requested from public sign-up or an authenticated participant portal. */
-export const pricingRequests = mysqlTable("pricing_requests", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId"),
-  source: mysqlEnum("source", ["Public", "ParticipantPortal"]).notNull(),
+export const pricingRequestsSourceEnum = pgEnum("pricing_requests_source", ["Public", "ParticipantPortal"]);
+export const pricingRequestsNotificationStatusEnum = pgEnum("pricing_requests_notification_status", ["Sent", "Failed", "Simulated"]);
+
+export const pricingRequests = pgTable("pricing_requests", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId"),
+  source: pricingRequestsSourceEnum("source").notNull(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   businessName: varchar("businessName", { length: 255 }),
   preferredPackage: varchar("preferredPackage", { length: 64 }),
   note: text("note"),
-  notificationStatus: mysqlEnum("notificationStatus", ["Sent", "Failed", "Simulated"]).default("Sent").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  notificationStatus: pricingRequestsNotificationStatusEnum("notificationStatus").default("Sent").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type PricingRequest = typeof pricingRequests.$inferSelect;
 
 /** Applicant registrations and their onboarding, payment, and diagnostic state. */
-export const registrations = mysqlTable("registrations", {
-  id: int("id").autoincrement().primaryKey(),
+export const registrationsBusinessModelEnum = pgEnum("registrations_business_model", ["Maker", "Trader", "Expert"]);
+export const registrationsPackageEnum = pgEnum("registrations_package", ["Foundation", "Engine Room", "Boardroom"]);
+export const registrationsStatusEnum = pgEnum("registrations_status", ["Pending", "Accepted", "Rejected", "Waitlisted"]);
+export const registrationsCohortGroupEnum = pgEnum("registrations_cohort_group", ["Unassigned", "Makers", "Traders", "Experts"]);
+export const registrationsDepositPaidEnum = pgEnum("registrations_deposit_paid", ["Pending", "Paid"]);
+export const registrationsInstalment1Enum = pgEnum("registrations_instalment1", ["Pending", "Paid"]);
+export const registrationsInstalment2Enum = pgEnum("registrations_instalment2", ["Pending", "Paid"]);
+
+export const registrations = pgTable("registrations", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 50 }).notNull(),
   businessName: varchar("businessName", { length: 255 }).notNull(),
   businessDescription: text("businessDescription").notNull(),
-  businessModel: mysqlEnum("businessModel", ["Maker", "Trader", "Expert"]).notNull(),
-  package: mysqlEnum("package", ["Foundation", "Engine Room", "Boardroom"]).notNull(),
+  businessModel: registrationsBusinessModelEnum("businessModel").notNull(),
+  package: registrationsPackageEnum("package").notNull(),
   question: text("question"),
-  status: mysqlEnum("status", ["Pending", "Accepted", "Rejected", "Waitlisted"]).default("Pending").notNull(),
-  cohortGroup: mysqlEnum("cohortGroup", ["Unassigned", "Makers", "Traders", "Experts"]).default("Unassigned").notNull(),
-  depositPaid: mysqlEnum("depositPaid", ["Pending", "Paid"]).default("Pending").notNull(),
-  instalment1: mysqlEnum("instalment1", ["Pending", "Paid"]).default("Pending").notNull(),
-  instalment2: mysqlEnum("instalment2", ["Pending", "Paid"]).default("Pending").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  status: registrationsStatusEnum("status").default("Pending").notNull(),
+  cohortGroup: registrationsCohortGroupEnum("cohortGroup").default("Unassigned").notNull(),
+  depositPaid: registrationsDepositPaidEnum("depositPaid").default("Pending").notNull(),
+  instalment1: registrationsInstalment1Enum("instalment1").default("Pending").notNull(),
+  instalment2: registrationsInstalment2Enum("instalment2").default("Pending").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
   bookingToken: varchar("bookingToken", { length: 64 }),
   diagnosticData: text("diagnosticData"),
   diagnosticStage: varchar("diagnosticStage", { length: 64 }),
   diagnosticEngineRoom: varchar("diagnosticEngineRoom", { length: 128 }),
   diagnosticClasses: varchar("diagnosticClasses", { length: 255 }),
   /** Points to the retained highest-pathway registration when an earlier pathway entry is superseded. */
-  supersededByRegistrationId: int("supersededByRegistrationId"),
+  supersededByRegistrationId: integer("supersededByRegistrationId"),
   /** Non-destructive removal from the active owner desk; the original engagement record remains intact. */
-  archivedAt: timestamp("archivedAt"),
-  archivedByUserId: int("archivedByUserId"),
+  archivedAt: timestamp("archivedAt", { withTimezone: true }),
+  archivedByUserId: integer("archivedByUserId"),
 });
 
 export type Registration = typeof registrations.$inferSelect;
 export type InsertRegistration = typeof registrations.$inferInsert;
 
 /** One private, non-guessable share code per canonical JUMP participant. */
-export const participantReferralProfiles = mysqlTable("participant_referral_profiles", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+export const participantReferralProfiles = pgTable("participant_referral_profiles", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   referralCode: varchar("referralCode", { length: 64 }).notNull().unique(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParticipantReferralProfile = typeof participantReferralProfiles.$inferSelect;
 
 /** A referral attribution and owner-reviewed credit decision; programme balances are never changed automatically. */
-export const participantReferrals = mysqlTable("participant_referrals", {
-  id: int("id").autoincrement().primaryKey(),
-  referrerRegistrationId: int("referrerRegistrationId").notNull(),
-  referredRegistrationId: int("referredRegistrationId").notNull().unique(),
+export const participantReferralsStatusEnum = pgEnum("participant_referrals_status", ["Registered", "Qualified", "Approved", "Declined"]);
+
+export const participantReferrals = pgTable("participant_referrals", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  referrerRegistrationId: integer("referrerRegistrationId").notNull(),
+  referredRegistrationId: integer("referredRegistrationId").notNull().unique(),
   referralCode: varchar("referralCode", { length: 64 }).notNull(),
-  status: mysqlEnum("status", ["Registered", "Qualified", "Approved", "Declined"]).default("Registered").notNull(),
-  creditPercentage: int("creditPercentage").default(0).notNull(),
-  reviewedByUserId: int("reviewedByUserId"),
-  reviewedAt: timestamp("reviewedAt"),
+  status: participantReferralsStatusEnum("status").default("Registered").notNull(),
+  creditPercentage: integer("creditPercentage").default(0).notNull(),
+  reviewedByUserId: integer("reviewedByUserId"),
+  reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ParticipantReferral = typeof participantReferrals.$inferSelect;
@@ -217,80 +241,97 @@ export type ParticipantReferral = typeof participantReferrals.$inferSelect;
  * Programme-level record derived from a registration. The original registration is preserved
  * as a JSON snapshot so future diagnostic phases can pre-fill rather than re-ask it.
  */
-export const participantProgrammeRecords = mysqlTable("participant_programme_records", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+export const participantProgrammeRecordsPaymentStructureEnum = pgEnum("participant_programme_records_payment_structure", ["instalments_40_30_30", "full_upfront_10pc_discount"]);
+export const participantProgrammeRecordsPaymentMethodEnum = pgEnum("participant_programme_records_payment_method", ["bank_transfer", "paystack", "wants_to_discuss"]);
+export const participantProgrammeRecordsPaymentStatusEnum = pgEnum("participant_programme_records_payment_status", ["awaiting", "partial", "complete"]);
+
+export const participantProgrammeRecords = pgTable("participant_programme_records", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   registrationSnapshot: text("registrationSnapshot").notNull(),
-  paymentStructure: mysqlEnum("paymentStructure", ["instalments_40_30_30", "full_upfront_10pc_discount"]),
-  paymentMethod: mysqlEnum("paymentMethod", ["bank_transfer", "paystack", "wants_to_discuss"]),
-  paymentStatus: mysqlEnum("paymentStatus", ["awaiting", "partial", "complete"]).default("awaiting").notNull(),
-  currentPhase: int("currentPhase").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  paymentStructure: participantProgrammeRecordsPaymentStructureEnum("paymentStructure"),
+  paymentMethod: participantProgrammeRecordsPaymentMethodEnum("paymentMethod"),
+  paymentStatus: participantProgrammeRecordsPaymentStatusEnum("paymentStatus").default("awaiting").notNull(),
+  currentPhase: integer("currentPhase").default(0).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ParticipantProgrammeRecord = typeof participantProgrammeRecords.$inferSelect;
 export type InsertParticipantProgrammeRecord = typeof participantProgrammeRecords.$inferInsert;
 
 /** Immutable audit history for participant tracker states; records are appended, never replaced. */
-export const participantProgrammeMilestoneEvents = mysqlTable("participant_programme_milestone_events", {
-  id: int("id").autoincrement().primaryKey(),
-  programmeRecordId: int("programmeRecordId").notNull(),
-  phase: int("phase").notNull(),
+export const participantProgrammeMilestoneEventsStatusEnum = pgEnum("participant_programme_milestone_events_status", ["locked", "available", "in_progress", "complete"]);
+export const participantProgrammeMilestoneEventsSourceEnum = pgEnum("participant_programme_milestone_events_source", ["system", "participant", "admin"]);
+
+export const participantProgrammeMilestoneEvents = pgTable("participant_programme_milestone_events", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  programmeRecordId: integer("programmeRecordId").notNull(),
+  phase: integer("phase").notNull(),
   milestone: varchar("milestone", { length: 128 }).notNull(),
-  status: mysqlEnum("status", ["locked", "available", "in_progress", "complete"]).notNull(),
-  source: mysqlEnum("source", ["system", "participant", "admin"]).default("system").notNull(),
-  recordedAt: timestamp("recordedAt").defaultNow().notNull(),
+  status: participantProgrammeMilestoneEventsStatusEnum("status").notNull(),
+  source: participantProgrammeMilestoneEventsSourceEnum("source").default("system").notNull(),
+  recordedAt: timestamp("recordedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParticipantProgrammeMilestoneEvent = typeof participantProgrammeMilestoneEvents.$inferSelect;
 export type InsertParticipantProgrammeMilestoneEvent = typeof participantProgrammeMilestoneEvents.$inferInsert;
 
 /** Bookable programme session slots. */
-export const scheduleSlots = mysqlTable("schedule_slots", {
-  id: int("id").autoincrement().primaryKey(),
-  kind: mysqlEnum("kind", ["Decide", "Learn", "Apply"]).notNull(),
-  sessionNumber: int("sessionNumber").default(1).notNull(),
-  startAt: timestamp("startAt").notNull(),
-  endAt: timestamp("endAt").notNull(),
+export const scheduleSlotsKindEnum = pgEnum("schedule_slots_kind", ["Decide", "Learn", "Apply"]);
+export const scheduleSlotsStatusEnum = pgEnum("schedule_slots_status", ["Open", "Booked", "Blocked"]);
+
+export const scheduleSlots = pgTable("schedule_slots", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  kind: scheduleSlotsKindEnum("kind").notNull(),
+  sessionNumber: integer("sessionNumber").default(1).notNull(),
+  startAt: timestamp("startAt", { withTimezone: true }).notNull(),
+  endAt: timestamp("endAt", { withTimezone: true }).notNull(),
   timezone: varchar("timezone", { length: 64 }).default("Africa/Lagos").notNull(),
-  capacity: int("capacity").default(1).notNull(),
-  bookedCount: int("bookedCount").default(0).notNull(),
-  status: mysqlEnum("status", ["Open", "Booked", "Blocked"]).default("Open").notNull(),
+  capacity: integer("capacity").default(1).notNull(),
+  bookedCount: integer("bookedCount").default(0).notNull(),
+  status: scheduleSlotsStatusEnum("status").default("Open").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ScheduleSlot = typeof scheduleSlots.$inferSelect;
 export type InsertScheduleSlot = typeof scheduleSlots.$inferInsert;
 
 /** Participant reservations against programme session slots. */
-export const scheduleBookings = mysqlTable("schedule_bookings", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
-  slotId: int("slotId").notNull(),
-  kind: mysqlEnum("kind", ["Decide", "Learn", "Apply"]).notNull(),
-  status: mysqlEnum("status", ["Confirmed", "Cancelled"]).default("Confirmed").notNull(),
-  calendarStatus: mysqlEnum("calendarStatus", ["Created", "Pending", "Failed", "NotConfigured"]).default("NotConfigured").notNull(),
+export const scheduleBookingsKindEnum = pgEnum("schedule_bookings_kind", ["Decide", "Learn", "Apply"]);
+export const scheduleBookingsStatusEnum = pgEnum("schedule_bookings_status", ["Confirmed", "Cancelled"]);
+export const scheduleBookingsCalendarStatusEnum = pgEnum("schedule_bookings_calendar_status", ["Created", "Pending", "Failed", "NotConfigured"]);
+
+export const scheduleBookings = pgTable("schedule_bookings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
+  slotId: integer("slotId").notNull(),
+  kind: scheduleBookingsKindEnum("kind").notNull(),
+  status: scheduleBookingsStatusEnum("status").default("Confirmed").notNull(),
+  calendarStatus: scheduleBookingsCalendarStatusEnum("calendarStatus").default("NotConfigured").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ScheduleBooking = typeof scheduleBookings.$inferSelect;
 export type InsertScheduleBooking = typeof scheduleBookings.$inferInsert;
 
 /** Durable audit and deduplication record for automated session reminders. */
-export const scheduledReminderDeliveries = mysqlTable("scheduled_reminder_deliveries", {
-  id: int("id").autoincrement().primaryKey(),
-  bookingId: int("bookingId").notNull(),
-  reminderType: mysqlEnum("reminderType", ["24h"]).notNull(),
+export const scheduledReminderDeliveriesReminderTypeEnum = pgEnum("scheduled_reminder_deliveries_reminder_type", ["24h"]);
+export const scheduledReminderDeliveriesStatusEnum = pgEnum("scheduled_reminder_deliveries_status", ["Pending", "Sent", "Failed"]);
+
+export const scheduledReminderDeliveries = pgTable("scheduled_reminder_deliveries", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  bookingId: integer("bookingId").notNull(),
+  reminderType: scheduledReminderDeliveriesReminderTypeEnum("reminderType").notNull(),
   deliveryKey: varchar("deliveryKey", { length: 255 }).notNull().unique(),
-  status: mysqlEnum("status", ["Pending", "Sent", "Failed"]).default("Pending").notNull(),
-  emailLogId: int("emailLogId"),
-  attemptedAt: timestamp("attemptedAt").defaultNow().notNull(),
-  sentAt: timestamp("sentAt"),
+  status: scheduledReminderDeliveriesStatusEnum("status").default("Pending").notNull(),
+  emailLogId: integer("emailLogId"),
+  attemptedAt: timestamp("attemptedAt", { withTimezone: true }).defaultNow().notNull(),
+  sentAt: timestamp("sentAt", { withTimezone: true }),
   errorMessage: text("errorMessage"),
 });
 
@@ -298,76 +339,84 @@ export type ScheduledReminderDelivery = typeof scheduledReminderDeliveries.$infe
 export type InsertScheduledReminderDelivery = typeof scheduledReminderDeliveries.$inferInsert;
 
 /** Engagement briefs uploaded by an administrator for an individual participant. */
-export const participantBriefs = mysqlTable("participant_briefs", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const participantBriefs = pgTable("participant_briefs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   fileUrl: text("fileUrl").notNull(),
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   fileType: varchar("fileType", { length: 64 }).default("pdf").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ParticipantBrief = typeof participantBriefs.$inferSelect;
 export type InsertParticipantBrief = typeof participantBriefs.$inferInsert;
 
 /** Immutable participant acknowledgements of a versioned personalised portal brief. */
-export const participantEngagementConsents = mysqlTable("participant_engagement_consents", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const participantEngagementConsentsPackageNameEnum = pgEnum("participant_engagement_consents_package_name", ["Foundation", "Engine Room", "Boardroom"]);
+export const participantEngagementConsentsConfirmationEmailStatusEnum = pgEnum("participant_engagement_consents_confirmation_email_status", ["Sent", "Failed", "Simulated"]);
+
+export const participantEngagementConsents = pgTable("participant_engagement_consents", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   briefVersion: varchar("briefVersion", { length: 32 }).notNull(),
-  packageName: mysqlEnum("packageName", ["Foundation", "Engine Room", "Boardroom"]).notNull(),
+  packageName: participantEngagementConsentsPackageNameEnum("packageName").notNull(),
   consentStatement: text("consentStatement").notNull(),
-  acknowledgedAt: timestamp("acknowledgedAt").notNull(),
-  confirmationEmailStatus: mysqlEnum("confirmationEmailStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  acknowledgedAt: timestamp("acknowledgedAt", { withTimezone: true }).notNull(),
+  confirmationEmailStatus: participantEngagementConsentsConfirmationEmailStatusEnum("confirmationEmailStatus").default("Simulated").notNull(),
   confirmationEmailMessageId: varchar("confirmationEmailMessageId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParticipantEngagementConsent = typeof participantEngagementConsents.$inferSelect;
 export type InsertParticipantEngagementConsent = typeof participantEngagementConsents.$inferInsert;
 
 /** Hashed single-use email-authentication tokens and participant browser sessions. */
-export const participantAuthTokens = mysqlTable("participant_auth_tokens", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const participantAuthTokensPurposeEnum = pgEnum("participant_auth_tokens_purpose", ["magic_link", "session"]);
+
+export const participantAuthTokens = pgTable("participant_auth_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  purpose: mysqlEnum("purpose", ["magic_link", "session"]).notNull(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  usedAt: timestamp("usedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  purpose: participantAuthTokensPurposeEnum("purpose").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  usedAt: timestamp("usedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParticipantAuthToken = typeof participantAuthTokens.$inferSelect;
 export type InsertParticipantAuthToken = typeof participantAuthTokens.$inferInsert;
 
 /** Password credentials for a JUMP participant. Plaintext passwords are never retained. */
-export const participantCredentials = mysqlTable("participant_credentials", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+export const participantCredentials = pgTable("participant_credentials", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 512 }).notNull(),
-  failedAttempts: int("failedAttempts").default(0).notNull(),
-  lockedUntil: timestamp("lockedUntil"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  failedAttempts: integer("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ParticipantCredential = typeof participantCredentials.$inferSelect;
 
 /** Short-lived, single-use links used only to set or reset a participant password. */
-export const participantPasswordTokens = mysqlTable("participant_password_tokens", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const participantPasswordTokensPurposeEnum = pgEnum("participant_password_tokens_purpose", ["setup", "reset"]);
+export const participantPasswordTokensDeliveryStatusEnum = pgEnum("participant_password_tokens_delivery_status", ["Sent", "Failed", "Simulated"]);
+
+export const participantPasswordTokens = pgTable("participant_password_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  purpose: mysqlEnum("purpose", ["setup", "reset"]).notNull(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  consumedAt: timestamp("consumedAt"),
-  revokedAt: timestamp("revokedAt"),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
+  purpose: participantPasswordTokensPurposeEnum("purpose").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumedAt", { withTimezone: true }),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  deliveryStatus: participantPasswordTokensDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
   deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParticipantPasswordToken = typeof participantPasswordTokens.$inferSelect;
@@ -376,55 +425,60 @@ export type ParticipantPasswordToken = typeof participantPasswordTokens.$inferSe
  * Durable personal portal URLs. Only a SHA-256 token hash is stored; replacing a
  * link revokes the previous bearer link and the participant's browser sessions.
  */
-export const participantPortalLinks = mysqlTable("participant_portal_links", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull().unique(),
+export const participantPortalLinks = pgTable("participant_portal_links", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull().unique(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
-  revokedAt: timestamp("revokedAt"),
-  lastUsedAt: timestamp("lastUsedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  lastUsedAt: timestamp("lastUsedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParticipantPortalLink = typeof participantPortalLinks.$inferSelect;
 export type InsertParticipantPortalLink = typeof participantPortalLinks.$inferInsert;
 
 /** Participant-uploaded assignments and completed work. */
-export const participantAssignments = mysqlTable("participant_assignments", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const participantAssignments = pgTable("participant_assignments", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   fileName: varchar("fileName", { length: 255 }).notNull(),
   fileUrl: text("fileUrl").notNull(),
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParticipantAssignment = typeof participantAssignments.$inferSelect;
 export type InsertParticipantAssignment = typeof participantAssignments.$inferInsert;
 
 /** Participant-submitted proof of bank transfer. An owner decision is always required before payment is confirmed. */
-export const participantPaymentReceipts = mysqlTable("participant_payment_receipts", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
-  paymentMilestone: mysqlEnum("paymentMilestone", ["deposit", "instalment_1", "instalment_2", "full_upfront"]).notNull(),
+export const participantPaymentReceiptsPaymentMilestoneEnum = pgEnum("participant_payment_receipts_payment_milestone", ["deposit", "instalment_1", "instalment_2", "full_upfront"]);
+export const participantPaymentReceiptsStatusEnum = pgEnum("participant_payment_receipts_status", ["Submitted", "Confirmed", "Declined"]);
+
+export const participantPaymentReceipts = pgTable("participant_payment_receipts", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
+  paymentMilestone: participantPaymentReceiptsPaymentMilestoneEnum("paymentMilestone").notNull(),
   fileName: varchar("fileName", { length: 255 }).notNull(),
   fileUrl: text("fileUrl").notNull(),
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   participantNote: text("participantNote"),
-  status: mysqlEnum("status", ["Submitted", "Confirmed", "Declined"]).default("Submitted").notNull(),
-  reviewedByUserId: int("reviewedByUserId"),
-  reviewedAt: timestamp("reviewedAt"),
+  status: participantPaymentReceiptsStatusEnum("status").default("Submitted").notNull(),
+  reviewedByUserId: integer("reviewedByUserId"),
+  reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   reviewNote: text("reviewNote"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ParticipantPaymentReceipt = typeof participantPaymentReceipts.$inferSelect;
 export type InsertParticipantPaymentReceipt = typeof participantPaymentReceipts.$inferInsert;
 /** Current State Assessment responses retained for each participant. */
-export const currentStatusAssessments = mysqlTable("current_status_assessments", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const currentStatusAssessmentsStatusEnum = pgEnum("current_status_assessments_status", ["Draft", "Submitted"]);
+
+export const currentStatusAssessments = pgTable("current_status_assessments", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   businessModelSummary: text("businessModelSummary"),
   currentRevenueStage: varchar("currentRevenueStage", { length: 100 }),
   primaryBottleNeck: text("primaryBottleNeck"),
@@ -434,38 +488,42 @@ export const currentStatusAssessments = mysqlTable("current_status_assessments",
   additionalNotes: text("additionalNotes"),
   /** Versioned JSON state for the staged, tap-first diagnostic. Legacy fields remain intact for existing records. */
   structuredDiagnostic: text("structuredDiagnostic"),
-  diagnosticVersion: int("diagnosticVersion").default(1).notNull(),
+  diagnosticVersion: integer("diagnosticVersion").default(1).notNull(),
   activeSection: varchar("activeSection", { length: 32 }),
-  status: mysqlEnum("status", ["Draft", "Submitted"]).default("Draft").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  status: currentStatusAssessmentsStatusEnum("status").default("Draft").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type CurrentStatusAssessment = typeof currentStatusAssessments.$inferSelect;
 export type InsertCurrentStatusAssessment = typeof currentStatusAssessments.$inferInsert;
 
 /** AI-guided assessment conversation history. */
-export const consultingChatMessages = mysqlTable("consulting_chat_messages", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
-  sender: mysqlEnum("sender", ["ai", "participant"]).notNull(),
+export const consultingChatMessagesSenderEnum = pgEnum("consulting_chat_messages_sender", ["ai", "participant"]);
+
+export const consultingChatMessages = pgTable("consulting_chat_messages", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
+  sender: consultingChatMessagesSenderEnum("sender").notNull(),
   content: text("content").notNull(),
   topicTag: varchar("topicTag", { length: 100 }),
   structuredData: text("structuredData"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ConsultingChatMessage = typeof consultingChatMessages.$inferSelect;
 export type InsertConsultingChatMessage = typeof consultingChatMessages.$inferInsert;
 
 /** AI-generated current-state assessment reports. */
-export const consultingReports = mysqlTable("consulting_reports", {
-  id: int("id").autoincrement().primaryKey(),
-  registrationId: int("registrationId").notNull(),
+export const consultingReportsStatusEnum = pgEnum("consulting_reports_status", ["Draft", "Ready"]);
+
+export const consultingReports = pgTable("consulting_reports", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  registrationId: integer("registrationId").notNull(),
   summaryJson: text("summaryJson").notNull(),
-  status: mysqlEnum("status", ["Draft", "Ready"]).default("Ready").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  status: consultingReportsStatusEnum("status").default("Ready").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
 export type ConsultingReport = typeof consultingReports.$inferSelect;
@@ -476,8 +534,13 @@ export type InsertConsultingReport = typeof consultingReports.$inferInsert;
  * the result is recomputed on the server so the outline can never be set by the browser.
  * publicToken lets the owner ask for the call or the full report without signing in.
  */
-export const businessChecks = mysqlTable("business_checks", {
-  id: int("id").autoincrement().primaryKey(),
+export const businessChecksRouteEnum = pgEnum("business_checks_route", ["advisory", "programme", "foundation", "idea"]);
+export const businessChecksReadinessEnum = pgEnum("business_checks_readiness", ["advanced", "intermediate", "nascent"]);
+export const businessChecksSummarySourceEnum = pgEnum("business_checks_summary_source", ["AI", "Rules"]);
+export const businessChecksNotificationStatusEnum = pgEnum("business_checks_notification_status", ["Sent", "Failed", "Simulated"]);
+
+export const businessChecks = pgTable("business_checks", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   publicToken: varchar("publicToken", { length: 64 }).notNull().unique(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
@@ -485,17 +548,17 @@ export const businessChecks = mysqlTable("business_checks", {
   businessName: varchar("businessName", { length: 255 }),
   description: varchar("description", { length: 500 }),
   stage: varchar("stage", { length: 16 }).notNull(),
-  route: mysqlEnum("route", ["advisory", "programme", "foundation", "idea"]).notNull(),
-  readiness: mysqlEnum("readiness", ["advanced", "intermediate", "nascent"]).notNull(),
-  primaryArea: int("primaryArea"),
+  route: businessChecksRouteEnum("route").notNull(),
+  readiness: businessChecksReadinessEnum("readiness").notNull(),
+  primaryArea: integer("primaryArea"),
   answersJson: text("answersJson").notNull(),
   resultJson: text("resultJson").notNull(),
   summaryJson: text("summaryJson").notNull(),
-  summarySource: mysqlEnum("summarySource", ["AI", "Rules"]).notNull(),
-  notificationStatus: mysqlEnum("notificationStatus", ["Sent", "Failed", "Simulated"]).default("Simulated").notNull(),
-  callRequestedAt: timestamp("callRequestedAt"),
-  reportRequestedAt: timestamp("reportRequestedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  summarySource: businessChecksSummarySourceEnum("summarySource").notNull(),
+  notificationStatus: businessChecksNotificationStatusEnum("notificationStatus").default("Simulated").notNull(),
+  callRequestedAt: timestamp("callRequestedAt", { withTimezone: true }),
+  reportRequestedAt: timestamp("reportRequestedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type BusinessCheck = typeof businessChecks.$inferSelect;

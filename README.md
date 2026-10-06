@@ -13,7 +13,7 @@ Participant registration, portal and programme-administration platform for IP Fa
 
 ## Stack
 
-React 19 + Vite + Tailwind 4 (client) · Express 5 + tRPC 11 (server) · Drizzle ORM + MySQL · Vitest.
+React 19 + Vite + Tailwind 4 (client) · Express 5 + tRPC 11 (server) · Drizzle ORM + PostgreSQL (Supabase) · Vitest.
 
 ```
 client/      React app (pages/, components/, lib/)
@@ -27,7 +27,7 @@ docs/        Operational and migration documentation
 
 ## Getting started
 
-Requirements: Node 22, pnpm 10 (`corepack enable`), a MySQL database for anything beyond tests and builds.
+Requirements: Node 22, pnpm 10 (`corepack enable`), a PostgreSQL database for anything beyond tests and builds.
 
 ```bash
 pnpm install
@@ -42,7 +42,8 @@ pnpm dev               # http://localhost:3000
 | `pnpm build` | Production client + server bundle into `dist/` |
 | `pnpm build:preview` | Static, clickable preview of the site into `dist/preview` (simulated server; no hosting, database or secrets needed) |
 | `pnpm start` | Run the production bundle |
-| `pnpm db:push` | Generate and apply Drizzle migrations (requires `DATABASE_URL`) |
+| `pnpm db:generate` / `pnpm db:migrate` | Generate / apply Drizzle migrations (`db:migrate` requires `MIGRATION_DATABASE_URL`) |
+| `pnpm test:db` | PostgreSQL contract tests against a real database (requires `TEST_DATABASE_URL`) |
 
 CI (`.github/workflows/ci.yml`) runs check, test and build on every push and pull request.
 

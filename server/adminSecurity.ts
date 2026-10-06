@@ -118,7 +118,8 @@ export async function setAdminPassword(userId: number, password: string) {
     passwordHash: hashAdminPassword(password),
     failedAttempts: 0,
     lockedUntil: null,
-  }).onDuplicateKeyUpdate({
+  }).onConflictDoUpdate({
+    target: adminCredentials.userId,
     set: {
       passwordHash: hashAdminPassword(password),
       failedAttempts: 0,
