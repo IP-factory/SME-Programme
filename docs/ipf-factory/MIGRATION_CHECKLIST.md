@@ -1,8 +1,32 @@
-# IPF Factory — Migration Checklist & Baseline Audit
+# IP Factory (IPF) — Migration Checklist & Baseline Audit
 
-**Prepared:** 6 October 2026
-**Scope:** Take-over audit of the migrated JUMP 2026 platform. Read-only: no application behaviour has been changed.
+**Prepared:** 6 October 2026 · **Updated:** 6 October 2026 (decisions, concept mapping, Phase 2 plan; see §0 and §8–§9)
+**Scope:** Take-over audit of the migrated JUMP 2026 platform and the plan to turn it into the IP Factory Business Support client area.
 **Companion to:** `IPF_FACTORY_HANDOVER_PLAN.md` (the seven-step route). This document is the engineering view of Steps 2, 4 and 5.
+
+## 0. Status at a glance
+
+**Decided (6 October 2026)**
+
+| # | Decision |
+|---|---|
+| D1 | The organisation is **IP Factory (IPF), Intellectual Property Factory**. "IPF Factory" in the original handover documents is a misnomer. The product name ("Operating Partner", "Growth Desk" or "Next Monday") is set separately per the concept note, by 7 October. |
+| D3 | Brand variant **ipf-teal-navy**: the Option 2 iPF box logo, navy wordmark, teal box. |
+| D7 | **Start clean.** No JUMP participant data is migrated. JUMP contacts are reached through the warm list instead. |
+| D9 | **Leave Manus completely.** The platform runs on independent, IPF-owned hosting. |
+| — | **Platform role:** this platform becomes the **Phase 2 private client area, due 8 November 2026 on an IPF domain**. The 8 October Phase 1 front door stays a content site with Calendly and Paystack links, as the concept note specifies. |
+
+**Done**
+
+| Step | Commit | Result |
+|---|---|---|
+| 0 Hygiene | `918638e` | Tests green without secrets; real participant data removed from fixtures; README, `.env.example` and CI added |
+| 1A Brand settings | `432a8af` | All programme and facilitator identity read from `shared/brand.ts`; 37 files verified value-identical |
+| 1B Deployment identity | `dfb55ba` | `APP_ORIGIN`, `APP_ALTERNATE_ORIGINS` and `OWNER_ADMIN_EMAIL` drive links, origin checks and Super Admin; the Paystack callback no longer points at a Manus preview host |
+| 1C Colour tokens | `712fc9c` | 1,002 hard-coded colours become 41 role-named tokens; 0 pixels changed on 18 screenshots |
+| Security | `229bab1` | The public admin sign-in page no longer discloses the Super Admin email |
+
+---
 
 > This file deliberately does **not** reproduce secrets, bank account numbers, or participant personal data. It points to where they live (`file:line`) so they can be dealt with.
 
@@ -133,46 +157,103 @@ The repository is **private**. No API keys, tokens or connection strings were fo
 
 ---
 
-## 6. Decisions required (owner: IPF Factory leadership)
+## 6. Decisions (owner: IP Factory leadership)
 
 | # | Decision | Blocks |
 |---|---|---|
-| D1 | Canonical brand name. The repo says "IPF Factory"; other IPF assets use "IP Factory". Confirm the legal entity name and the public programme name (for example, "IP Factory SME Programme"). | Phase 1D |
+| D1 | ✅ **Decided:** IP Factory (Intellectual Property Factory). Product name still to set (concept note, 7 Oct). | Phase 1D copy |
 | D2 | Production domain and the programme mailbox (sender + reply-to) | Phase 1D, email cutover |
-| D3 | Brand assets: logo, palette, typography (IP Factory palettes exist: green / navy / teal-navy / gradient) | Phase 1D (visual) |
-| D4 | Facilitator model: does the experience remain personally fronted, or IPF-institutional? This drives roughly 60% of the copy. | Phase 2 copy |
+| D3 | ✅ **Decided:** ipf-teal-navy. Typography still open. | Phase 1D (visual) |
+| D4 | Facilitator model. The concept note implies **IPF-institutional**: roles, not names, unless agreed (§15). Confirm. This drives roughly 60% of the copy. | Phase 2 copy |
 | D5 | Super Admin owner(s) at IPF, and Emmanuel's role after handover | Phase 1B governance |
-| D6 | IPF payment entity: bank accounts, Paystack merchant, pricing, packages, instalment policy | Payments workstream |
-| D7 | Which JUMP participants transfer, and on what lawful basis | Data migration (Step 3) |
+| D6 | IPF payment entity: Paystack merchant and bank-transfer fallback. The price ladder itself is decided in the concept note (§8). Who signs client terms is open (concept note, 8 Nov). | Payments workstream |
+| D7 | ✅ **Decided:** start clean, so no participant data is transferred | — |
 | D8 | PII clean-up approach, including whether to rewrite git history | Phase 0 |
-| D9 | Stay on Manus (IPF workspace) or replatform | Infra roadmap |
+| D9 | ✅ **Decided:** leave Manus; replatform (§9, workstream R) | — |
 
 ---
 
 ## 7. Migration checklist (consolidated)
 
-**Phase 0: Hygiene (no user-visible change)**
-- [ ] Fix the stale DB mock in `participantPasswordFlow.test.ts`
-- [ ] Gate the two live-credential tests behind opt-in env flags (matching the existing `VALIDATE_RESEND_SENDER` pattern) so `pnpm test` is green without secrets
-- [ ] Add `README.md` (setup, scripts, architecture) and `.env.example` (names only)
-- [ ] Relocate PII and operational notes per §5 (on D8)
-- [ ] Add CI (GitHub Actions: check, test, build)
+**Phase 0: Hygiene** ✅
+- [x] Fix the stale DB mock in `participantPasswordFlow.test.ts`
+- [x] Gate the two live-credential tests behind opt-in env flags
+- [x] Add `README.md` and `.env.example` (names only)
+- [x] Replace real participant data in test fixtures
+- [ ] Relocate the root-level JUMP operational notes, which contain PII, to an IPF-controlled archive (D8)
+- [x] Add CI (GitHub Actions: check, test, build)
 
-**Phase 1: Centralise, then rebrand** (see proposal below)
-- [ ] 1A Brand config module, behaviour-identical
-- [ ] 1B Domain/origin/owner identity → env-driven
-- [ ] 1C Colour tokens, visually identical
-- [ ] 1D Swap values to IPF (on D1–D3, D5)
+**Phase 1: Centralise, then rebrand**
+- [x] 1A Brand settings module, behaviour-identical
+- [x] 1B Domain, origin and owner identity read from environment
+- [x] 1C Colour tokens, visually identical
+- [ ] 1D Apply IPF identity: ipf-teal-navy palette and logo now; product name and copy once set (§9, workstream B)
 
-**Phase 2: Content & programme**
-- [ ] Email templates and portal copy rewritten for the IPF voice (D4)
-- [ ] Programme names, schedule, packages (display labels)
-- [ ] AI persona prompt and PDF footers
+The remaining phases are replaced by the Phase 2 plan in §9. Data migration (old Phase 5) is dropped by D7.
 
-**Phase 3: Payments** (D6). Separate review with a two-person check on every beneficiary detail.
+---
 
-**Phase 4: Environment & integrations** (Step 4 of the handover plan). IPF Manus workspace, DB, Resend domain, Google Workspace OAuth, Paystack, storage, analytics.
+## 8. How the concept note maps onto the platform
 
-**Phase 5: Data migration** (D7, Step 3). Selective export, file-key migration, password hashes preserved, legacy JUMP labelling.
+Source: *IPF Business Support — Concept Note and Launch Blueprint v0.6 (final, 4 Oct 2026)*. The concept adds layers to the existing structure rather than replacing it.
 
-**Phase 6: Acceptance & cutover** (Steps 6–7). Run against the existing test inventory plus a manual UAT script. Change domain only after sign-off.
+| Concept note | Existing platform | Change needed |
+|---|---|---|
+| Ten-minute form: 12 questions, banded answers | Staged registration (`DiagnosticRegistrationDialog`), which already uses ranges | Re-word to the 12 questions; add sector, staff, revenue, decision-maker and hours bands |
+| Price ladder: diagnostic ₦500k, sprint ₦1.2m, retainer ₦400k a month | Packages Foundation, Engine Room and Boardroom; payment guidance; Paystack links; receipt upload with owner review | New product values (DB enum migration); retainer is monthly; Paystack pages per product |
+| Referral: 10% off the next invoice per paying referral, capped at 30%, never on the first payment | Referral module with owner-reviewed credit % and a credit cap | Configure the values; enforce "never on the first payment" |
+| Diagnostic instrument across the ten doors | Structured diagnostic plus the working-diagnostic PDF | Rebase the questions on the ten doors and add scoring (instrument content from the IPF team) |
+| **Engagement record** (identity, funnel, diagnostic, sprint, weekly check-ins, close, day 30) | Registration, programme record, append-only milestone events | **New tables:** engagement (door, sub-problem, measure, baseline, target, playbook version), weekly check-in (progress, blockers, next step, measure reading, questions asked, hours by role, AI used), close (final value, moved, extension, next door, retainer, day-30 check) |
+| Client area: problem statement, measure, check-in log, files | Participant portal: briefs, uploads, progress tracker, sign-in | Add measure and check-in views; briefs become problem statements and tools |
+| Desk lead and analysts; desk lead signs off prescriptions | Capability-scoped admins with invitations and an audit trail | Analyst permission profile; client allocation; sign-off step |
+| Terms: owner implements, AI disclosed, one door at a time, consent for anonymised cases | Versioned consent acknowledgement | New terms content and version |
+| Weekly check-ins and sessions | Slot scheduling, calendar events, `.ics` invitations, 24-hour reminders | Session kinds become discovery, diagnostic and check-in |
+| AI (Claude) for scoring, analysis and drafts, disclosed | Manus LLM plumbing, which is unused | Anthropic API, when the scoring is built |
+
+---
+
+## 9. Phase 2 plan: client area live on an IPF domain by 8 November 2026
+
+Four workstreams. R and B can start now. P depends on the instrument and record content from the IPF team. A closes.
+
+**R. Replatform off Manus (target: by 23 Oct)**
+- [ ] R1 Delete unused Manus code: LLM, image, voice, map and data API helpers, `ManusDialog`, `ComponentShowcase`, the Manus Vite plugins and debug collector, the `*.manus.*` allowed hosts and origin trust.
+- [ ] R2 Admin sign-in: replace Manus OAuth with Google sign-in on IPF's Workspace, keeping the existing admin password second factor. *Needs an IPF Google Cloud OAuth client.*
+- [ ] R3 File storage: S3-compatible bucket (Cloudflare R2 or AWS S3; the SDK is already a dependency). Replace `/manus-storage/` and move the facilitator and brand assets into the repo.
+- [ ] R4 Owner notifications: replace Manus `notifyOwner` with email to the desk mailbox via the existing sender.
+- [ ] R5 Scheduled reminders: replace Manus heartbeat authentication with a shared-secret cron call (`CRON_SECRET`) from the host.
+- [ ] R6 Hosting and deploy: Node host plus managed MySQL, deploying from GitHub; staging and production. *Needs a hosting choice and an IPF-owned account.*
+- [ ] R7 Secrets under IPF ownership: database, `JWT_SECRET`, Resend (IPF sending domain), Google, Paystack, storage, cron.
+
+**B. Brand and copy (visual by 16 Oct, copy once the name is set)**
+- [ ] B1 ipf-teal-navy palette into the colour tokens (brand-kit roles: primary `#174579`, deep `#0F2E52`, accent `#23807B`, teal `#57C3BD` for fills only, tint `#EDF7F6`, line `#CFE6E4`, body `#404040`).
+- [ ] B2 Logo files into `client/public/brand/` (full, mark, white and mono; used as supplied, never recoloured).
+- [ ] B3 `shared/brand.ts` values: organisation, product name (7 Oct), desk mailbox and sender (D2), and an institutional voice (D4).
+- [ ] B4 Email templates and PDF footers in the IPF voice; AI disclosure line.
+
+**P. Product layer (target: by 2 Nov)**
+- [ ] P1 Products and payments: diagnostic, sprint and retainer; Paystack pages; referral rule; IPF bank-transfer details (D6).
+- [ ] P2 Engagement record tables and admin desk views (the §8 schema), with weekly check-in entry by analysts.
+- [ ] P3 Client area: problem statement, measure and trend, check-in log, files.
+- [ ] P4 Intake: the 12-question form, either native or imported from the Calendly booking. *Decision needed.*
+- [ ] P5 Analyst role, client allocation, prescription sign-off.
+- [ ] P6 Terms v1 with AI disclosure and consent; versioned acknowledgement.
+- [ ] P7 Ten-door diagnostic instrument and scoring (content from the team's Appendix D).
+
+**A. Acceptance and launch (3–8 Nov)**
+- [ ] A1 UAT script across sign-in, intake, payment, receipts, record, check-ins and the client area, on staging.
+- [ ] A2 Security review: auth, uploads, origin checks, secrets, data retention.
+- [ ] A3 IPF domain, TLS, mail sending domain (SPF, DKIM, DMARC) and analytics.
+- [ ] A4 Go-live on 8 Nov; Monday desk-review metrics available from the record.
+
+**Open inputs needed**
+
+| Input | Needed for | By |
+|---|---|---|
+| Product name | B3, B4 | 7 Oct (per concept note) |
+| IPF domain and desk mailbox (D2) | R6, R7, B3, A3 | 13 Oct |
+| Super Admin and desk admins (D5) | R2 | 13 Oct |
+| Hosting choice and IPF accounts (host, Google Cloud, Resend, Paystack, storage) | R2–R7 | 13 Oct |
+| Intake model: native form or Calendly import (P4) | P4 | 16 Oct |
+| Diagnostic instrument and engagement record definitions | P2, P7 | 16 Oct |
+| Terms text, and the entity that signs | P6 | 23 Oct |

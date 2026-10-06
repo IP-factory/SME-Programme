@@ -5,7 +5,7 @@
  * client, server and email templates reads from here, so a rebrand is a change to
  * this file (plus matching test expectations) rather than a codebase-wide edit.
  *
- * Values intentionally still describe the JUMP 2026 programme until the IPF Factory
+ * Values intentionally still describe the JUMP 2026 programme until the IP Factory
  * identity is approved (see docs/ipf-factory/MIGRATION_CHECKLIST.md, decisions D1–D4).
  *
  * Not covered here, by design:

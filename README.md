@@ -1,8 +1,8 @@
-# IPF Factory — SME Programme Platform
+# IP Factory (IPF) — Business Support Platform
 
-Participant registration, portal and programme-administration platform for the IPF Factory SME Programme. Migrated from the JUMP 2026 platform; the existing, tested functionality is being preserved and rebranded rather than rebuilt.
+Participant registration, portal and programme-administration platform for IP Factory (Intellectual Property Factory) business support. Migrated from the JUMP 2026 platform; the existing, tested functionality is being preserved and rebranded rather than rebuilt.
 
-> **Migration in progress.** See [`docs/ipf-factory/MIGRATION_CHECKLIST.md`](docs/ipf-factory/MIGRATION_CHECKLIST.md) for the audit, the phased plan and open decisions. The platform is being moved off Manus to independent hosting; sections marked *legacy* below describe the Manus integrations that are being replaced.
+> **Migration in progress.** See [`docs/ipf-factory/MIGRATION_CHECKLIST.md`](docs/ipf-factory/MIGRATION_CHECKLIST.md) for the audit, the phased plan and open decisions. The platform is being moved off Manus to independent hosting; variables marked LEGACY in `.env.example` belong to the Manus integrations being replaced.
 
 ## What it does
 
