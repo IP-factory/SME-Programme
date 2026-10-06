@@ -40,9 +40,9 @@ export const PROBLEM_AREAS: readonly ProblemArea[] = [
 /**
  * The offer in three parts, in place of JUMP's "Learn, Apply & Decide", and the home page headline.
  * It starts with finding the problem because many owners can feel that something is wrong without
- * being able to name it, and ends on the result: the one number each fix is measured by.
+ * being able to name it, and ends on what the owner gets: results they can see.
  */
-export const PROMISE = ["Find it.", "Fix it.", "Move the number."] as const;
+export const PROMISE = ["Find it.", "Fix it.", "See the results."] as const;
 
 /** Prices in naira (section 11). Ongoing support is deliberately unpriced: copy must not quote a figure. */
 export const PRICES = {
