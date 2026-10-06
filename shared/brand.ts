@@ -24,6 +24,14 @@ export const BRAND = {
   /** The organisation that owns and runs the programme. */
   organisationName: "IP Factory",
   organisationLegalName: "Intellectual Property Factory",
+  /**
+   * The business-support offer's public name. "Operating Partner" is the concept note's working
+   * name; the final name (Operating Partner, Growth Desk or Next Monday) is set separately.
+   */
+  productName: "Operating Partner",
+  productTagline: "Business support for owners",
+  /** External booking page for the ten-minute form (e.g. Calendly). Empty: Apply opens the on-site form. */
+  applyUrl: "",
   /** Logo files in client/public/brand (ipf-teal-navy). Use as supplied: never recolour or stretch. */
   logoUrl: "/brand/ipf-logo-teal-navy.webp",
   logoOnDarkUrl: "/brand/ipf-logo-white.webp",

@@ -1,28 +1,16 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import FacilitatorVideo from "@/components/FacilitatorVideo";
 import DiagnosticRegistrationDialog from "@/components/DiagnosticRegistrationDialog";
-import PricingRequestDialog from "@/components/PricingRequestDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { currencyReferenceLabel, formatProgrammePrice, type DisplayCurrency } from "@/lib/currency";
-import { ArrowRight, CheckCircle2, KeyRound, MailCheck, ShieldAlert, Sparkles, UserCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, KeyRound, MailCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Link } from "wouter";
 import { BRAND } from "@shared/brand";
+import { DOORS, ENGAGEMENT_LOOP, formatNaira, JOINING_STEPS, PRICE_LADDER, REFERRAL_RULE, SERVICE_TIERS, SPRINT_WEEKS } from "@shared/businessSupport";
 
 export default function Home() {
-  const { user } = useAuth();
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isParticipantSignInOpen, setIsParticipantSignInOpen] = useState(false);
-  const [isPricingRequestOpen, setIsPricingRequestOpen] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signInError, setSignInError] = useState("");
@@ -75,447 +63,372 @@ export default function Home() {
   };
 
   const [selectedPackage, setSelectedPackage] = useState<"Foundation" | "Engine Room" | "Boardroom">("Foundation");
-  const [currency, setCurrency] = useState<DisplayCurrency>("USD");
-  const [submittedResult, setSubmittedResult] = useState<{ status: string; message: string; emailStatus?: "Sent" | "Simulated" | "Failed" } | null>(null);
 
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    businessName: "",
-    businessDescription: "",
-    businessModel: "Maker" as "Maker" | "Trader" | "Expert",
-    question: "",
-  });
 
-  const { data: capacityData } = trpc.registration.capacity.useQuery();
-  const boardroomCount = capacityData?.boardroomCount ?? 0;
-  const boardroomRemaining = Math.max(0, 8 - boardroomCount);
-
-  const registerMutation = trpc.registration.submit.useMutation({
-    onSuccess: (data) => {
-      setSubmittedResult(data);
-      toast.success(data.message);
-    },
-    onError: (err) => {
-      toast.error(err.message || "Failed to submit registration.");
-    },
-  });
 
   const handleOpenRegister = (pkg: "Foundation" | "Engine Room" | "Boardroom") => {
     setSelectedPackage(pkg);
-    setSubmittedResult(null);
     setIsRegisterOpen(true);
   };
 
-  const handleSubmitRegistration = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.businessName || !formData.businessDescription) {
-      toast.error("Please fill in all required fields.");
+  /** Apply goes to the external booking form when one is configured, otherwise to the on-site form. */
+  const handleApply = () => {
+    if (BRAND.applyUrl) {
+      window.open(BRAND.applyUrl, "_blank", "noopener,noreferrer");
       return;
     }
-    registerMutation.mutate({
-      ...formData,
-      package: selectedPackage,
-    });
+    handleOpenRegister("Foundation");
   };
+
 
   return (
     <div className="min-h-screen bg-paper text-ink font-sans flex flex-col selection:bg-brand selection:text-paper">
       {/* Top Header */}
-      <header className="border-b border-line bg-paper/80 backdrop-blur sticky top-0 z-50">
+      <header className="border-b border-line bg-paper/90 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-20">
-          <div className="flex items-center gap-3">
+          <a href="#top" className="flex items-center gap-3" aria-label={`${BRAND.organisationName} ${BRAND.productName}`}>
             <img src={BRAND.markUrl} alt={BRAND.organisationName} className="h-9 w-auto shrink-0 sm:hidden" />
             <img src={BRAND.logoUrl} alt={BRAND.organisationName} className="hidden h-10 w-auto shrink-0 sm:block" />
-            <span className="hidden sm:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.programmeName}</span>
-            <span className="hidden sm:inline-block text-xs uppercase tracking-widest px-2.5 py-1 bg-brand text-paper rounded-full">Cohort 2</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-ink-600">
-            <a href="#about" className="hover:text-brand transition-colors">The Programme</a>
-            <a href="#structure" className="hover:text-brand transition-colors">Learning Flow</a>
-            <a href="#packages" className="hover:text-brand transition-colors">Packages & Pricing</a>
-            <a href="#payment" className="hover:text-brand transition-colors">Payment Info</a>
+            <span className="hidden lg:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.productName}</span>
+          </a>
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-ink-600">
+            <a href="#how" className="hover:text-brand transition-colors">How it works</a>
+            <a href="#doors" className="hover:text-brand transition-colors">The ten doors</a>
+            <a href="#pricing" className="hover:text-brand transition-colors">Pricing</a>
+            <a href="#questions" className="hover:text-brand transition-colors">Questions</a>
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => { setIsParticipantSignInOpen(true); setIsPasswordHelpMode(false); setPasswordLinkSent(false); setSignInError(""); }}
-              className="border-red-500/50 text-red-600 hover:bg-red-50 hover:text-red-700 text-xs uppercase tracking-wider font-semibold"
+              className="rounded-none border-brand-line text-brand hover:bg-brand-tint text-xs uppercase tracking-wider font-semibold"
             >
-              Participant Sign In
+              Client sign in
             </Button>
-
-            <Button
-              onClick={() => handleOpenRegister("Foundation")}
-              className="bg-ink text-paper hover:bg-charcoal font-medium text-xs uppercase tracking-widest px-5 py-2.5 rounded-none"
-            >
-              Sign-up Now
+            <Button onClick={handleApply} className="bg-ink text-paper hover:bg-charcoal font-medium text-xs uppercase tracking-widest px-5 py-2.5 rounded-none">
+              Apply
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative pt-24 pb-20 md:pt-32 md:pb-32 border-b border-line">
+      {/* Hero */}
+      <section id="top" className="relative pt-20 pb-20 md:pt-28 md:pb-28 border-b border-line">
         <div className="container max-w-5xl mx-auto text-center px-4">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-line bg-brand-tint text-brand text-xs font-semibold uppercase tracking-widest mb-8">
-            <Sparkles className="w-3.5 h-3.5" /> Strategy & Innovation Genius Track • Sept – Oct 2026
+            {BRAND.productTagline} · {BRAND.organisationName}
           </div>
           <h1 className="font-serif text-5xl sm:text-7xl md:text-8xl font-black tracking-tight leading-[1.05] text-ink mb-8">
-            Learn, Apply <span className="italic font-normal">&amp; Decide.</span>
+            Bring us the problem.
           </h1>
-          <p className="font-serif italic text-xl sm:text-2xl text-ink-soft max-w-3xl mx-auto mb-12 leading-relaxed">
-            &ldquo;You don&apos;t just attend the class. You come prepared, learn deeply, and get access to the person teaching you.&rdquo;
+          <p className="font-serif italic text-xl sm:text-2xl text-ink-soft max-w-3xl mx-auto mb-6 leading-relaxed">
+            We work it with you, week by week, until your business shows the difference.
           </p>
-          <div className="grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3 mx-auto">
-            <Button
-              onClick={() => handleOpenRegister("Foundation")}
-              className="w-full bg-ink text-paper hover:bg-charcoal text-sm uppercase tracking-widest px-5 py-6 rounded-none font-semibold shadow-lg"
-            >
-              Secure Your Place <ArrowRight className="ml-2 w-4 h-4" />
+          <p className="text-ink-soft max-w-2xl mx-auto mb-12 leading-relaxed">
+            A paid diagnostic names the real problem. A six-to-eight-week sprint fixes it, with a weekly check-in and one agreed measure we track until it moves. You stay in the driver&apos;s seat.
+          </p>
+          <div className="grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-2 mx-auto">
+            <Button onClick={handleApply} className="w-full h-14 bg-ink text-paper hover:bg-charcoal text-sm uppercase tracking-widest px-5 rounded-none font-semibold shadow-lg">
+              Apply <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
-            <a
-              href="#packages"
-              className="w-full inline-flex items-center justify-center px-5 py-6 border border-brand text-brand text-sm uppercase tracking-widest font-semibold hover:bg-brand-tint transition-colors"
-            >
-              Explore Packages
+            <a href="#how" className="w-full h-14 inline-flex items-center justify-center px-5 border border-brand text-brand text-sm uppercase tracking-widest font-semibold hover:bg-brand-tint transition-colors">
+              See how it works
             </a>
-            <Button variant="outline" onClick={() => setIsPricingRequestOpen(true)} className="w-full rounded-none border-brand py-6 text-xs font-semibold uppercase tracking-widest text-brand hover:bg-brand-tint">Request programme pricing</Button>
           </div>
-          <div className="mt-16 pt-12 border-t border-line grid grid-cols-2 md:grid-cols-[1.35fr_1fr_1fr_1fr] gap-8 text-left">
-            <div className="col-span-2 md:col-span-1 flex items-center gap-4">
-              <img
-                src={BRAND.facilitatorPortraitUrl}
-                alt={`${BRAND.facilitatorFormalName}, facilitator of ${BRAND.programmeName}`}
-                className="h-24 w-20 shrink-0 border border-line-strongest object-cover object-center shadow-[4px_4px_0_0_var(--color-brand)] sm:h-28 sm:w-24"
-              />
-              <div>
-                <p className="text-xs uppercase tracking-widest text-ink-muted mb-1">Facilitator</p>
-                <p className="font-serif font-bold text-lg leading-tight">{BRAND.facilitatorFormalName}</p>
-                <p className="mt-1 text-xs leading-relaxed text-ink-soft">Partner, Enzo Krypton<br />Strategy &amp; Innovation Advisor</p>
-              </div>
+          <p className="mt-4 text-xs text-ink-muted">The form takes about ten minutes. A short call then confirms whether we can help, before you pay anything.</p>
+          <div className="mt-16 pt-12 border-t border-line grid grid-cols-2 md:grid-cols-4 gap-8 text-left">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-highlight-ink font-semibold mb-1">The test</p>
+              <p className="font-serif font-bold text-lg leading-snug">Did the agreed measure move?</p>
+              <p className="text-xs text-ink-soft mt-1">If not, we have not finished.</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-widest text-ink-muted mb-1">Experience</p>
-              <p className="font-serif font-bold text-lg">18 Years</p>
-              <p className="text-xs text-ink-soft">180+ Organizations Advised</p>
+              <p className="text-xs uppercase tracking-widest text-highlight-ink font-semibold mb-1">Focus</p>
+              <p className="font-serif font-bold text-lg leading-snug">One problem at a time</p>
+              <p className="text-xs text-ink-soft mt-1">One door and one measure, agreed in week one.</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-widest text-ink-muted mb-1">Cohort Timeline</p>
-              <p className="font-serif font-bold text-lg">Sept – Oct 2026</p>
-              <p className="text-xs text-ink-soft">Cohort 2 (Intimate Room)</p>
+              <p className="text-xs uppercase tracking-widest text-highlight-ink font-semibold mb-1">Rhythm</p>
+              <p className="font-serif font-bold text-lg leading-snug">A weekly check-in</p>
+              <p className="text-xs text-ink-soft mt-1">45 minutes, every week of the sprint.</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-widest text-ink-muted mb-1">Outcome</p>
-              <p className="font-serif font-bold text-lg">Decisions, Not Notes</p>
-              <p className="text-xs text-ink-soft">Rigorous Business Architecture</p>
+              <p className="text-xs uppercase tracking-widest text-highlight-ink font-semibold mb-1">Ownership</p>
+              <p className="font-serif font-bold text-lg leading-snug">You implement</p>
+              <p className="text-xs text-ink-soft mt-1">We prescribe, equip, review and track.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="facilitator" className="py-20 md:py-24 border-b border-line bg-paper-sunken/35">
-        <div className="container max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_380px] gap-12 md:gap-16 items-center">
-            <div className="flex flex-col sm:flex-row gap-7 items-start">
-              <img
-                src={BRAND.facilitatorPortraitUrl}
-                alt={`${BRAND.facilitatorFormalName}, facilitator of ${BRAND.programmeName}`}
-                className="w-40 sm:w-48 aspect-[4/5] object-cover border border-line-strongest shadow-[6px_6px_0_0_var(--color-brand)]"
-              />
-              <div className="max-w-xl">
-                <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Facilitator</span>
-                <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-5">Meet {BRAND.facilitatorFormalName}</h2>
-                <p className="font-serif italic text-xl text-ink-750 mb-5">Strategy &amp; Innovation Advisor · Partner, Enzo Krypton</p>
-                <p className="text-ink-soft leading-relaxed">
-                  {BRAND.facilitatorFirstName} brings eighteen years of advisory experience to the room, helping leaders move from business friction to clear strategic decisions, practical architecture, and disciplined execution.
-                </p>
-              </div>
-            </div>
-            <div className="w-full flex justify-center md:justify-end">
-              <FacilitatorVideo />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Programme Problem Statement & Overview */}
-      <section id="about" className="py-24 border-b border-line">
+      {/* The problem */}
+      <section id="problem" className="py-24 border-b border-line">
         <div className="container max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
-            <div className="md:col-span-5">
-              <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Diagnostic Focus</span>
+            <div className="md:col-span-6">
+              <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">The problem we solve</span>
               <h2 className="font-serif text-4xl font-bold tracking-tight mb-6">
-                Built for founders who are ready to stop guessing.
+                Owners don&apos;t fail for lack of information. They fail between knowing and doing.
               </h2>
-              <p className="text-ink-soft leading-relaxed mb-6">
-                {BRAND.programmeName} is designed for leaders who sense friction in their enterprise but lack a rigorous architecture to diagnose and correct it. You leave with decisive answers, not academic theories.
+              <p className="text-ink-soft leading-relaxed mb-4">
+                Courses leave owners informed and still stuck. What is missing is a method, the right tools, someone to check the work, and the discipline of a weekly review.
               </p>
-              <div className="p-6 bg-paper-deep border-l-2 border-ink">
-                <p className="font-serif italic text-sm text-ink-750">
-                  &ldquo;A bakery and a fashion label look like different businesses but have nearly identical problems — both convert raw input into units and live or die on cost per unit.&rdquo;
-                </p>
-              </div>
+              <p className="text-ink-soft leading-relaxed">
+                That gap is where we work. We get into the business with you, name the problem, prescribe the fix from experience, hand over the tools, and stay until the result shows.
+              </p>
             </div>
-            <div className="md:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="p-8 bg-paper-sunken border border-line">
-                <span className="text-xs uppercase tracking-widest text-ink-muted block mb-2">Symptom 01</span>
-                <h3 className="font-serif font-bold text-lg mb-2">Founder Dependency</h3>
-                <p className="text-sm text-ink-soft">Your business depends too much on you, creating a ceiling on growth and daily operational bottlenecks.</p>
-              </div>
-              <div className="p-8 bg-paper-sunken border border-line">
-                <span className="text-xs uppercase tracking-widest text-ink-muted block mb-2">Symptom 02</span>
-                <h3 className="font-serif font-bold text-lg mb-2">Lack of Growth Architecture</h3>
-                <p className="text-sm text-ink-soft">You do not fully understand what is wrong in the business or what precise step to take next.</p>
-              </div>
-              <div className="p-8 bg-paper-sunken border border-line">
-                <span className="text-xs uppercase tracking-widest text-ink-muted block mb-2">Symptom 03</span>
-                <h3 className="font-serif font-bold text-lg mb-2">Unit Economics Leakage</h3>
-                <p className="text-sm text-ink-soft">Pricing to guesswork instead of margin, with hidden cost leaks eroding profitability across units.</p>
-              </div>
-              <div className="p-8 bg-paper-sunken border border-line">
-                <span className="text-xs uppercase tracking-widest text-ink-muted block mb-2">Symptom 04</span>
-                <h3 className="font-serif font-bold text-lg mb-2">Senior Thinking Partner</h3>
-                <p className="text-sm text-ink-soft">You need an experienced strategist to dissect your model and pressure-test your strategic intent.</p>
+            <div className="md:col-span-6">
+              <p className="text-xs uppercase tracking-widest text-ink-muted font-semibold mb-4">What owners told us, in their words</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {["I'm busy but not making money.", "How do I get more clients?", "Nothing moves unless I'm there.", "How do I build a team without payroll overtaking revenue?"].map((quote) => (
+                  <div key={quote} className="p-6 bg-paper-sunken border border-line">
+                    <p className="font-serif italic text-ink-750 leading-snug">&ldquo;{quote}&rdquo;</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Learning Flow & Session Structure */}
-      <section id="structure" className="py-24 border-b border-line bg-paper-sunken/50">
+      {/* Who it is for */}
+      <section id="fit" className="py-24 border-b border-line bg-paper-sunken/50">
         <div className="container max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">The Classroom</span>
-            <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-              How {BRAND.facilitatorFirstName}&apos;s Sessions Are Structured
-            </h2>
-            <p className="text-ink-soft">
-              Every session combines rigorous preparation, targeted masterclass teaching, and direct access to {BRAND.facilitatorFirstName}.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
-            <div className="p-8 bg-paper border border-line relative">
-              <span className="absolute -top-4 left-8 px-3 py-1 bg-ink text-paper text-xs font-mono uppercase">15 Mins Before</span>
-              <h3 className="font-serif font-bold text-2xl mt-4 mb-3">Open Office</h3>
-              <p className="text-sm text-ink-soft leading-relaxed mb-4">
-                {BRAND.facilitatorFirstName} opens the room 15 minutes before class for first-come, first-served questions on the assigned textbook and previous masterclass.
-              </p>
-              <ul className="text-xs text-ink-muted space-y-2">
-                <li>• Two questions only</li>
-                <li>• Submit ahead or register early</li>
-                <li>• 90 seconds to ask, direct answers</li>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <div>
+              <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Who it is for</span>
+              <h2 className="font-serif text-4xl font-bold tracking-tight mb-6">Owners whose business already trades, and who can name what the problem is costing them.</h2>
+              <ul className="space-y-3 text-ink-600">
+                {[
+                  "Trading for two years or more",
+                  "Turning over about ₦5m a month (₦60m a year) or more",
+                  "Typically 5 to 50 staff, some on contract",
+                  "The owner decides, and pays from business cash before work starts",
+                  "A problem one of our ten doors covers",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-highlight-ink" />{item}</li>
+                ))}
               </ul>
+              <p className="mt-6 text-sm text-ink-soft">The discovery call decides. If we cannot help, we say so before you pay.</p>
             </div>
-            <div className="p-8 bg-paper border border-line relative shadow-md">
-              <span className="absolute -top-4 left-8 px-3 py-1 bg-ink text-paper text-xs font-mono uppercase">60 Mins Class</span>
-              <h3 className="font-serif font-bold text-2xl mt-4 mb-3">Masterclass</h3>
-              <p className="text-sm text-ink-soft leading-relaxed mb-4">
-                Classes are built around decision-making, not lectures. The foundational textbook provides the required reading ahead so the live hour focuses entirely on rigorous application and strategic choices.
-              </p>
-              <ul className="text-xs text-ink-muted space-y-2">
-                <li>• Foundational textbook pre-reads</li>
-                <li>• Decision-making over lectures</li>
-                <li>• Frameworks applied directly to your enterprise</li>
-              </ul>
-            </div>
-            <div className="p-8 bg-paper border border-line relative">
-              <span className="absolute -top-4 left-8 px-3 py-1 bg-ink text-paper text-xs font-mono uppercase">30 Mins After</span>
-              <h3 className="font-serif font-bold text-2xl mt-4 mb-3">Deep-Dive Q&amp;A</h3>
-              <p className="text-sm text-ink-soft leading-relaxed mb-4">
-                Challenge the thinking. The room opens again for questions on the session just taught, testing concepts directly against your enterprise.
-              </p>
-              <ul className="text-xs text-ink-muted space-y-2">
-                <li>• Clarify difficult frameworks</li>
-                <li>• Test ideas against your market</li>
-                <li>• Actionable next steps</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Five Classes Progression */}
-          <div className="border border-line bg-paper p-8 md:p-12">
-            <h3 className="font-serif text-2xl font-bold mb-8 text-center">Five Classes. One Business. Deeper Thinking.</h3>
-            <div className="space-y-6 divide-y divide-line">
-              <div className="pt-6 first:pt-0 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                <div className="md:col-span-3 font-mono text-xs uppercase tracking-widest text-ink-muted">01 • Clarity</div>
-                <div className="md:col-span-4 font-serif font-bold text-lg">Why are we here, and what are we building?</div>
-                <div className="md:col-span-5 text-sm text-ink-soft">Business Overview • Strategic Intent • Purpose, ambition and strategic choices</div>
-              </div>
-              <div className="pt-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                <div className="md:col-span-3 font-mono text-xs uppercase tracking-widest text-ink-muted">02 • Business Model</div>
-                <div className="md:col-span-4 font-serif font-bold text-lg">How does the business create and capture value?</div>
-                <div className="md:col-span-5 text-sm text-ink-soft">Business Model • Market and Industry • Customer, value proposition, positioning</div>
-              </div>
-              <div className="pt-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                <div className="md:col-span-3 font-mono text-xs uppercase tracking-widest text-ink-muted">03 • Growth Engine</div>
-                <div className="md:col-span-4 font-serif font-bold text-lg">How do we win customers and make money?</div>
-                <div className="md:col-span-5 text-sm text-ink-soft">Brand, Marketing and Sales • Acquisition, pricing, margins, unit economics</div>
-              </div>
-              <div className="pt-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                <div className="md:col-span-3 font-mono text-xs uppercase tracking-widest text-ink-muted">04 • Operating Engine</div>
-                <div className="md:col-span-4 font-serif font-bold text-lg">What must exist behind the scenes to scale?</div>
-                <div className="md:col-span-5 text-sm text-ink-soft">Operations • People • Technology • Processes, organisation, artificial intelligence</div>
-              </div>
-              <div className="pt-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                <div className="md:col-span-3 font-mono text-xs uppercase tracking-widest text-ink-muted">05 • Durable Business</div>
-                <div className="md:col-span-4 font-serif font-bold text-lg">How do we build a resilient, valuable enterprise?</div>
-                <div className="md:col-span-5 text-sm text-ink-soft">Financial Plan • Risk • Exit • Capital, resilience, enterprise value, succession</div>
+            <div>
+              <p className="text-xs uppercase tracking-widest text-ink-muted font-semibold mb-4">Not the right fit yet</p>
+              <div className="space-y-4">
+                {[
+                  { title: "Founders who have not started yet", body: "Door 0, founder readiness, is offered on its own: a diagnostic and a personal plan, without a sprint." },
+                  { title: "Businesses below about ₦5m a month", body: "The price would take too much of a month's revenue. A lower-cost, self-serve route is being built." },
+                  { title: "Raising investment", body: `Fundraising beyond the business's current scale is handled by ${BRAND.organisationName}'s Finance and Capital practice.` },
+                ].map((card) => (
+                  <div key={card.title} className="p-6 bg-paper border border-line">
+                    <h3 className="font-serif font-bold text-lg mb-1">{card.title}</h3>
+                    <p className="text-sm text-ink-soft">{card.body}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Packages & Pricing Section */}
-      <section id="packages" className="py-24 border-b border-line">
+      {/* The ten doors */}
+      <section id="doors" className="py-24 border-b border-line">
         <div className="container max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Investment &amp; Tiers</span>
-            <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-              Three Packages. Choose Your Depth.
-            </h2>
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">The catalogue</span>
+            <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">Ten places a business gets stuck.</h2>
             <p className="text-ink-soft">
-              Payment terms: 40% commitment before classes begin, 30% by the end of September, and the final 30% by mid-October before the programme ends. Pay the full programme fee upfront and receive a 10% discount. <strong className="text-brand">Note: Higher tiers (Engine Room and Boardroom) comprehensively include all foundational access—selecting a tier is cumulative, not additive, so there is no double payment.</strong>
+              Every business we have worked with gets stuck at one of these doors, somewhere between founder readiness and exit. Start at whichever one is costing you money now; the diagnostic confirms where.
             </p>
-            <div className="mt-7 flex flex-col items-center gap-3">
-              <div className="inline-flex border border-brand-line bg-brand-tint p-1" role="group" aria-label="Choose display currency">
-                {(["USD", "NGN"] as const).map((option) => <button key={option} type="button" onClick={() => setCurrency(option)} aria-pressed={currency === option} className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors ${currency === option ? "bg-brand text-paper" : "text-brand hover:bg-paper"}`}>{option}</button>)}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {DOORS.map((door) => (
+              <article key={door.number} className="flex flex-col bg-paper-raised border border-line p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-brand text-paper font-mono text-sm font-semibold">{door.number}</span>
+                  <h3 className="font-serif font-bold text-xl leading-tight">{door.name}</h3>
+                </div>
+                <p className="font-serif italic text-ink-750 leading-snug mb-4">&ldquo;{door.ownerWords}&rdquo;</p>
+                <p className="text-sm text-ink-soft mb-4">{door.together}</p>
+                <p className="mt-auto border-t border-line pt-3 text-xs text-ink-muted"><span className="font-semibold uppercase tracking-wider text-highlight-ink">Measure</span> · {door.measure}</p>
+              </article>
+            ))}
+          </div>
+          <p className="mt-8 text-center text-xs text-ink-muted">Doors 1 to 9 run as a diagnostic, then one sprint per door. Door 0 is a diagnostic and personal plan; door 10 is worked through partner sessions.</p>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section id="how" className="py-24 border-b border-line bg-paper-sunken/50">
+        <div className="container max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">How it works</span>
+            <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">We stay until the measure moves.</h2>
+            <p className="text-ink-soft">Each problem runs through the same six steps. You do the work in your business; we prescribe, equip, review and keep score.</p>
+          </div>
+
+          <ol className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-16">
+            {ENGAGEMENT_LOOP.map((step, index) => (
+              <li key={step.name} className="bg-paper border border-line p-5">
+                <span className="font-mono text-xs text-highlight-ink">{String(index + 1).padStart(2, "0")}</span>
+                <p className="font-serif font-bold text-lg mt-1">{step.name}</p>
+                <p className="text-xs text-ink-soft mt-1">{step.detail}</p>
+              </li>
+            ))}
+          </ol>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+            <div>
+              <h3 className="font-serif text-2xl font-bold mb-6">Getting started</h3>
+              <ol className="space-y-4">
+                {JOINING_STEPS.map((step, index) => (
+                  <li key={step.name} className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-brand text-brand font-mono text-xs font-semibold">{index + 1}</span>
+                    <div>
+                      <p className="font-semibold text-ink">{step.name}</p>
+                      <p className="text-sm text-ink-soft">{step.detail}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div>
+              <h3 className="font-serif text-2xl font-bold mb-6">Inside a sprint</h3>
+              <div className="border border-line bg-paper divide-y divide-line">
+                {SPRINT_WEEKS.map((week) => (
+                  <div key={week.when} className="grid grid-cols-[110px_1fr] gap-4 p-4">
+                    <div>
+                      <p className="font-semibold text-sm text-brand">{week.when}</p>
+                      <p className="text-[11px] text-ink-muted mt-1">Your time: {week.ownerTime}</p>
+                    </div>
+                    <p className="text-sm text-ink-soft">{week.what}</p>
+                  </div>
+                ))}
               </div>
-              <p className="text-[11px] text-ink-muted">{currencyReferenceLabel(currency)} · displayed prices are programme fee equivalents</p>
             </div>
           </div>
 
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {SERVICE_TIERS.map((tier) => (
+              <div key={tier.name} className="bg-paper border border-line p-6">
+                <p className="text-xs uppercase tracking-widest text-highlight-ink font-semibold mb-2">{tier.name}</p>
+                <p className="text-ink-600 mb-3">{tier.detail}</p>
+                <p className="text-xs text-ink-muted">For example: {tier.example}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 border border-brand-line bg-brand-tint">
+              <p className="font-semibold text-brand-deep mb-2">The rules that keep it honest</p>
+              <ul className="space-y-1.5 text-sm text-brand-deep">
+                <li>One active door at a time.</li>
+                <li>One measure per door, agreed in week 1 and written down.</li>
+                <li>If the measure has not moved by week 8, we keep going for up to four weeks at no fee.</li>
+                <li>Everything you receive is kept in your private client folder.</li>
+              </ul>
+            </div>
+            <div className="p-6 border border-brand-line bg-brand-tint">
+              <p className="font-semibold text-brand-deep mb-2">Open about AI</p>
+              <p className="text-sm text-brand-deep">Our analysts use AI to analyse your numbers and prepare first drafts. Every piece of work follows {BRAND.organisationName}&apos;s method and is reviewed by a named consultant before it reaches you.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="py-24 border-b border-line">
+        <div className="container max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Pricing</span>
+            <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">Three steps, each paid before work starts.</h2>
+            <p className="text-ink-soft">Most owners begin with a diagnostic, fix one door in a sprint, then continue on a retainer for the next.</p>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
-            {/* Foundation */}
-            <div className="bg-paper-sunken border border-line p-8 flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-mono uppercase tracking-widest text-ink-muted block mb-2">Package 01</span>
-                <h3 className="font-serif text-3xl font-bold mb-2">Foundation</h3>
-                <p className="text-xs uppercase tracking-widest text-brand font-semibold mb-3">Learn</p>
-                <p className="text-xs italic text-ink-muted mb-6">“I run on instinct, and it is starting to show.”</p>
-                <div className="mb-8">
-                  <span className="text-4xl font-serif font-bold">{formatProgrammePrice("Foundation", currency)}</span>
-                  <span className="text-xs text-ink-muted block mt-1">40% commitment before classes; 30% by end of September; 30% by mid-October. 10% discount on full upfront payment</span>
-                </div>
-                <ul className="space-y-3 text-sm text-ink-600 mb-8">
-                  <li className="flex items-start gap-2">✓ Five live classes x 90 minutes, fortnightly</li>
-                  <li className="flex items-start gap-2">✓ Live Q&amp;A plus dedicated post-class question time</li>
-                  <li className="flex items-start gap-2">✓ Slides, replays and curated resource library</li>
-                  <li className="flex items-start gap-2">✓ The Last Testament of Business textbook</li>
+            {PRICE_LADDER.map((step, index) => (
+              <div key={step.id} className={`border p-8 flex flex-col ${step.id === "sprint" ? "border-brand bg-paper-raised shadow-md" : "border-line bg-paper-sunken"}`}>
+                <span className="text-xs font-mono uppercase tracking-widest text-ink-muted block mb-2">Step {String(index + 1).padStart(2, "0")}</span>
+                <h3 className="font-serif text-3xl font-bold mb-4">{step.name}</h3>
+                <p className="mb-6">
+                  <span className="text-4xl font-serif font-bold">{formatNaira(step.priceNaira)}</span>
+                  {step.priceSuffix && <span className="text-sm text-ink-muted"> {step.priceSuffix}</span>}
+                </p>
+                <ul className="space-y-2 text-sm text-ink-600 mb-6">
+                  {step.buys.map((item) => <li key={item} className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-highlight-ink" />{item}</li>)}
                 </ul>
+                <p className="mt-auto text-xs text-ink-muted border-t border-line pt-4">{step.scope}</p>
               </div>
-              <Button
-                onClick={() => handleOpenRegister("Foundation")}
-                className="w-full bg-ink text-paper hover:bg-charcoal rounded-none py-6 uppercase tracking-wider text-xs font-semibold"
-              >
-                Register for Foundation
-              </Button>
-            </div>
-
-            {/* Engine Room */}
-            <div className="bg-paper-sunken border border-line p-8 flex flex-col justify-between relative">
-              <div>
-                <span className="text-xs font-mono uppercase tracking-widest text-ink-muted block mb-2">Package 02</span>
-                <h3 className="font-serif text-3xl font-bold mb-2">Engine Room</h3>
-                <p className="text-xs uppercase tracking-widest text-brand font-semibold mb-3">Apply</p>
-                <p className="text-xs italic text-ink-muted mb-6">“Show me how this works in a business built like mine.”</p>
-                <div className="mb-8">
-                  <span className="text-4xl font-serif font-bold">{formatProgrammePrice("Engine Room", currency)}</span>
-                  <span className="text-xs text-ink-muted block mt-1">40% commitment before classes; 30% by end of September; 30% by mid-October. 10% discount on full upfront payment</span>
-                </div>
-                <ul className="space-y-3 text-sm text-ink-600 mb-8">
-                  <li className="flex items-start gap-2 font-medium">✓ Everything in Foundation</li>
-                  <li className="flex items-start gap-2">✓ Two Engine Room sessions grouped by how you make money (Makers, Traders, Experts)</li>
-                  <li className="flex items-start gap-2">✓ Competitive positioning for your specific business model</li>
-                  <li className="flex items-start gap-2">✓ Peer diagnosis and unit economics workshops</li>
-                </ul>
-              </div>
-              <Button
-                onClick={() => handleOpenRegister("Engine Room")}
-                className="w-full bg-ink text-paper hover:bg-charcoal rounded-none py-6 uppercase tracking-wider text-xs font-semibold"
-              >
-                Register for Engine Room
-              </Button>
-            </div>
-
-            {/* Boardroom */}
-            <div className="bg-paper-sunken border border-line p-8 flex flex-col justify-between relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-brand text-white text-[10px] font-mono uppercase px-4 py-1">
-                Capped at 8 Places ({boardroomRemaining} left)
-              </div>
-              <div>
-                <span className="text-xs font-mono uppercase tracking-widest text-ink-muted block mb-2">Package 03</span>
-                <h3 className="font-serif text-3xl font-bold mb-2">Boardroom</h3>
-                <p className="text-xs uppercase tracking-widest text-brand font-semibold mb-3">Decide</p>
-                <p className="text-xs italic text-ink-muted mb-6">“I need someone senior to sit with me and tell me what to do.”</p>
-                <div className="mb-8">
-                  <span className="text-4xl font-serif font-bold">{formatProgrammePrice("Boardroom", currency)}</span>
-                  <span className="text-xs text-ink-muted block mt-1">40% commitment before classes; 30% by end of September; 30% by mid-October. 10% discount on full upfront payment</span>
-                </div>
-                <ul className="space-y-3 text-sm text-ink-600 mb-8">
-                  <li className="flex items-start gap-2 font-medium">✓ Everything in Engine Room</li>
-                  <li className="flex items-start gap-2">✓ Three private strategy sessions with {BRAND.facilitatorFirstName} (90 mins each)</li>
-                  <li className="flex items-start gap-2">✓ Written action points after every session</li>
-                  <li className="flex items-start gap-2 text-brand font-semibold">✓ Strictly capped at 8 businesses for Cohort 2</li>
-                </ul>
-              </div>
-              <Button
-                onClick={() => handleOpenRegister("Boardroom")}
-                className="w-full bg-ink text-paper hover:bg-charcoal rounded-none py-6 uppercase tracking-wider text-xs font-semibold"
-              >
-                {boardroomRemaining === 0 ? "Join Boardroom Waitlist" : "Register for Boardroom"}
-              </Button>
-            </div>
+            ))}
           </div>
-
-          {boardroomRemaining === 0 && (
-            <div className="mt-8 p-4 bg-brand-tint border border-brand text-brand text-center text-sm font-medium">
-              <ShieldAlert className="inline w-4 h-4 mr-2" />
-              Boardroom capacity of 8 businesses has been reached. New Boardroom submissions will automatically be placed on the priority Waitlist.
-            </div>
-          )}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <p className="p-5 border border-line bg-paper text-ink-soft"><span className="font-semibold text-ink">Referrals.</span> {REFERRAL_RULE}</p>
+            <p className="p-5 border border-line bg-paper text-ink-soft"><span className="font-semibold text-ink">How you pay.</span> There is no checkout on this site. A secure payment link is sent after your discovery call. Hands-on services such as bookkeeping, a funding pack or a hiring process are quoted separately.</p>
+          </div>
         </div>
       </section>
 
-      {/* Payment Instructions Section */}
-      <section id="payment" className="py-24 border-b border-line bg-paper-sunken/30">
-        <div className="container max-w-4xl mx-auto">
-          <div className="text-center max-w-xl mx-auto mb-12">
-            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Offline Settling</span>
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-              Payment Instructions &amp; Bank Transfer
-            </h2>
-            <p className="text-sm text-ink-soft">
-              Once your registration is accepted by the review team, pay 40% as your commitment before classes begin, 30% by the end of September, and the final 30% by mid-October before the programme ends. Alternatively, pay the full programme fee upfront and receive a 10% discount.
-            </p>
+      {/* Who you work with */}
+      <section id="team" className="py-24 border-b border-line bg-paper-sunken/50">
+        <div className="container max-w-6xl mx-auto">
+          <div className="max-w-2xl mb-12">
+            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Who you work with</span>
+            <h2 className="font-serif text-4xl font-bold tracking-tight mb-4">A desk, not a lone consultant.</h2>
+            <p className="text-ink-soft">{BRAND.organisationName} already does this work for larger clients. This service brings the same method to owner-run businesses, systematised so the right people are on your problem at the right moment.</p>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { role: "Desk lead", body: "Runs every discovery call and diagnostic, and signs off every prescription." },
+              { role: "Partners", body: "Join the diagnostic and key reviews for businesses above about ₦10m a month, or when the problem needs them." },
+              { role: "Analysts", body: "Prepare each check-in and work through your numbers, with AI, under the desk lead's review." },
+              { role: "Experts by door", body: `Specialists from the ${BRAND.organisationName} group join when your door calls for them.` },
+            ].map((person) => (
+              <div key={person.role} className="bg-paper border border-line p-6">
+                <p className="font-serif font-bold text-xl mb-2">{person.role}</p>
+                <p className="text-sm text-ink-soft">{person.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-          <div className="border border-ink bg-paper p-8 md:p-12 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-              <div className="md:col-span-2 p-5 bg-paper-sunken border border-line">
-                <p className="text-xs uppercase tracking-widest text-ink-muted mb-2">Official transfer details</p>
-                <p className="font-serif text-2xl font-bold">Shared after acceptance</p>
-                <p className="text-sm text-ink-soft mt-2 max-w-2xl">Your registration is reviewed first. Accepted applicants will receive the verified bank name, account name, account number, deposit amount, and payment reference by email. No payment is requested through this page until those details are confirmed.</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-widest text-ink-muted mb-1">Payment schedule</p>
-                <p className="font-serif font-bold text-xl">40% commitment · 30% Sept · 30% Oct</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-widest text-ink-muted mb-1">Upfront option</p>
-                <p className="font-serif font-bold text-xl">10% discount on full payment</p>
-              </div>
-            </div>
-            <div className="pt-6 border-t border-line text-xs text-ink-muted flex flex-col sm:flex-row justify-between gap-4">
-              <span>• Do not transfer funds until the official acceptance email arrives.</span>
-              <span>• Instalments are tracked by the programme team.</span>
-            </div>
+      {/* Questions */}
+      <section id="questions" className="py-24 border-b border-line">
+        <div className="container max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="text-xs uppercase tracking-widest text-ink-muted font-semibold block mb-3">Questions</span>
+            <h2 className="font-serif text-4xl font-bold tracking-tight">What owners usually ask</h2>
           </div>
+          <div className="divide-y divide-line border-y border-line">
+            {[
+              { q: "Is this a course?", a: "No. There are no classes and no certificates. We work on one problem inside your business, with you, until an agreed number moves." },
+              { q: "How much of my time does it take?", a: "About two to four hours a week during a sprint, including a 45-minute check-in." },
+              { q: "What if the measure doesn't move?", a: "If it has not moved by week 8, we keep going for up to four more weeks at no extra fee." },
+              { q: "Can I bring more than one problem?", a: "We work on one door at a time so the effort stays focused. A second problem becomes your next sprint or part of a retainer." },
+              { q: "Do you use AI?", a: "Yes, and we tell every client up front. Analysts use AI for analysis and first drafts; a named consultant reviews everything you receive." },
+              { q: "Is my information confidential?", a: "Yes. Your documents sit in a private folder for your business. We only ever share an anonymised case with your consent." },
+              { q: "How do I pay?", a: "By a secure payment link sent after your discovery call. Nothing is paid through this website." },
+            ].map((item) => (
+              <details key={item.q} className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-ink">
+                  {item.q}
+                  <span className="text-brand transition-transform group-open:rotate-45 text-xl leading-none" aria-hidden="true">+</span>
+                </summary>
+                <p className="mt-3 text-ink-soft leading-relaxed">{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Closing call to action */}
+      <section className="py-20 bg-brand text-paper">
+        <div className="container max-w-4xl mx-auto text-center">
+          <img src={BRAND.logoOnDarkUrl} alt={BRAND.organisationName} className="mx-auto mb-8 h-12 w-auto" />
+          <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight mb-4">Bring us the problem.</h2>
+          <p className="text-on-dark-muted max-w-xl mx-auto mb-8">Ten minutes to apply. A short call to confirm we can help. Then we get to work.</p>
+          <Button onClick={handleApply} className="bg-highlight text-brand-deep hover:bg-highlight-hover rounded-none px-10 py-6 text-sm uppercase tracking-widest font-semibold">
+            Apply <ArrowRight className="ml-2 w-4 h-4" />
+          </Button>
         </div>
       </section>
 
@@ -523,12 +436,12 @@ export default function Home() {
       <Dialog open={isParticipantSignInOpen} onOpenChange={setIsParticipantSignInOpen}>
         <DialogContent className="max-w-md bg-paper border border-line text-ink">
           <DialogHeader>
-            <DialogTitle className="font-serif text-xl font-bold">Participant Sign In</DialogTitle>
-            <DialogDescription className="text-xs text-ink-soft">Sign in with the email address and password linked to your {BRAND.programmeShortName} participant account.</DialogDescription>
+            <DialogTitle className="font-serif text-xl font-bold">Client sign in</DialogTitle>
+            <DialogDescription className="text-xs text-ink-soft">Sign in with the email address and password for your {BRAND.productName} client area.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-xs uppercase tracking-wider text-ink-muted block mb-1 font-semibold">Registered Email Address</label>
+              <label className="text-xs uppercase tracking-wider text-ink-muted block mb-1 font-semibold">Email address</label>
               <Input
                 type="email"
                 placeholder="e.g. name@company.com"
@@ -540,7 +453,7 @@ export default function Home() {
             </div>
             {!isPasswordHelpMode && <div>
               <label className="text-xs uppercase tracking-wider text-ink-muted block mb-1 font-semibold">Password</label>
-              <Input type="password" placeholder={`Your ${BRAND.programmeShortName} participant password`} value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="bg-white border-line" autoComplete="current-password" />
+              <Input type="password" placeholder="Your password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="bg-white border-line" autoComplete="current-password" />
             </div>}
             {signInError && (
               <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
@@ -550,7 +463,7 @@ export default function Home() {
             {passwordLinkSent ? (
               <div className="p-4 bg-green-50 border border-green-200 rounded space-y-3">
                 <p className="text-xs text-green-800 font-medium">
-                  If this email is linked to an eligible {BRAND.programmeShortName} registration, a secure password link will arrive shortly. It lets you set a first password or reset an existing one, and expires in 20 minutes.
+                  If this email belongs to a client account, a secure password link will arrive shortly. It lets you set a first password or reset an existing one, and expires in 20 minutes.
                 </p>
                 <Button
                   onClick={() => {
@@ -566,202 +479,39 @@ export default function Home() {
               </div>
             ) : (
               isPasswordHelpMode ? <>
-                <p className="border-l-2 border-brand bg-brand-tint px-3 py-2 text-xs leading-5 text-brand">New participant? This link will let you set your password. Returning participant? It will let you reset it.</p>
+                <p className="border-l-2 border-brand bg-brand-tint px-3 py-2 text-xs leading-5 text-brand">New client? This link lets you set your password. Returning? It lets you reset it.</p>
                 <Button onClick={handlePasswordLinkRequest} disabled={requestPortalLinkMutation.isPending} className="w-full bg-brand text-white hover:bg-brand-deep-hover text-xs uppercase tracking-widest py-2.5 rounded-none">
                   <MailCheck className="mr-2 h-4 w-4" />{requestPortalLinkMutation.isPending ? "Sending secure link…" : "Email secure password link"}
                 </Button>
                 <button type="button" onClick={() => { setIsPasswordHelpMode(false); setSignInError(""); }} className="w-full text-center text-xs font-semibold text-brand underline underline-offset-2">Back to password sign in</button>
               </> : <>
                 <Button onClick={handleParticipantSignIn} disabled={participantSignInMutation.isPending} className="w-full bg-brand text-white hover:bg-brand-deep-hover text-xs uppercase tracking-widest py-2.5 rounded-none">
-                  <KeyRound className="mr-2 h-4 w-4" />{participantSignInMutation.isPending ? "Signing in…" : "Sign in to my portal"}
+                  <KeyRound className="mr-2 h-4 w-4" />{participantSignInMutation.isPending ? "Signing in…" : "Sign in"}
                 </Button>
                 <button type="button" onClick={() => { setIsPasswordHelpMode(true); setSignInError(""); }} className="w-full text-center text-xs font-semibold text-brand underline underline-offset-2">First time here or forgot your password?</button>
               </>
             )}
-            {!passwordLinkSent && <p className="text-center text-xs leading-5 text-ink-muted">Not registered yet? <button type="button" onClick={() => { setIsParticipantSignInOpen(false); setIsRegisterOpen(true); }} className="font-semibold text-brand underline underline-offset-2">Sign up now</button>.</p>}
+            {!passwordLinkSent && <p className="text-center text-xs leading-5 text-ink-muted">Not a client yet? <button type="button" onClick={() => { setIsParticipantSignInOpen(false); handleApply(); }} className="font-semibold text-brand underline underline-offset-2">Apply</button>.</p>}
           </div>
         </DialogContent>
       </Dialog>
 
-      <PricingRequestDialog open={isPricingRequestOpen} onOpenChange={setIsPricingRequestOpen} source="public" />
-
-      {/* Footer */}
       <DiagnosticRegistrationDialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen} selectedPackage={selectedPackage} />
+
       <footer className="py-12 border-t border-line bg-paper">
         <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-ink-muted">
-          <p>© 2026 {BRAND.programmeShortName} Strategy &amp; Innovation Genius Track. Facilitated by {BRAND.facilitatorFormalName}.</p>
+          <div className="flex items-center gap-4">
+            <img src={BRAND.markUrl} alt="" className="h-8 w-auto" />
+            <p>© 2026 {BRAND.organisationLegalName} ({BRAND.organisationName}). {BRAND.productTagline}.</p>
+          </div>
           <div className="flex items-center gap-6">
-            <a href="#about" className="hover:text-ink">About</a>
-            <a href="#packages" className="hover:text-ink">Packages</a>
-            <a href="#payment" className="hover:text-ink">Payment</a>
-
+            <a href="#how" className="hover:text-ink">How it works</a>
+            <a href="#pricing" className="hover:text-ink">Pricing</a>
+            <a href="#questions" className="hover:text-ink">Questions</a>
           </div>
         </div>
       </footer>
 
-      {/* Registration Modal */}
-      <Dialog open={false} onOpenChange={setIsRegisterOpen}>
-        <DialogContent className="max-w-xl bg-paper border border-line text-ink max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-2xl font-bold">
-              {BRAND.programmeName} Application — {selectedPackage} Package
-            </DialogTitle>
-            <DialogDescription className="text-xs text-ink-soft">
-              Please complete the diagnostic details below. Our team reviews all applications to ensure cohort fit.
-            </DialogDescription>
-            <div className="mt-3 p-3 bg-paper-sunken border border-line text-xs text-ink-soft">
-              <strong className="text-ink">Payment terms:</strong> 40% commitment before classes begin, 30% by the end of September, and the final 30% by mid-October before the programme ends. Full upfront payment receives a 10% discount.
-            </div>
-          </DialogHeader>
-
-          {submittedResult ? (
-            <div className="py-8 text-center space-y-6">
-              <CheckCircle2 className="w-16 h-16 mx-auto text-emerald-600" />
-              <h3 className="font-serif text-2xl font-bold">Registration Received</h3>
-              <p className="text-sm text-ink-soft max-w-md mx-auto leading-relaxed">
-                {submittedResult.message}
-              </p>
-              <div className="p-4 bg-paper-sunken border border-line text-xs text-left space-y-1">
-                <p><strong>Package:</strong> {selectedPackage}</p>
-                <p><strong>Status:</strong> {submittedResult.status}</p>
-                <p><strong>Acknowledgement:</strong> {submittedResult.emailStatus === "Sent" ? `Sent to ${formData.email}` : "Recorded; delivery is pending email configuration."}</p>
-              </div>
-              <Button
-                onClick={() => setIsRegisterOpen(false)}
-                className="w-full bg-ink text-paper rounded-none uppercase tracking-wider text-xs py-6"
-              >
-                Close &amp; Return to Page
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmitRegistration} className="space-y-5 pt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-xs uppercase tracking-wider text-ink-muted">Full Name *</Label>
-                  <Input
-                    id="fullName"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    placeholder="e.g. Adebayo Ogunlesi"
-                    required
-                    className="bg-paper-sunken border-line"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs uppercase tracking-wider text-ink-muted">Email Address *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="adebayo@company.com"
-                    required
-                    className="bg-paper-sunken border-line"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-xs uppercase tracking-wider text-ink-muted">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+234 803 000 0000"
-                    required
-                    className="bg-paper-sunken border-line"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="businessName" className="text-xs uppercase tracking-wider text-ink-muted">Business Name *</Label>
-                  <Input
-                    id="businessName"
-                    value={formData.businessName}
-                    onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-                    placeholder="Enterprise Ltd"
-                    required
-                    className="bg-paper-sunken border-line"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="businessModel" className="text-xs uppercase tracking-wider text-ink-muted">Business Model Type *</Label>
-                <Select
-                  value={formData.businessModel}
-                  onValueChange={(val: "Maker" | "Trader" | "Expert") => setFormData({ ...formData, businessModel: val })}
-                >
-                  <SelectTrigger className="bg-paper-sunken border-line">
-                    <SelectValue placeholder="Select business model" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-paper border-line">
-                    <SelectItem value="Maker">Maker (Turns input into units / Manufacturing, Processing)</SelectItem>
-                    <SelectItem value="Trader">Trader (Buys, moves &amp; sells / Retail, E-commerce, Real estate)</SelectItem>
-                    <SelectItem value="Expert">Expert (Sells something invisible / Consulting, Services)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="businessDescription" className="text-xs uppercase tracking-wider text-ink-muted">Business Description &amp; Main Bottleneck *</Label>
-                <Textarea
-                  id="businessDescription"
-                  value={formData.businessDescription}
-                  onChange={(e) => setFormData({ ...formData, businessDescription: e.target.value })}
-                  placeholder="Briefly describe what your business does and what specific friction or bottleneck you want to solve..."
-                  rows={3}
-                  required
-                  className="bg-paper-sunken border-line"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="packageSelect" className="text-xs uppercase tracking-wider text-ink-muted">Chosen Package *</Label>
-                <Select
-                  value={selectedPackage}
-                  onValueChange={(val: "Foundation" | "Engine Room" | "Boardroom") => setSelectedPackage(val)}
-                >
-                  <SelectTrigger className="bg-paper-sunken border-line">
-                    <SelectValue placeholder="Select package" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-paper border-line">
-                    <SelectItem value="Foundation">Foundation ({formatProgrammePrice("Foundation", currency)})</SelectItem>
-                    <SelectItem value="Engine Room">Engine Room ({formatProgrammePrice("Engine Room", currency)})</SelectItem>
-                    <SelectItem value="Boardroom">Boardroom ({formatProgrammePrice("Boardroom", currency)} — Capped at 8)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="question" className="text-xs uppercase tracking-wider text-ink-muted">Pre-submission Question for Open Office / Q&amp;A</Label>
-                <Textarea
-                  id="question"
-                  value={formData.question}
-                  onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-                  placeholder={`What specific question or problem would you like ${BRAND.facilitatorFirstName} to address in session?`}
-                  rows={2}
-                  className="bg-paper-sunken border-line"
-                />
-              </div>
-
-              {selectedPackage === "Boardroom" && boardroomRemaining === 0 && (
-                <div className="p-3 bg-danger-tint border border-danger text-danger text-xs">
-                  <strong>Notice:</strong> Boardroom capacity is currently full (8/8). Submitting will automatically place you on the priority Waitlist.
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                disabled={registerMutation.isPending}
-                className="w-full bg-ink text-paper hover:bg-charcoal rounded-none py-6 uppercase tracking-wider text-xs font-semibold"
-              >
-                {registerMutation.isPending ? "Submitting Application..." : "Submit Application &amp; Acknowledge"}
-              </Button>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

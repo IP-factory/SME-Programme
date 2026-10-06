@@ -7,9 +7,9 @@ const portalSource = readFileSync(resolve(process.cwd(), "client/src/pages/Parti
 const dialogSource = readFileSync(resolve(process.cwd(), "client/src/components/PricingRequestDialog.tsx"), "utf8");
 
 describe("Request Programme Pricing entry points", () => {
-  it("places the public request in the sign-up call-to-action group", () => {
-    expect(homeSource).toContain("Request programme pricing");
-    expect(homeSource).toContain('source="public"');
+  it("publishes the price ladder on the public page instead of a pricing request", () => {
+    expect(homeSource).toContain("PRICE_LADDER.map");
+    expect(homeSource).not.toContain("PricingRequestDialog");
   });
 
   it("offers the authenticated portal request inside private payment guidance", () => {

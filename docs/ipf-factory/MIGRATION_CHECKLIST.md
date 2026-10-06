@@ -231,7 +231,8 @@ Four workstreams. R and B can start now. P depends on the instrument and record 
 **B. Brand and copy (visual by 16 Oct, copy once the name is set)**
 - [x] B1 ipf-teal-navy palette into the colour tokens (brand-kit roles: primary `#174579`, deep `#0F2E52`, accent `#23807B`, teal `#57C3BD` for fills only, tint `#EDF7F6`, line `#CFE6E4`, body `#404040`).
 - [x] B2 Logo files into `client/public/brand/` (full, mark, white and mono; used as supplied, never recoloured).
-- [ ] B3 `shared/brand.ts` values: organisation, product name (7 Oct), desk mailbox and sender (D2), and an institutional voice (D4).
+- [x] B3a Public home page rewritten from the concept note (hero, problem, fit, ten doors, how it works, pricing, team roles, FAQ) in an institutional voice; catalogue in `shared/businessSupport.ts`; working product name in `BRAND.productName`.
+- [ ] B3b Final product name (7 Oct), desk mailbox and sender (D2), Apply link (`BRAND.applyUrl`, e.g. Calendly) and contact details.
 - [ ] B4 Email templates and PDF footers in the IPF voice; AI disclosure line.
 
 **P. Product layer (target: by 2 Nov)**
