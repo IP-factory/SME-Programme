@@ -7,6 +7,7 @@ import { buildBrandedEmailHtml } from "./emailTemplates";
 import { generateICS } from "./ics";
 import { createHash, timingSafeEqual } from "crypto";
 import { ENV } from "./_core/env";
+import { sdk } from "./_core/sdk";
 import { BRAND } from "../shared/brand";
 
 const HOUR = 60 * 60 * 1000;
@@ -38,8 +39,8 @@ function isDuplicateReminderError(error: unknown) {
 }
 
 /**
- * Scheduled endpoints are called by the host's cron with `Authorization: Bearer <CRON_SECRET>`.
- * Without a configured secret every call is refused.
+ * Off Manus, scheduled endpoints are called by the host's cron with `Authorization: Bearer <CRON_SECRET>`.
+ * Without a configured secret this check refuses every call.
  */
 export function isAuthorisedCronRequest(authorization: string | undefined, secret = ENV.cronSecret) {
   if (!secret || !authorization?.startsWith("Bearer ")) return false;
@@ -47,9 +48,19 @@ export function isAuthorisedCronRequest(authorization: string | undefined, secre
   return timingSafeEqual(digest(authorization.slice("Bearer ".length)), digest(secret));
 }
 
+/** On Manus, scheduled tasks call in with a platform-issued cron session. */
+async function isManusScheduledTask(req: Request) {
+  try {
+    const caller = await sdk.authenticateRequest(req);
+    return Boolean(caller.isCron && caller.taskUid);
+  } catch {
+    return false;
+  }
+}
+
 export async function handleScheduledReminder(req: Request, res: Response) {
   try {
-    if (!isAuthorisedCronRequest(req.get("authorization"))) {
+    if (!isAuthorisedCronRequest(req.get("authorization")) && !(await isManusScheduledTask(req))) {
       return res.status(403).json({ error: "Cron execution required" });
     }
 

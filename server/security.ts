@@ -15,6 +15,20 @@ export function isTrustedBrowserOrigin(origin: string | undefined, nodeEnv = pro
   return origin === ENV.appOrigin || ENV.appAlternateOrigins.includes(origin);
 }
 
+/**
+ * True when the browser's Origin names the same host the request was sent to. A cross-site page
+ * cannot forge this, so it is safe on any domain the app is served from (custom or Manus) without
+ * trusting other sites that share a parent domain.
+ */
+export function isSameHostOrigin(origin: string | undefined, requestHost: string | undefined) {
+  if (!origin || !requestHost) return false;
+  try {
+    return new URL(origin).host.toLowerCase() === requestHost.trim().toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeStorageProxyKey(rawKey: string) {
   let key: string;
   try {
@@ -56,7 +70,7 @@ export function applySecurityHeaders(req: Request, res: Response, next: NextFunc
     const analyticsSource = analyticsCspSource();
     res.setHeader(
       "Content-Security-Policy",
-      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://www.instagram.com${analyticsSource}; connect-src 'self' https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com;`,
+      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com;`,
     );
   }
 
@@ -74,7 +88,8 @@ export function requireTrustedBrowserOrigin(req: Request, res: Response, next: N
 
   const origin = req.get("origin");
   const fetchSite = req.get("sec-fetch-site");
-  if (isTrustedBrowserOrigin(origin) || (!origin && (fetchSite === "same-origin" || fetchSite === "none"))) {
+  const requestHost = req.get("x-forwarded-host")?.split(",")[0] || req.get("host");
+  if (isTrustedBrowserOrigin(origin) || isSameHostOrigin(origin, requestHost) || (!origin && (fetchSite === "same-origin" || fetchSite === "none"))) {
     next();
     return;
   }

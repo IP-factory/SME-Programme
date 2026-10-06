@@ -2,7 +2,7 @@
 
 Participant registration, portal and programme-administration platform for IP Factory (Intellectual Property Factory) business support. Migrated from the JUMP 2026 platform; the existing, tested functionality is being preserved and rebranded rather than rebuilt.
 
-> **Migration in progress.** See [`docs/ipf-factory/MIGRATION_CHECKLIST.md`](docs/ipf-factory/MIGRATION_CHECKLIST.md) for the audit, the phased plan and open decisions. The platform is being moved off Manus to independent hosting; variables marked LEGACY in `.env.example` belong to the Manus integrations being replaced.
+> **Migration in progress.** See [`docs/ipf-factory/MIGRATION_CHECKLIST.md`](docs/ipf-factory/MIGRATION_CHECKLIST.md) for the audit, the phased plan and open decisions. v0.1 launches on Manus (IPF workspace); hosting moves off Manus afterwards, so Manus-specific code is kept but isolated.
 
 ## What it does
 

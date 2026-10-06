@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   getTrustedApplicationOrigin,
   isPrivateParticipantStorageKey,
+  isSameHostOrigin,
   isTrustedBrowserOrigin,
   normalizeStorageProxyKey,
   participantCanReadPrivateStorageKey,
@@ -21,6 +22,15 @@ describe("JUMP defensive security controls", () => {
     expect(isTrustedBrowserOrigin("https://attacker.example", "production")).toBe(false);
     expect(isTrustedBrowserOrigin("https://3000-example.us2.manus.computer", "development")).toBe(false);
     expect(isTrustedBrowserOrigin("https://any-site.manus.space", "production")).toBe(false);
+  });
+
+  it("accepts a browser origin only when it names the host the request was sent to", () => {
+    expect(isSameHostOrigin("https://ipf-sme.manus.space", "ipf-sme.manus.space")).toBe(true);
+    expect(isSameHostOrigin("https://3000-example.us2.manus.computer", "3000-example.us2.manus.computer")).toBe(true);
+    expect(isSameHostOrigin("https://other-project.manus.space", "ipf-sme.manus.space")).toBe(false);
+    expect(isSameHostOrigin("https://attacker.example", "ipf-sme.manus.space")).toBe(false);
+    expect(isSameHostOrigin("not a url", "ipf-sme.manus.space")).toBe(false);
+    expect(isSameHostOrigin(undefined, "ipf-sme.manus.space")).toBe(false);
     expect(isTrustedBrowserOrigin("https://attacker.example", "development")).toBe(false);
     expect(adminRouterSource).toContain("getTrustedApplicationOrigin()");
     expect(adminRouterSource).not.toContain("ctx.req.get(\"host\")");
