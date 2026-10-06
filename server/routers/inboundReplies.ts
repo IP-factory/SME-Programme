@@ -4,7 +4,7 @@ import { inboundEmailReplies, registrations } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { getJumpMailboxMessages, isJumpMailboxSyncConfigured } from "../workspaceMailbox";
 import { adminPermissionProcedure, ownerAdminProcedure, router } from "../_core/trpc";
-
+import { databaseNow } from "../dbHelpers";
 const replyStatus = z.enum(["New", "Reviewed", "Follow-up", "Closed"]);
 
 export const inboundRepliesRouter = router({
@@ -57,7 +57,7 @@ export const inboundRepliesRouter = router({
       }).onConflictDoUpdate({
         target: inboundEmailReplies.mailboxMessageId,
         set: {
-          updatedAt: new Date(),
+          updatedAt: databaseNow(),
           preview: message.preview,
           body: message.body,
           receivedAt: message.receivedAt,

@@ -48,7 +48,7 @@ vi.mock("@server/participantAuth", async importOriginal => ({
 
 import { upsertUser } from "@server/db";
 import { setAdminPassword } from "@server/adminSecurity";
-import { emailEquals } from "@server/dbHelpers";
+import { databaseNow, emailEquals } from "@server/dbHelpers";
 import { isDuplicateReminderError } from "@server/scheduledReminder";
 import { createParticipantPasswordLink, completeParticipantPassword, signInParticipantWithPassword } from "@server/participantAuth";
 import { registrationRouter } from "@server/routers/registration";
@@ -56,9 +56,12 @@ import { schedulingRouter } from "@server/routers/scheduling";
 import { ENGAGEMENT_BRIEF_VERSION } from "@shared/engagementBrief";
 import type { TrpcContext } from "@server/_core/context";
 
+// A real remote database costs one network round trip (~150 ms) per statement, so application-flow tests need a
+// realistic ceiling there. Local targets keep the default 5 s so slowness is still caught; a genuine hang still fails.
+const REMOTE_TEST_TIMEOUT_MS = 30_000;
 const targets = [
-  { name: "PGlite", enabled: true, make: () => createPgliteHarness() },
-  { name: "TEST_DATABASE_URL", enabled: Boolean(process.env.TEST_DATABASE_URL), make: () => createRemoteHarness(process.env.TEST_DATABASE_URL!) },
+  { name: "PGlite", enabled: true, timeout: undefined, make: () => createPgliteHarness() },
+  { name: "TEST_DATABASE_URL", enabled: Boolean(process.env.TEST_DATABASE_URL), timeout: REMOTE_TEST_TIMEOUT_MS, make: () => createRemoteHarness(process.env.TEST_DATABASE_URL!) },
 ];
 
 const expectedTableNames = allTables.map(table => getTableConfig(table).name).sort();
@@ -74,7 +77,7 @@ function tableByName(name: string) {
 }
 
 for (const target of targets) {
-  describe.skipIf(!target.enabled)(`PostgreSQL contract on ${target.name}`, () => {
+  describe.skipIf(!target.enabled)(`PostgreSQL contract on ${target.name}`, target.timeout ? { timeout: target.timeout } : {}, () => {
     let harness: DbHarness;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let db: any;
@@ -240,7 +243,7 @@ for (const target of targets) {
         await new Promise(resolve => setTimeout(resolve, 15));
         await db.insert(schema.inboundEmailReplies).values({ ...reply, preview: "two" }).onConflictDoUpdate({
           target: schema.inboundEmailReplies.mailboxMessageId,
-          set: { updatedAt: new Date(), preview: "two" },
+          set: { updatedAt: databaseNow(), preview: "two" },
         });
         const rows = await db.select().from(schema.inboundEmailReplies).where(eq(schema.inboundEmailReplies.mailboxMessageId, "message-1"));
         expect(rows).toHaveLength(1);
@@ -255,6 +258,23 @@ for (const target of targets) {
         expect(await db.select().from(schema.users).where(eq(schema.users.email, "admin.person@example.test"))).toHaveLength(0);
         const found = await db.select().from(schema.users).where(and(emailEquals(schema.users.email, "  Admin.Person@EXAMPLE.test "), eq(schema.users.role, "admin")));
         expect(found).toHaveLength(1);
+      });
+
+      // Only meaningful where the database has its own clock: PGlite takes its time from the same JS clock.
+      it.skipIf(target.name === "PGlite")("updatedAt never moves backwards when the application clock lags the database", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+          const real = Date.now();
+          vi.setSystemTime(real - 120_000); // application clock two minutes behind
+          const [row] = await db.insert(schema.users).values({ openId: `skew-${real}` }).returning();
+          await upsertUser({ openId: row.openId, name: "skewed" });
+          const [afterUpsert] = await db.select().from(schema.users).where(eq(schema.users.id, row.id));
+          const [afterUpdate] = await db.update(schema.users).set({ name: "skewed again" }).where(eq(schema.users.id, row.id)).returning();
+          expect(afterUpsert.updatedAt.getTime()).toBeGreaterThanOrEqual(row.updatedAt.getTime());
+          expect(afterUpdate.updatedAt.getTime()).toBeGreaterThanOrEqual(afterUpsert.updatedAt.getTime());
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       it("advances updatedAt on an ordinary Drizzle update (replaces MySQL ON UPDATE CURRENT_TIMESTAMP)", async () => {

@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
-
+import { databaseNow } from './dbHelpers';
 let _pool: pg.Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -110,10 +110,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    // onConflictDoUpdate does not apply $onUpdate, so updatedAt is set explicitly.
+    // onConflictDoUpdate does not apply $onUpdate, so updatedAt is set explicitly (database clock).
     await db.insert(users).values(values).onConflictDoUpdate({
       target: users.openId,
-      set: { ...updateSet, updatedAt: new Date() },
+      set: { ...updateSet, updatedAt: databaseNow() },
     });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);

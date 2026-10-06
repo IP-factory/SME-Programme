@@ -34,15 +34,16 @@ import { cleanAnswers, evaluate, founderRead } from "@shared/businessCheck/engin
 import type { TrpcContext } from "@server/_core/context";
 
 const targets = [
-  { name: "PGlite", enabled: true, make: () => createPgliteHarness() },
-  { name: "TEST_DATABASE_URL", enabled: Boolean(process.env.TEST_DATABASE_URL), make: () => createRemoteHarness(process.env.TEST_DATABASE_URL!) },
+  { name: "PGlite", enabled: true, timeout: undefined, make: () => createPgliteHarness() },
+  // One network round trip per statement on a real database; local targets keep the default 5 s ceiling.
+  { name: "TEST_DATABASE_URL", enabled: Boolean(process.env.TEST_DATABASE_URL), timeout: 30_000, make: () => createRemoteHarness(process.env.TEST_DATABASE_URL!) },
 ];
 
 const caller = () =>
   businessCheckRouter.createCaller({ req: { ip: "203.0.113.9", protocol: "https", headers: {} }, res: {}, user: null } as unknown as TrpcContext);
 
 for (const target of targets) {
-  describe.skipIf(!target.enabled)(`Free Business Check persistence on ${target.name}`, () => {
+  describe.skipIf(!target.enabled)(`Free Business Check persistence on ${target.name}`, target.timeout ? { timeout: target.timeout } : {}, () => {
     let harness: DbHarness;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let db: any;

@@ -6,7 +6,7 @@ import { getDb } from "./db";
 import { getAdminAccessCookieOptions } from "./_core/cookies";
 import { ENV } from "./_core/env";
 import { BRAND } from "../shared/brand";
-
+import { databaseNow } from "./dbHelpers";
 export const ADMIN_ACCESS_COOKIE = "jump_admin_access";
 export const ADMIN_PASSWORD_MIN_LENGTH = 12;
 export const ADMIN_SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
@@ -124,7 +124,7 @@ export async function setAdminPassword(userId: number, password: string) {
       passwordHash: hashAdminPassword(password),
       failedAttempts: 0,
       lockedUntil: null,
-      updatedAt: new Date(),
+      updatedAt: databaseNow(),
     },
   });
 }

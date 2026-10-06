@@ -209,6 +209,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 
 // drizzle/schema.ts
+import { sql } from "drizzle-orm";
 import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 var usersRoleEnum = pgEnum("users_role", ["user", "admin"]);
 var users = pgTable("users", {
@@ -219,7 +220,7 @@ var users = pgTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: usersRoleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull()
 });
 var adminCredentials = pgTable("admin_credentials", {
@@ -229,7 +230,7 @@ var adminCredentials = pgTable("admin_credentials", {
   failedAttempts: integer("failedAttempts").default(0).notNull(),
   lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var adminPermissionProfiles = pgTable("admin_permission_profiles", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -237,7 +238,7 @@ var adminPermissionProfiles = pgTable("admin_permission_profiles", {
   permissionsJson: text("permissionsJson").notNull(),
   updatedByUserId: integer("updatedByUserId"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var adminAccessSessions = pgTable("admin_access_sessions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -276,7 +277,7 @@ var adminInvitations = pgTable("admin_invitations", {
   /** Immutable proposed capability set selected by Emmanuel when the invitation is issued. */
   proposedPermissionsJson: text("proposedPermissionsJson"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var adminAccessAuditEvents = pgTable("admin_access_audit_events", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -310,7 +311,7 @@ var inboundEmailReplies = pgTable("inbound_email_replies", {
   receivedAt: timestamp("receivedAt", { withTimezone: true }).notNull(),
   status: inboundEmailRepliesStatusEnum("status").default("New").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var pricingRequestsSourceEnum = pgEnum("pricing_requests_source", ["Public", "ParticipantPortal"]);
 var pricingRequestsNotificationStatusEnum = pgEnum("pricing_requests_notification_status", ["Sent", "Failed", "Simulated"]);
@@ -349,7 +350,7 @@ var registrations = pgTable("registrations", {
   instalment1: registrationsInstalment1Enum("instalment1").default("Pending").notNull(),
   instalment2: registrationsInstalment2Enum("instalment2").default("Pending").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
   bookingToken: varchar("bookingToken", { length: 64 }),
   diagnosticData: text("diagnosticData"),
   diagnosticStage: varchar("diagnosticStage", { length: 64 }),
@@ -379,7 +380,7 @@ var participantReferrals = pgTable("participant_referrals", {
   reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   notes: text("notes"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var participantProgrammeRecordsPaymentStructureEnum = pgEnum("participant_programme_records_payment_structure", ["instalments_40_30_30", "full_upfront_10pc_discount"]);
 var participantProgrammeRecordsPaymentMethodEnum = pgEnum("participant_programme_records_payment_method", ["bank_transfer", "paystack", "wants_to_discuss"]);
@@ -393,7 +394,7 @@ var participantProgrammeRecords = pgTable("participant_programme_records", {
   paymentStatus: participantProgrammeRecordsPaymentStatusEnum("paymentStatus").default("awaiting").notNull(),
   currentPhase: integer("currentPhase").default(0).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var participantProgrammeMilestoneEventsStatusEnum = pgEnum("participant_programme_milestone_events_status", ["locked", "available", "in_progress", "complete"]);
 var participantProgrammeMilestoneEventsSourceEnum = pgEnum("participant_programme_milestone_events_source", ["system", "participant", "admin"]);
@@ -420,7 +421,7 @@ var scheduleSlots = pgTable("schedule_slots", {
   status: scheduleSlotsStatusEnum("status").default("Open").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var scheduleBookingsKindEnum = pgEnum("schedule_bookings_kind", ["Decide", "Learn", "Apply"]);
 var scheduleBookingsStatusEnum = pgEnum("schedule_bookings_status", ["Confirmed", "Cancelled"]);
@@ -434,7 +435,7 @@ var scheduleBookings = pgTable("schedule_bookings", {
   calendarStatus: scheduleBookingsCalendarStatusEnum("calendarStatus").default("NotConfigured").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var scheduledReminderDeliveriesReminderTypeEnum = pgEnum("scheduled_reminder_deliveries_reminder_type", ["24h"]);
 var scheduledReminderDeliveriesStatusEnum = pgEnum("scheduled_reminder_deliveries_status", ["Pending", "Sent", "Failed"]);
@@ -458,7 +459,7 @@ var participantBriefs = pgTable("participant_briefs", {
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   fileType: varchar("fileType", { length: 64 }).default("pdf").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var participantEngagementConsentsPackageNameEnum = pgEnum("participant_engagement_consents_package_name", ["Foundation", "Engine Room", "Boardroom"]);
 var participantEngagementConsentsConfirmationEmailStatusEnum = pgEnum("participant_engagement_consents_confirmation_email_status", ["Sent", "Failed", "Simulated"]);
@@ -490,7 +491,7 @@ var participantCredentials = pgTable("participant_credentials", {
   failedAttempts: integer("failedAttempts").default(0).notNull(),
   lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var participantPasswordTokensPurposeEnum = pgEnum("participant_password_tokens_purpose", ["setup", "reset"]);
 var participantPasswordTokensDeliveryStatusEnum = pgEnum("participant_password_tokens_delivery_status", ["Sent", "Failed", "Simulated"]);
@@ -538,7 +539,7 @@ var participantPaymentReceipts = pgTable("participant_payment_receipts", {
   reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   reviewNote: text("reviewNote"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var currentStatusAssessmentsStatusEnum = pgEnum("current_status_assessments_status", ["Draft", "Submitted"]);
 var currentStatusAssessments = pgTable("current_status_assessments", {
@@ -557,7 +558,7 @@ var currentStatusAssessments = pgTable("current_status_assessments", {
   activeSection: varchar("activeSection", { length: 32 }),
   status: currentStatusAssessmentsStatusEnum("status").default("Draft").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var consultingChatMessagesSenderEnum = pgEnum("consulting_chat_messages_sender", ["ai", "participant"]);
 var consultingChatMessages = pgTable("consulting_chat_messages", {
@@ -576,7 +577,7 @@ var consultingReports = pgTable("consulting_reports", {
   summaryJson: text("summaryJson").notNull(),
   status: consultingReportsStatusEnum("status").default("Ready").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => /* @__PURE__ */ new Date()).notNull()
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 var businessChecksRouteEnum = pgEnum("business_checks_route", ["advisory", "programme", "foundation", "idea"]);
 var businessChecksReadinessEnum = pgEnum("business_checks_readiness", ["advanced", "intermediate", "nascent"]);
@@ -606,6 +607,17 @@ var businessChecks = pgTable("business_checks", {
 
 // server/db.ts
 init_env();
+
+// server/dbHelpers.ts
+import { sql as sql2 } from "drizzle-orm";
+function emailEquals(column, normalisedEmail) {
+  return sql2`lower(${column}) = ${normalisedEmail.trim().toLowerCase()}`;
+}
+function databaseNow() {
+  return sql2`now()`;
+}
+
+// server/db.ts
 var _pool = null;
 var _db = null;
 var POOL_MAX_CONNECTIONS = 1;
@@ -686,7 +698,7 @@ async function upsertUser(user) {
     }
     await db.insert(users).values(values).onConflictDoUpdate({
       target: users.openId,
-      set: { ...updateSet, updatedAt: /* @__PURE__ */ new Date() }
+      set: { ...updateSet, updatedAt: databaseNow() }
     });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
@@ -1774,7 +1786,7 @@ async function completeParticipantPassword(ctx, input) {
       passwordHash: hashParticipantPassword(input.password),
       failedAttempts: 0,
       lockedUntil: null,
-      updatedAt: now
+      updatedAt: databaseNow()
     }
   });
   await db.update(participantPasswordTokens).set({ consumedAt: now }).where(eq3(participantPasswordTokens.id, passwordToken.id));
@@ -1930,7 +1942,7 @@ async function setAdminPassword(userId, password) {
       passwordHash: hashAdminPassword(password),
       failedAttempts: 0,
       lockedUntil: null,
-      updatedAt: /* @__PURE__ */ new Date()
+      updatedAt: databaseNow()
     }
   });
 }
@@ -2243,7 +2255,7 @@ var systemRouter = router({
 
 // server/routers/registration.ts
 import { TRPCError as TRPCError4 } from "@trpc/server";
-import { and as and4, desc, eq as eq6, inArray, sql } from "drizzle-orm";
+import { and as and4, desc, eq as eq6, inArray, sql as sql3 } from "drizzle-orm";
 import { z as z3 } from "zod";
 import { nanoid } from "nanoid";
 
@@ -2520,7 +2532,7 @@ var registrationRouter = router({
   capacity: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) return { boardroomCount: 0, boardroomAvailable: true };
-    const result = await db.select({ count: sql`count(*)` }).from(registrations).where(
+    const result = await db.select({ count: sql3`count(*)` }).from(registrations).where(
       and4(
         eq6(registrations.package, "Boardroom"),
         eq6(registrations.status, "Accepted")
@@ -2560,7 +2572,7 @@ var registrationRouter = router({
     const bookingToken = nanoid(32);
     const { diagnostic, registrationFields } = buildRegistrationInsertFields(input, bookingToken);
     if (input.package === "Boardroom") {
-      const capacityCheck = await db.select({ count: sql`count(*)` }).from(registrations).where(
+      const capacityCheck = await db.select({ count: sql3`count(*)` }).from(registrations).where(
         and4(
           eq6(registrations.package, "Boardroom"),
           eq6(registrations.status, "Accepted")
@@ -2719,7 +2731,7 @@ Pre-submitted Question: ${input.question || "None"}`
       const applicant = current[0];
       if (!applicant) throw new TRPCError4({ code: "NOT_FOUND", message: "Registration not found" });
       if (applicant.package === "Boardroom") {
-        const acceptedBoardroom = await db.select({ count: sql`count(*)` }).from(registrations).where(
+        const acceptedBoardroom = await db.select({ count: sql3`count(*)` }).from(registrations).where(
           and4(
             eq6(registrations.package, "Boardroom"),
             eq6(registrations.status, "Accepted")
@@ -3054,7 +3066,7 @@ Notes: ${input.messageNotes || "Please join on time."}`,
 
 // server/routers/scheduling.ts
 import { TRPCError as TRPCError5 } from "@trpc/server";
-import { and as and5, desc as desc2, eq as eq7, sql as sql2 } from "drizzle-orm";
+import { and as and5, desc as desc2, eq as eq7, sql as sql4 } from "drizzle-orm";
 import { z as z4 } from "zod";
 
 // server/calendar.ts
@@ -3522,7 +3534,7 @@ var schedulingRouter = router({
       if (required.kind !== slot.kind) {
         throw new TRPCError5({ code: "BAD_REQUEST", message: `This package books ${required.kind} sessions.` });
       }
-      const currentBookings = await tx.select({ count: sql2`count(*)` }).from(scheduleBookings).where(and5(
+      const currentBookings = await tx.select({ count: sql4`count(*)` }).from(scheduleBookings).where(and5(
         eq7(scheduleBookings.registrationId, applicant.id),
         eq7(scheduleBookings.kind, slot.kind),
         eq7(scheduleBookings.status, "Confirmed")
@@ -3553,10 +3565,10 @@ var schedulingRouter = router({
         }
       }
       const claimedSlots = await tx.update(scheduleSlots).set({
-        bookedCount: sql2`${scheduleSlots.bookedCount} + 1`,
+        bookedCount: sql4`${scheduleSlots.bookedCount} + 1`,
         // PostgreSQL does not coerce a text CASE result into an enum column, so the result is cast explicitly.
-        status: sql2`(CASE WHEN ${scheduleSlots.bookedCount} + 1 >= ${scheduleSlots.capacity} THEN 'Booked' ELSE 'Open' END)::${sql2.identifier(scheduleSlotsStatusEnum.enumName)}`
-      }).where(and5(eq7(scheduleSlots.id, slot.id), eq7(scheduleSlots.status, "Open"), sql2`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`)).returning({ id: scheduleSlots.id });
+        status: sql4`(CASE WHEN ${scheduleSlots.bookedCount} + 1 >= ${scheduleSlots.capacity} THEN 'Booked' ELSE 'Open' END)::${sql4.identifier(scheduleSlotsStatusEnum.enumName)}`
+      }).where(and5(eq7(scheduleSlots.id, slot.id), eq7(scheduleSlots.status, "Open"), sql4`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`)).returning({ id: scheduleSlots.id });
       if (claimedSlots.length !== 1) {
         throw new TRPCError5({ code: "CONFLICT", message: "That slot has just been taken. Please choose another available time." });
       }
@@ -4260,8 +4272,7 @@ var participantRouter = router({
       activeSection: draft.activeSection,
       businessModelSummary: draft.section1.businessDescription,
       primaryBottleNeck: draft.section1.primaryConstraint,
-      status: "Draft",
-      updatedAt: /* @__PURE__ */ new Date()
+      status: "Draft"
     };
     if (existing) {
       await db.update(currentStatusAssessments).set(values).where(eq8(currentStatusAssessments.id, existing.id));
@@ -4389,8 +4400,7 @@ ${BRAND.facilitatorName}`;
         financialVisibility: input.financialVisibility,
         desiredSixMonthOutcome: input.desiredSixMonthOutcome,
         additionalNotes: input.additionalNotes,
-        status: input.status,
-        updatedAt: /* @__PURE__ */ new Date()
+        status: input.status
       }).where(eq8(currentStatusAssessments.registrationId, applicant.id));
     } else {
       await db.insert(currentStatusAssessments).values({
@@ -4696,14 +4706,6 @@ import { TRPCError as TRPCError7 } from "@trpc/server";
 import { and as and7, desc as desc4, eq as eq9, gt as gt3, isNull as isNull3 } from "drizzle-orm";
 import { randomBytes as randomBytes3 } from "crypto";
 import { z as z7 } from "zod";
-
-// server/dbHelpers.ts
-import { sql as sql3 } from "drizzle-orm";
-function emailEquals(column, normalisedEmail) {
-  return sql3`lower(${column}) = ${normalisedEmail.trim().toLowerCase()}`;
-}
-
-// server/routers/adminAccess.ts
 init_brand();
 var passwordSchema = z7.string().min(12).max(160);
 var PASSWORD_RESET_TOKEN_MAX_AGE_MS = 20 * 60 * 1e3;
@@ -5001,7 +5003,7 @@ ${BRAND.senderDisplayName}`
 
 // server/routers/referrals.ts
 import { TRPCError as TRPCError8 } from "@trpc/server";
-import { and as and8, desc as desc5, eq as eq10, sql as sql4 } from "drizzle-orm";
+import { and as and8, desc as desc5, eq as eq10, sql as sql5 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid as nanoid2 } from "nanoid";
 
@@ -5087,7 +5089,7 @@ var referralsRouter = router({
     }
     if (input.decision === "Approved") {
       if (referral.status !== "Qualified") throw new TRPCError8({ code: "PRECONDITION_FAILED", message: "Mark the referral Qualified before approving a credit." });
-      const countRow = (await db.select({ count: sql4`count(*)` }).from(participantReferrals).where(and8(eq10(participantReferrals.referrerRegistrationId, referral.referrerRegistrationId), eq10(participantReferrals.status, "Approved"))))[0];
+      const countRow = (await db.select({ count: sql5`count(*)` }).from(participantReferrals).where(and8(eq10(participantReferrals.referrerRegistrationId, referral.referrerRegistrationId), eq10(participantReferrals.status, "Approved"))))[0];
       if (!referralCreditIsAvailable(Number(countRow?.count ?? 0))) {
         throw new TRPCError8({ code: "PRECONDITION_FAILED", message: `The referrer has reached the maximum of ${REFERRAL_MAX_APPROVED_CREDITS} approved referral credits.` });
       }
@@ -5467,7 +5469,7 @@ var inboundRepliesRouter = router({
       }).onConflictDoUpdate({
         target: inboundEmailReplies.mailboxMessageId,
         set: {
-          updatedAt: /* @__PURE__ */ new Date(),
+          updatedAt: databaseNow(),
           preview: message.preview,
           body: message.body,
           receivedAt: message.receivedAt,

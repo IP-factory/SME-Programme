@@ -8,3 +8,12 @@ import { sql, type AnyColumn, type SQL } from "drizzle-orm";
 export function emailEquals(column: AnyColumn, normalisedEmail: string): SQL {
   return sql`lower(${column}) = ${normalisedEmail.trim().toLowerCase()}`;
 }
+
+/**
+ * The database clock for persisted `updatedAt`. Rows are inserted with `DEFAULT now()`, so updates must use the same
+ * clock: mixing in the application's `new Date()` lets `updatedAt` move backwards by the app/database clock skew.
+ * (MySQL's `ON UPDATE CURRENT_TIMESTAMP` was always the database clock.)
+ */
+export function databaseNow(): SQL {
+  return sql`now()`;
+}

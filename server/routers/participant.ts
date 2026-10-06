@@ -606,7 +606,6 @@ export const participantRouter = router({
         businessModelSummary: draft.section1.businessDescription,
         primaryBottleNeck: draft.section1.primaryConstraint,
         status: "Draft" as const,
-        updatedAt: new Date(),
       };
 
       if (existing) {
@@ -760,7 +759,6 @@ export const participantRouter = router({
             desiredSixMonthOutcome: input.desiredSixMonthOutcome,
             additionalNotes: input.additionalNotes,
             status: input.status,
-            updatedAt: new Date(),
           })
           .where(eq(currentStatusAssessments.registrationId, applicant.id));
       } else {

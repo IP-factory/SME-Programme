@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { PgDialect, getTableConfig } from "drizzle-orm/pg-core";
+import { databaseNow } from "@server/dbHelpers";
 import * as schema from "../../drizzle/schema";
 import { allTables } from "../db/harness";
 
@@ -83,7 +84,8 @@ describe("upsertUser conflict handling", () => {
     expect(arguments_.target.name).toBe("openId");
     expect(getTableConfig(arguments_.target.table).name).toBe("users");
     expect(arguments_.set.name).toBe("Name");
-    expect(arguments_.set.updatedAt).toBeInstanceOf(Date);
+    // The database clock, not the application's: rows insert with DEFAULT now().
+    expect(new PgDialect().sqlToQuery(arguments_.set.updatedAt).sql).toBe("now()");
   });
 
   it("exports upsertUser", () => expect(typeof upsertUser).toBe("function"));
@@ -149,3 +151,34 @@ describe("PostgreSQL schema and migration history", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("updatedAt uses one authoritative clock (the database)", () => {
+  const dialect = new PgDialect();
+  const updatedAtColumns = allTables.flatMap(table => getTableConfig(table).columns.filter(column => column.name === "updatedAt").map(column => ({ table: getTableConfig(table).name, column })));
+
+  it("defaults to now() on insert and rewrites to now() on every update for all 15 tables", () => {
+    expect(updatedAtColumns).toHaveLength(15);
+    for (const { table, column } of updatedAtColumns) {
+      expect(column.hasDefault, `${table} default`).toBe(true);
+      const onUpdate = (column as unknown as { onUpdateFn?: () => unknown }).onUpdateFn?.();
+      expect(onUpdate, `${table} $onUpdate`).toBeDefined();
+      expect(dialect.sqlToQuery(onUpdate as never).sql, `${table} $onUpdate`).toBe("now()");
+    }
+  });
+
+  it("databaseNow() renders the database function", () => {
+    expect(dialect.sqlToQuery(databaseNow()).sql).toBe("now()");
+  });
+
+  it("no application code writes updatedAt from the application clock", () => {
+    const walk = (directory: string): string[] =>
+      readdirSync(directory, { withFileTypes: true }).flatMap(entry => (entry.isDirectory() ? walk(resolve(directory, entry.name)) : [resolve(directory, entry.name)]));
+    const offenders = ["server"].flatMap(directory => walk(resolve(root, directory)))
+      .filter(file => file.endsWith(".ts"))
+      // sdk.ts builds an in-memory user for scheduled-task callers; it is never written to the database.
+      .filter(file => !file.endsWith("server/_core/sdk.ts"))
+      .filter(file => /updatedAt:\s*(new Date\(|now\b)/.test(readFileSync(file, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+});
+

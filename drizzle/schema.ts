@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 /**
@@ -14,7 +15,7 @@ export const users = pgTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: usersRoleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -29,7 +30,7 @@ export const adminCredentials = pgTable("admin_credentials", {
   failedAttempts: integer("failedAttempts").default(0).notNull(),
   lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type AdminCredential = typeof adminCredentials.$inferSelect;
@@ -41,7 +42,7 @@ export const adminPermissionProfiles = pgTable("admin_permission_profiles", {
   permissionsJson: text("permissionsJson").notNull(),
   updatedByUserId: integer("updatedByUserId"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type AdminPermissionProfile = typeof adminPermissionProfiles.$inferSelect;
@@ -94,7 +95,7 @@ export const adminInvitations = pgTable("admin_invitations", {
   /** Immutable proposed capability set selected by Emmanuel when the invitation is issued. */
   proposedPermissionsJson: text("proposedPermissionsJson"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type AdminInvitation = typeof adminInvitations.$inferSelect;
@@ -143,7 +144,7 @@ export const inboundEmailReplies = pgTable("inbound_email_replies", {
   receivedAt: timestamp("receivedAt", { withTimezone: true }).notNull(),
   status: inboundEmailRepliesStatusEnum("status").default("New").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type InboundEmailReply = typeof inboundEmailReplies.$inferSelect;
@@ -192,7 +193,7 @@ export const registrations = pgTable("registrations", {
   instalment1: registrationsInstalment1Enum("instalment1").default("Pending").notNull(),
   instalment2: registrationsInstalment2Enum("instalment2").default("Pending").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
   bookingToken: varchar("bookingToken", { length: 64 }),
   diagnosticData: text("diagnosticData"),
   diagnosticStage: varchar("diagnosticStage", { length: 64 }),
@@ -232,7 +233,7 @@ export const participantReferrals = pgTable("participant_referrals", {
   reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   notes: text("notes"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ParticipantReferral = typeof participantReferrals.$inferSelect;
@@ -254,7 +255,7 @@ export const participantProgrammeRecords = pgTable("participant_programme_record
   paymentStatus: participantProgrammeRecordsPaymentStatusEnum("paymentStatus").default("awaiting").notNull(),
   currentPhase: integer("currentPhase").default(0).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ParticipantProgrammeRecord = typeof participantProgrammeRecords.$inferSelect;
@@ -293,7 +294,7 @@ export const scheduleSlots = pgTable("schedule_slots", {
   status: scheduleSlotsStatusEnum("status").default("Open").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ScheduleSlot = typeof scheduleSlots.$inferSelect;
@@ -313,7 +314,7 @@ export const scheduleBookings = pgTable("schedule_bookings", {
   calendarStatus: scheduleBookingsCalendarStatusEnum("calendarStatus").default("NotConfigured").notNull(),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 255 }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ScheduleBooking = typeof scheduleBookings.$inferSelect;
@@ -348,7 +349,7 @@ export const participantBriefs = pgTable("participant_briefs", {
   fileKey: varchar("fileKey", { length: 255 }).notNull(),
   fileType: varchar("fileType", { length: 64 }).default("pdf").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ParticipantBrief = typeof participantBriefs.$inferSelect;
@@ -397,7 +398,7 @@ export const participantCredentials = pgTable("participant_credentials", {
   failedAttempts: integer("failedAttempts").default(0).notNull(),
   lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ParticipantCredential = typeof participantCredentials.$inferSelect;
@@ -468,7 +469,7 @@ export const participantPaymentReceipts = pgTable("participant_payment_receipts"
   reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
   reviewNote: text("reviewNote"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ParticipantPaymentReceipt = typeof participantPaymentReceipts.$inferSelect;
@@ -492,7 +493,7 @@ export const currentStatusAssessments = pgTable("current_status_assessments", {
   activeSection: varchar("activeSection", { length: 32 }),
   status: currentStatusAssessmentsStatusEnum("status").default("Draft").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type CurrentStatusAssessment = typeof currentStatusAssessments.$inferSelect;
@@ -523,7 +524,7 @@ export const consultingReports = pgTable("consulting_reports", {
   summaryJson: text("summaryJson").notNull(),
   status: consultingReportsStatusEnum("status").default("Ready").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type ConsultingReport = typeof consultingReports.$inferSelect;

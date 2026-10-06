@@ -14,7 +14,7 @@ import { getDb } from "./db";
 import { buildBrandedEmailHtml } from "./emailTemplates";
 import { getTrustedApplicationOrigin } from "./security";
 import { BRAND } from "../shared/brand";
-
+import { databaseNow } from "./dbHelpers";
 export const PARTICIPANT_SESSION_COOKIE = "jump_participant_session";
 export const PARTICIPANT_PASSWORD_MIN_LENGTH = 5;
 const PARTICIPANT_PASSWORD_LINK_TTL_MS = 20 * 60 * 1000;
@@ -225,7 +225,7 @@ export async function completeParticipantPassword(ctx: TrpcContext, input: { tok
       passwordHash: hashParticipantPassword(input.password),
       failedAttempts: 0,
       lockedUntil: null,
-      updatedAt: now,
+      updatedAt: databaseNow(),
     },
   });
   await db.update(participantPasswordTokens).set({ consumedAt: now }).where(eq(participantPasswordTokens.id, passwordToken.id));
