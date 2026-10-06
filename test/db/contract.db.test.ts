@@ -9,6 +9,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { getTableConfig, isPgEnum, type PgEnumColumn, type PgTable } from "drizzle-orm/pg-core";
 import { TRPCError } from "@trpc/server";
 import * as schema from "../../drizzle/schema";
+import { registerSchedulingCapacityTests } from "./schedulingCapacity";
 import { allTables, createPgliteHarness, createRemoteHarness, fixtureRow, pgErrorCode, type DbHarness } from "./harness";
 
 const holder = vi.hoisted(() => {
@@ -23,8 +24,8 @@ const mocked = vi.hoisted(() => ({
 }));
 
 // Route the application's own getDb() to whichever harness is active, so real production code runs.
-vi.mock("postgres", () => ({ default: () => ({}) }));
-vi.mock("drizzle-orm/postgres-js", () => ({
+vi.mock("pg", () => ({ default: { Pool: class { on() { return this; } } } }));
+vi.mock("drizzle-orm/node-postgres", () => ({
   drizzle: () =>
     new Proxy({}, {
       get: (_target, property) => {
@@ -343,6 +344,11 @@ for (const target of targets) {
         await callerFor(registration).book({ slotId: slot.id });
         const [after] = await db.select().from(schema.scheduleSlots).where(eq(schema.scheduleSlots.id, slot.id));
         expect(after).toMatchObject({ bookedCount: 1, status: "Open" });
+      });
+
+      registerSchedulingCapacityTests({
+        getDb: () => db,
+        book: async (registration, slotId) => callerFor(registration).book({ slotId }),
       });
 
       it("rolls back the booking transaction when the slot can no longer be claimed", async () => {

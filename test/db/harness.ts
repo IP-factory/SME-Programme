@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import { is, type SQL } from "drizzle-orm";
+import { is, sql, type SQL } from "drizzle-orm";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { getTableConfig, PgTable, type PgDatabase } from "drizzle-orm/pg-core";
 import { vi } from "vitest";
@@ -55,23 +55,23 @@ export async function createPgliteHarness(): Promise<DbHarness> {
  * schema that is dropped afterwards, so no existing table is touched. Use a session-mode or direct URL.
  */
 export async function createRemoteHarness(url: string): Promise<DbHarness> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { default: postgres } = await vi.importActual<any>("postgres");
-  const { drizzle } = await vi.importActual<typeof import("drizzle-orm/postgres-js")>("drizzle-orm/postgres-js");
+  const { default: pg } = await vi.importActual<typeof import("pg")>("pg");
+  const { drizzle } = await vi.importActual<typeof import("drizzle-orm/node-postgres")>("drizzle-orm/node-postgres");
   const schemaName = `contract_${randomBytes(6).toString("hex")}`;
-  // One connection, so the search_path set below applies to every statement.
-  const client = postgres(url, { max: 1, prepare: false, onnotice: () => undefined, ssl: /@(localhost|127\.0\.0\.1)[:/]/.test(url) ? false : "require" });
-  await client.unsafe(`create schema "${schemaName}"`);
-  await client.unsafe(`set search_path to "${schemaName}"`);
-  for (const statement of activeMigrationStatements(schemaName)) await client.unsafe(statement);
-  const db = drizzle(client);
+  const { createPoolConfig } = await vi.importActual<typeof import("@server/db")>("@server/db");
+  // The production pool settings (max 1 connection), so the search_path set on connect applies to every statement.
+  const pool = new pg.Pool(createPoolConfig(url));
+  pool.on("connect", client => void client.query(`set search_path to "${schemaName}"`));
+  await pool.query(`create schema "${schemaName}"`);
+  for (const statement of activeMigrationStatements(schemaName)) await pool.query(statement);
+  const db = drizzle(pool);
   return {
     label: "TEST_DATABASE_URL",
     db,
     query: async statement => rowsOf(await db.execute(statement)),
     close: async () => {
-      await client.unsafe(`drop schema "${schemaName}" cascade`);
-      await client.end();
+      await pool.query(`drop schema "${schemaName}" cascade`);
+      await pool.end();
     },
   };
 }
@@ -103,4 +103,55 @@ export function fixtureRow(table: PgTable, overrides: Record<string, unknown> = 
     }
   }
   return { ...row, ...overrides };
+}
+
+/**
+ * `pglite-socket` (a test-only server) drops the TCP connection after any server-side SQL error, which real
+ * PostgreSQL never does; the pool then reconnects on the next query. Call this after a test that deliberately
+ * provokes a server error so the following test starts on a live connection.
+ */
+export async function recoverDriverConnection(db: AnyPgDb) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await db.execute(sql`select 1`);
+      return;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  }
+  throw new Error("test server connection did not recover");
+}
+
+/**
+ * The PRODUCTION driver path: PGlite served over a local TCP socket, with `getDb()` (node-postgres Pool +
+ * drizzle-orm/node-postgres, exactly as on Vercel) connected to it. Hermetic: loopback only, no credentials.
+ */
+export async function createDriverHarness(): Promise<DbHarness> {
+  const { default: net } = await import("node:net");
+  const { PGLiteSocketServer } = await import("@electric-sql/pglite-socket");
+  const port = await new Promise<number>(resolvePort => {
+    const probe = net.createServer();
+    probe.listen(0, "127.0.0.1", () => {
+      const { port: free } = probe.address() as import("node:net").AddressInfo;
+      probe.close(() => resolvePort(free));
+    });
+  });
+  const pg = await PGlite.create();
+  for (const statement of activeMigrationStatements()) await pg.exec(statement);
+  const server = new PGLiteSocketServer({ db: pg, port, host: "127.0.0.1" });
+  await server.start();
+
+  process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${port}/postgres`;
+  const database = await vi.importActual<typeof import("@server/db")>("@server/db");
+  const db = (await database.getDb()) as AnyPgDb;
+  return {
+    label: "node-postgres over PGlite socket",
+    db,
+    query: async statement => rowsOf(await db.execute(statement)),
+    close: async () => {
+      await database.closeDb();
+      await server.stop();
+      await pg.close();
+    },
+  };
 }

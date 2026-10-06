@@ -205,8 +205,8 @@ import { parse as parseCookieHeader2 } from "cookie";
 
 // server/db.ts
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 
 // drizzle/schema.ts
 import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
@@ -606,25 +606,39 @@ var businessChecks = pgTable("business_checks", {
 
 // server/db.ts
 init_env();
+var _pool = null;
 var _db = null;
-var POOL_MAX_CONNECTIONS = 3;
-function createPostgresClient(connectionString) {
-  const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(connectionString);
-  return postgres(connectionString, {
-    // Transaction pooling (Supabase port 6543) does not support prepared statements.
-    prepare: false,
+var POOL_MAX_CONNECTIONS = 1;
+var SSL_PARAMETERS = ["sslmode", "ssl", "sslcert", "sslkey", "sslrootcert"];
+function createPoolConfig(connectionString, env = process.env) {
+  const url = new URL(connectionString);
+  const isLocal = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname);
+  for (const parameter of SSL_PARAMETERS) url.searchParams.delete(parameter);
+  const ca = env.DATABASE_SSL_CA?.trim();
+  return {
+    connectionString: url.toString(),
     max: POOL_MAX_CONNECTIONS,
-    idle_timeout: 20,
-    connect_timeout: 10,
-    ssl: isLocal ? false : "require"
-  });
+    idleTimeoutMillis: 1e4,
+    connectionTimeoutMillis: 1e4,
+    allowExitOnIdle: true,
+    // Supabase's poolers present a private CA that Node does not trust by default. Without DATABASE_SSL_CA the
+    // connection is encrypted but the server certificate is not verified; with it, verification is on.
+    ssl: isLocal ? false : ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false }
+  };
+}
+function createPool(connectionString) {
+  const pool = new pg.Pool(createPoolConfig(connectionString));
+  pool.on("error", (error) => console.error("[Database] Idle client error:", error.message));
+  return pool;
 }
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(createPostgresClient(process.env.DATABASE_URL));
+      _pool = createPool(process.env.DATABASE_URL);
+      _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
+      _pool = null;
       _db = null;
     }
   }

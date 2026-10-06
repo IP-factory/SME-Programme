@@ -9,7 +9,8 @@ Requirement groups: **A** basic API, **B** database, **C** registration, **D** p
 |---|---|---|---|---|---|
 | `NODE_ENV` | security.ts, vite.ts, index.ts, email.ts, gmail.ts | Server | Required (A) | Switches CSP, origin policy and test-mode email suppression | Vercel sets `production` for builds/functions. Production origin policy applies only when it is `production`. |
 | `PORT` | server/_core/index.ts | Server (local only) | Optional | Preferred local listen port | Not used on Vercel (no listener). |
-| `DATABASE_URL` | db.ts | Server | Required (B, C, D, E) | PostgreSQL runtime connection | Supabase **Transaction Pooler** (port 6543). Prepared statements are disabled and the pool is capped at 3. |
+| `DATABASE_URL` | db.ts | Server | Required (B, C, D, E) | PostgreSQL runtime connection | Supabase **Transaction Pooler** (port 6543). node-postgres pool created once per function instance with `max: 1` and no named prepared statements (transaction pooling does not support pipelining). |
+| `DATABASE_SSL_CA` | db.ts | Server | Optional | PEM of the database CA | When set, the server certificate is verified; otherwise the connection is encrypted but unverified. |
 | `MIGRATION_DATABASE_URL` | drizzle.config.ts | Server (tooling) | Required to migrate | PostgreSQL migration connection | Supabase **Session Pooler** (port 5432) or a direct connection. Never needed at runtime. |
 | `TEST_DATABASE_URL` | test/db | Test | Optional | Disposable database for `pnpm test:db` | Never set on Vercel. |
 | `JWT_SECRET` | env.ts → sdk.ts | Server | Required (D, E) | Signs session cookies/tokens | Generate fresh per environment. Changing it signs everyone out. |

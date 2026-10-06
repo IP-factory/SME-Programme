@@ -1,37 +1,63 @@
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+let _pool: pg.Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Serverless clients stay small: Supabase's Transaction Pooler multiplexes the real connections.
-const POOL_MAX_CONNECTIONS = 3;
+// One connection per function instance: Supabase's Transaction Pooler multiplexes the real connections,
+// and node-postgres (unlike postgres.js) does not pipeline queries, which transaction pooling cannot serve.
+const POOL_MAX_CONNECTIONS = 1;
+const SSL_PARAMETERS = ["sslmode", "ssl", "sslcert", "sslkey", "sslrootcert"];
 
-export function createPostgresClient(connectionString: string) {
-  const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(connectionString);
-  return postgres(connectionString, {
-    // Transaction pooling (Supabase port 6543) does not support prepared statements.
-    prepare: false,
+export function createPoolConfig(connectionString: string, env: NodeJS.ProcessEnv = process.env): pg.PoolConfig {
+  const url = new URL(connectionString);
+  const isLocal = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname);
+  // node-postgres lets URL parameters override the ssl option, so TLS is configured here and only here.
+  for (const parameter of SSL_PARAMETERS) url.searchParams.delete(parameter);
+  const ca = env.DATABASE_SSL_CA?.trim();
+  return {
+    connectionString: url.toString(),
     max: POOL_MAX_CONNECTIONS,
-    idle_timeout: 20,
-    connect_timeout: 10,
-    ssl: isLocal ? false : "require",
-  });
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    allowExitOnIdle: true,
+    // Supabase's poolers present a private CA that Node does not trust by default. Without DATABASE_SSL_CA the
+    // connection is encrypted but the server certificate is not verified; with it, verification is on.
+    ssl: isLocal ? false : ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false },
+  };
+}
+
+/** Created once per module (function instance), never per request. Statements are unnamed, so none are prepared. */
+export function createPool(connectionString: string) {
+  const pool = new pg.Pool(createPoolConfig(connectionString));
+  pool.on("error", error => console.error("[Database] Idle client error:", error.message));
+  return pool;
 }
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(createPostgresClient(process.env.DATABASE_URL));
+      _pool = createPool(process.env.DATABASE_URL);
+      _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
+      _pool = null;
       _db = null;
     }
   }
   return _db;
+}
+
+/** Drains the pool (graceful shutdown and tests). The next getDb() call creates a fresh pool. */
+export async function closeDb() {
+  const pool = _pool;
+  _pool = null;
+  _db = null;
+  await pool?.end();
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

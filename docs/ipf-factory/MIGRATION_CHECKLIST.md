@@ -59,7 +59,7 @@ Note on `server/participantAuth.ts:128`: the eligibility lookup loads **every re
 
 ## 2. Platform dependency map
 
-The app is a **Manus WebDev template**: React 19 + Vite + tRPC + Express + Drizzle/MySQL. Several core capabilities are provided by the Manus platform rather than by the code:
+The app is a **Manus WebDev template**: React 19 + Vite + tRPC + Express + Drizzle/PostgreSQL (migrated from MySQL). Several core capabilities are provided by the Manus platform rather than by the code:
 
 | Capability | Provider today | Where | Portable? |
 |---|---|---|---|
@@ -70,7 +70,7 @@ The app is a **Manus WebDev template**: React 19 + Vite + tRPC + Express + Drizz
 | Scheduled jobs (24h reminders) | Manus heartbeat → `POST /api/scheduled/*` | `server/_core/heartbeat.ts`, `server/_core/index.ts:101` | Only inside Manus |
 | Dev tooling | `vite-plugin-manus-runtime`, debug collector, `*.manus.computer` allowed hosts | `vite.config.ts`, `client/public/__manus__/` | Harmless outside Manus |
 | Analytics | Umami (`VITE_ANALYTICS_ENDPOINT`, `VITE_ANALYTICS_WEBSITE_ID`) | `client/index.html` | Portable |
-| Database | MySQL (`DATABASE_URL`), 23 Drizzle migrations | `drizzle/` | Portable |
+| Database | PostgreSQL / Supabase (`DATABASE_URL` runtime, `MIGRATION_DATABASE_URL` migrations); one baseline migration, inherited MySQL history archived in `drizzle/mysql-archive/` | `drizzle/` | Portable |
 
 **Implication:** the handover plan assumes a **new IPF-owned Manus workspace**. On that path, the items above are re-provisioned, not rewritten. Moving IPF off Manus would mean replatforming auth, storage, LLM and scheduling. That is a separate decision with a separate budget (see §6, D9).
 
@@ -80,7 +80,7 @@ The app is a **Manus WebDev template**: React 19 + Vite + tRPC + Express + Drizz
 
 | Variable | Purpose | Notes |
 |---|---|---|
-| `DATABASE_URL` | MySQL connection | New IPF database |
+| `DATABASE_URL` | PostgreSQL connection (Supabase Transaction Pooler) | New IPF database |
 | `JWT_SECRET` | Session cookie signing | **Generate fresh.** Do not reuse JUMP's. All existing sessions will be invalidated, which is the intended effect. |
 | `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL` | Manus OAuth | Issued by the IPF Manus workspace |
 | `OWNER_OPEN_ID` | Super Admin identity | Set to the IPF owner's Manus openId |
@@ -230,7 +230,7 @@ Four workstreams. R and B can start now. P depends on the instrument and record 
 - [ ] R3 File storage: S3-compatible bucket (Cloudflare R2 or AWS S3; the SDK is already a dependency). Replace `/manus-storage/` and move the facilitator and brand assets into the repo.
 - [x] R4 Owner notifications: replace Manus `notifyOwner` with email to the desk mailbox via the existing sender.
 - [x] R5 Scheduled reminders: replace Manus heartbeat authentication with a shared-secret cron call (`CRON_SECRET`) from the host.
-- [ ] R6 Hosting and deploy: Node host plus managed MySQL, deploying from GitHub; staging and production. *Needs a hosting choice and an IPF-owned account.*
+- [ ] R6 Hosting and deploy: Node host plus managed PostgreSQL (Supabase), deploying from GitHub; staging and production. *Needs a hosting choice and an IPF-owned account.*
 - [ ] R7 Secrets under IPF ownership: database, `JWT_SECRET`, Resend (IPF sending domain), Google, Paystack, storage, cron.
 
 **B. Brand and copy (visual by 16 Oct, copy once the name is set)**

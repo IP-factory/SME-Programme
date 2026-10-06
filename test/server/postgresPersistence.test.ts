@@ -1,48 +1,73 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PgDialect, getTableConfig } from "drizzle-orm/pg-core";
 import * as schema from "../../drizzle/schema";
 import { allTables } from "../db/harness";
 
 const mocked = vi.hoisted(() => {
-  process.env.DATABASE_URL = "postgresql://user:secret@db.example.test:6543/postgres";
+  process.env.DATABASE_URL = "postgresql://user:secret@db.example.test:6543/postgres?sslmode=require&application_name=ipf";
   return {
-    postgres: vi.fn(() => ({ marker: "client" })),
+    pools: [] as { config: Record<string, unknown>; on: ReturnType<typeof vi.fn> }[],
     drizzle: vi.fn(),
     onConflictDoUpdate: vi.fn(),
   };
 });
 
-vi.mock("postgres", () => ({ default: mocked.postgres }));
-vi.mock("drizzle-orm/postgres-js", () => ({ drizzle: mocked.drizzle }));
+vi.mock("pg", () => ({
+  default: {
+    Pool: class {
+      on = vi.fn();
+      constructor(public config: Record<string, unknown>) {
+        mocked.pools.push(this);
+      }
+    },
+  },
+}));
+vi.mock("drizzle-orm/node-postgres", () => ({ drizzle: mocked.drizzle }));
 
-import { createPostgresClient, getDb, upsertUser } from "@server/db";
+import { createPoolConfig, getDb, upsertUser } from "@server/db";
 import { emailEquals } from "@server/dbHelpers";
 
 const root = process.cwd();
 
-describe("database client for Vercel and the Supabase transaction pooler", () => {
-  beforeEach(() => mocked.postgres.mockClear());
-
-  it("disables prepared statements, keeps the pool small and requires TLS for remote hosts", () => {
-    createPostgresClient("postgresql://user:secret@aws-1-eu-west-1.pooler.supabase.com:6543/postgres");
-    expect(mocked.postgres).toHaveBeenCalledWith(
-      "postgresql://user:secret@aws-1-eu-west-1.pooler.supabase.com:6543/postgres",
-      expect.objectContaining({ prepare: false, max: 3, ssl: "require" }),
-    );
+describe("database pool for Vercel and the Supabase transaction pooler", () => {
+  it("uses a single connection, short idle timeouts and no TLS parameters from the URL", () => {
+    const config = createPoolConfig("postgresql://user:secret@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&application_name=ipf", {});
+    expect(config).toMatchObject({ max: 1, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 10_000, allowExitOnIdle: true });
+    const url = new URL(config.connectionString!);
+    expect(url.searchParams.has("sslmode")).toBe(false);
+    expect(url.searchParams.get("application_name")).toBe("ipf");
+    expect(url.port).toBe("6543");
   });
 
-  it("does not force TLS for a local database", () => {
-    createPostgresClient("postgresql://user:secret@localhost:5432/postgres");
-    expect(mocked.postgres).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ prepare: false, ssl: false }));
+  it("encrypts remote connections, verifying the server only when DATABASE_SSL_CA is provided", () => {
+    const remote = "postgresql://user:secret@aws-1-eu-west-1.pooler.supabase.com:6543/postgres";
+    expect(createPoolConfig(remote, {}).ssl).toEqual({ rejectUnauthorized: false });
+    expect(createPoolConfig(remote, { DATABASE_SSL_CA: " -----BEGIN CERTIFICATE-----x " }).ssl).toEqual({ ca: "-----BEGIN CERTIFICATE-----x", rejectUnauthorized: true });
   });
 
-  it("reads the runtime DATABASE_URL lazily and caches the instance", async () => {
+  it("does not use TLS for a local database", () => {
+    expect(createPoolConfig("postgresql://user:secret@localhost:5432/postgres", {}).ssl).toBe(false);
+    expect(createPoolConfig("postgresql://user:secret@127.0.0.1:5432/postgres", {}).ssl).toBe(false);
+  });
+
+  it("creates the pool once, lazily, and reuses the cached Drizzle instance", async () => {
     mocked.drizzle.mockReturnValue({ insert: vi.fn() });
+    expect(mocked.pools).toHaveLength(0);
     const first = await getDb();
     expect(await getDb()).toBe(first);
+    expect(await getDb()).toBe(first);
+    expect(mocked.pools).toHaveLength(1);
     expect(mocked.drizzle).toHaveBeenCalledTimes(1);
+    expect(mocked.drizzle.mock.calls[0][0]).toBe(mocked.pools[0]);
+    expect(mocked.pools[0].config.max).toBe(1);
+    expect(mocked.pools[0].on).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+  it("never prepares named statements", () => {
+    const sources = ["server/db.ts"].map(file => readFileSync(resolve(root, file), "utf8")).join("\n");
+    expect(sources).not.toMatch(/\.prepare\(|name:\s*["']/);
   });
 });
 
@@ -114,7 +139,8 @@ describe("PostgreSQL schema and migration history", () => {
   it("no longer references MySQL in application code or dependencies", () => {
     const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as { dependencies: Record<string, string> };
     expect(packageJson.dependencies.mysql2).toBeUndefined();
-    expect(packageJson.dependencies.postgres).toBeDefined();
+    expect(packageJson.dependencies.postgres).toBeUndefined();
+    expect(packageJson.dependencies.pg).toBeDefined();
     const walk = (directory: string): string[] =>
       readdirSync(directory, { withFileTypes: true }).flatMap(entry => (entry.isDirectory() ? walk(resolve(directory, entry.name)) : [resolve(directory, entry.name)]));
     const offenders = ["server", "scripts", "shared"].flatMap(directory => walk(resolve(root, directory)))

@@ -50,14 +50,15 @@ function createFakeDb(input: {
       set: (values: Record<string, unknown>) => ({
         where: async () => {
           updates.push({ table, values });
-          return { affectedRows: 1 };
+          return { rowCount: 1 };
         },
       }),
     }),
     insert: (table: unknown) => ({
-      values: async (values: Record<string, unknown>) => {
+      // Like Drizzle's PostgreSQL insert builder: awaitable, and `.returning()` yields the generated id.
+      values: (values: Record<string, unknown>) => {
         inserts.push({ table, values });
-        return [{ insertId: 1 }];
+        return Object.assign(Promise.resolve({ rowCount: 1 }), { returning: async () => [{ id: 1 }] });
       },
     }),
   };

@@ -14,8 +14,8 @@ const holder = vi.hoisted(() => {
 });
 const mocked = vi.hoisted(() => ({ deliverEmail: vi.fn() }));
 
-vi.mock("postgres", () => ({ default: () => ({}) }));
-vi.mock("drizzle-orm/postgres-js", () => ({
+vi.mock("pg", () => ({ default: { Pool: class { on() { return this; } } } }));
+vi.mock("drizzle-orm/node-postgres", () => ({
   drizzle: () =>
     new Proxy({}, {
       get: (_target, property) => {
