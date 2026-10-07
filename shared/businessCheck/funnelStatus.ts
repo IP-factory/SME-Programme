@@ -21,18 +21,21 @@ export const FUNNEL_STATUSES = [
 ] as const;
 export type FunnelStatus = (typeof FUNNEL_STATUSES)[number];
 
-/** `tone` only chooses a colour treatment; it carries no meaning of its own. */
+/**
+ * `tone` only chooses a colour treatment; it carries no meaning of its own. Labels use the owner's agreed pipeline
+ * names (Lead, Qualified lead, Opportunity, Lost, Nurture…); the internal ids (fit, declined…) are unchanged.
+ */
 export type FunnelTone = "muted" | "neutral" | "attention" | "info" | "positive" | "negative";
 
 export const FUNNEL_STATUS_LABELS: Record<FunnelStatus, { label: string; tone: FunnelTone }> = {
-  in_progress: { label: "Check in progress", tone: "muted" },
-  completed: { label: "Check completed", tone: "neutral" },
+  in_progress: { label: "Lead", tone: "muted" },
+  completed: { label: "Qualified lead", tone: "neutral" },
   call_requested: { label: "Call requested", tone: "attention" },
   call_scheduled: { label: "Call scheduled", tone: "info" },
-  fit: { label: "Fit", tone: "positive" },
+  fit: { label: "Opportunity", tone: "positive" },
   referred: { label: "Referred", tone: "info" },
-  declined: { label: "Declined", tone: "negative" },
-  nurture: { label: "Follow up later", tone: "muted" },
+  declined: { label: "Lost", tone: "negative" },
+  nurture: { label: "Nurture", tone: "muted" },
   won: { label: "Won", tone: "positive" },
   onboarding: { label: "Onboarding", tone: "info" },
   onboarded: { label: "Onboarded", tone: "positive" },

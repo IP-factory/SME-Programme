@@ -7,15 +7,15 @@ const scheduled = new Date("2026-10-08T13:00:00Z");
 
 describe("funnelStatus: the plain words the admin console uses", () => {
   it.each([
-    [{ pipelineStage: "lead" }, "in_progress", "Check in progress"],
-    [{ pipelineStage: "lead", completedAt: done }, "completed", "Check completed"],
-    [{ pipelineStage: "qualified_lead", completedAt: done }, "completed", "Check completed"],
+    [{ pipelineStage: "lead" }, "in_progress", "Lead"],
+    [{ pipelineStage: "lead", completedAt: done }, "completed", "Qualified lead"],
+    [{ pipelineStage: "qualified_lead", completedAt: done }, "completed", "Qualified lead"],
     [{ pipelineStage: "call_booked", completedAt: done }, "call_requested", "Call requested"],
     [{ pipelineStage: "call_booked", completedAt: done, callScheduledFor: scheduled }, "call_scheduled", "Call scheduled"],
-    [{ pipelineStage: "opportunity", completedAt: done }, "fit", "Fit"],
+    [{ pipelineStage: "opportunity", completedAt: done }, "fit", "Opportunity"],
     [{ pipelineStage: "referred", completedAt: done }, "referred", "Referred"],
-    [{ pipelineStage: "lost", completedAt: done }, "declined", "Declined"],
-    [{ pipelineStage: "nurture", completedAt: done }, "nurture", "Follow up later"],
+    [{ pipelineStage: "lost", completedAt: done }, "declined", "Lost"],
+    [{ pipelineStage: "nurture", completedAt: done }, "nurture", "Nurture"],
     [{ pipelineStage: "won", completedAt: done }, "won", "Won"],
   ] as const)("%j -> %s (%s)", (input, key, label) => {
     expect(funnelStatus(input as never)).toBe(key);

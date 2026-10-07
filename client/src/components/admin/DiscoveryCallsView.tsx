@@ -37,7 +37,7 @@ export default function DiscoveryCallsView({ onOpenSection }: { onOpenSection: (
         <AdminMetricCard label="Call requests" value={rows.length} />
         <AdminMetricCard label="Not scheduled" value={rows.filter(row => row.status === "call_requested").length} />
         <AdminMetricCard label="Scheduled" value={rows.filter(row => row.callScheduledFor).length} />
-        <AdminMetricCard label="Fit" value={rows.filter(row => row.status === "fit").length} />
+        <AdminMetricCard label="Opportunity" value={rows.filter(row => row.status === "fit").length} />
       </dl>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

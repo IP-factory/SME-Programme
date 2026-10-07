@@ -199,7 +199,7 @@ describe("Business Checks table", () => {
     const row = rowOf("Ada Okafor");
     expect(row.textContent).toContain("Not finished");
     expect(row.textContent).toContain("Started 5 Oct 2026");
-    expect(row.textContent).toContain("Check in progress");
+    expect(within(row).getByText("Lead")).toBeTruthy();
   });
 
   it("shows a call request as 'Call requested', never 'Call booked'", () => {
@@ -222,7 +222,7 @@ describe("Business Checks table", () => {
       check({ id: 6, fullName: "P Six", pipelineStage: "qualified_lead", callRequestedAt: null }),
     ];
     renderConsole();
-    for (const [name, label] of [["P One", "Fit"], ["P Two", "Referred"], ["P Three", "Declined"], ["P Four", "Onboarding"], ["P Five", "Onboarded"], ["P Six", "Check completed"]]) {
+    for (const [name, label] of [["P One", "Opportunity"], ["P Two", "Referred"], ["P Three", "Lost"], ["P Four", "Onboarding"], ["P Five", "Onboarded"], ["P Six", "Qualified lead"]]) {
       expect(within(rowOf(name)).getByText(label)).toBeTruthy();
     }
   });
@@ -379,7 +379,7 @@ describe("Discovery Calls table", () => {
     const table = screen.getByRole("table");
     expect(table.querySelector("input")).toBeNull();
     expect(table.querySelector("select")).toBeNull();
-    for (const name of ["Mark call scheduled", "Mark fit", "Refer", "Decline", "Fit", "Save call schedule"]) expect(within(table).queryByRole("button", { name })).toBeNull();
+    for (const name of ["Mark call scheduled", "Mark fit", "Refer", "Decline", "Fit", "Opportunity", "Lost", "Save call schedule"]) expect(within(table).queryByRole("button", { name })).toBeNull();
     expect(within(table).getAllByRole("button")).toHaveLength(1); // only the row's own open button
   });
 
@@ -396,13 +396,13 @@ describe("Discovery Calls table", () => {
     api.calls = [check(), check({ id: 2, fullName: "Two", callScheduledFor: new Date("2026-10-08T13:00:00Z") }), check({ id: 3, fullName: "Three", pipelineStage: "opportunity" }), check({ id: 4, fullName: "Four", pipelineStage: "lost" })];
     open();
     const counts = Object.fromEntries(Array.from(screen.getByLabelText("Summary").children).map(item => [item.querySelector("dt")!.textContent, item.querySelector("dd")!.textContent]));
-    expect(counts).toEqual({ "Call requests": "4", "Not scheduled": "1", Scheduled: "1", Fit: "1" });
+    expect(counts).toEqual({ "Call requests": "4", "Not scheduled": "1", Scheduled: "1", Opportunity: "1" });
   });
 
   it("searches and filters by status", () => {
     api.calls = [check(), check({ id: 2, fullName: "Bola Quiet", email: "bola@example.test", pipelineStage: "opportunity" }), check({ id: 3, fullName: "Cee Decline", email: "cee@example.test", pipelineStage: "lost" })];
     open();
-    expect(Array.from((screen.getByLabelText("Filter by status") as HTMLSelectElement).options).map(option => option.textContent)).toEqual(["All", "Call requested", "Call scheduled", "Fit", "Referred", "Declined"]);
+    expect(Array.from((screen.getByLabelText("Filter by status") as HTMLSelectElement).options).map(option => option.textContent)).toEqual(["All", "Call requested", "Call scheduled", "Opportunity", "Referred", "Lost"]);
     fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "fit" } });
     expect(screen.queryByText("Ada Okafor")).toBeNull();
     expect(screen.getByText("Bola Quiet")).toBeTruthy();
@@ -460,12 +460,12 @@ describe("Discovery Call record drawer", () => {
     expect(api.mutations.schedule).toHaveLength(1);
   });
 
-  it("offers Fit, Refer and Decline with different weight, and records them with the existing actions", () => {
+  it("offers Opportunity, Refer and Lost with different weight, and records them with the existing actions", () => {
     open();
     expect(drawer().getByRole("heading", { name: "Record call outcome" })).toBeTruthy();
-    const fit = drawer().getByRole("button", { name: "Fit" });
+    const fit = drawer().getByRole("button", { name: "Opportunity" });
     const refer = drawer().getByRole("button", { name: "Refer" });
-    const decline = drawer().getByRole("button", { name: "Decline" });
+    const decline = drawer().getByRole("button", { name: "Lost" });
     expect(fit.className).toMatch(/bg-brand/);
     expect(refer.className).not.toMatch(/bg-brand/);
     expect(decline.className).toMatch(/rose/);
@@ -484,7 +484,7 @@ describe("Discovery Call record drawer", () => {
     open();
     const card = screen.getByRole("region", { name: "Suitable to proceed" });
     expect(within(card).getByText("Confirm commercial approval/payment before sending the onboarding invitation.")).toBeTruthy();
-    expect(drawer().getByText(/Recorded:/).textContent).toContain("Fit");
+    expect(drawer().getByText(/Recorded:/).textContent).toContain("Opportunity");
     fireEvent.click(within(card).getByRole("button", { name: "Continue to Client Onboarding" }));
     expect(api.mutations.invite).toEqual([]);
     expect(screen.queryByRole("dialog")).toBeNull();

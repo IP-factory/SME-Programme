@@ -175,8 +175,9 @@ with call outcomes. Stage names in the console come from `stageDisplayName` (`sh
 
 **Status wording** (`shared/businessCheck/funnelStatus.ts`) is display only: the stored stage is unchanged. The stored stage
 `call_booked` means the owner only REQUESTED a call, so it reads "Call requested" (or "Call scheduled" once a time is
-recorded). Fit = `opportunity`, Referred = `referred`, Declined = `lost`; an invitation that is out reads "Onboarding" and an
-accepted one "Onboarded".
+recorded). Every other label is the owner's agreed pipeline name: Lead (check not finished), Qualified lead (check
+finished), Opportunity = `opportunity` (call outcome "fit"), Referred, Lost = `lost` (call outcome "decline"), Nurture, Won;
+an invitation that is out reads "Onboarding" and an accepted one "Onboarded".
 
 The funnel: Free Business Check (a prospect: no user, no business) -> the owner **requests** a free discovery call
 (`callRequestedAt`, stage `call_booked`; there is no booking provider yet, so nothing is booked) -> the team agrees a time by
