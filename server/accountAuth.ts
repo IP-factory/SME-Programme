@@ -102,6 +102,11 @@ function clearSessionCookie(req: Request, res: Response) {
   res.clearCookie(ACCOUNT_SESSION_COOKIE, { ...getAccountSessionCookieOptions(req), maxAge: -1 });
 }
 
+/** True when the request carries an account session cookie (valid or not). */
+export function hasAccountSessionCookie(req: Request) {
+  return readSessionToken(req) !== null;
+}
+
 function readSessionToken(req: Request) {
   const header = req.headers.cookie || "";
   for (const item of header.split(";")) {
@@ -240,7 +245,7 @@ export async function emailIsReserved(db: Pick<Database, "select">, email: strin
 }
 
 /** Wrong email, wrong password, unknown account and suspended account all fail with the same message. */
-export async function signInAccount(req: Request, res: Response, rawInput: { email: string; password: string }) {
+export async function signInAccount(req: Request, res: Response, rawInput: { email: string; password: string }, options: { internalOnly?: boolean } = {}) {
   assertSameOrigin(req);
   const email = normaliseAccountEmail(rawInput.email);
   if (!consumeRateLimit("signin", req, email, ACCOUNT_MAX_FAILED_ATTEMPTS)) {
@@ -268,6 +273,13 @@ export async function signInAccount(req: Request, res: Response, rawInput: { ema
     throw new TRPCError({ code: "UNAUTHORIZED", message: ACCOUNT_AUTH_ERRORS.invalidCredentials });
   }
 
+  const authority = await loadAuthority(db, user);
+  if (options.internalOnly && authority.roles.length === 0) {
+    // The password was right but this person has no internal role: no session is created at all.
+    await recordAudit(db, { action: "admin_sign_in_refused", actorUserId: user.id, targetEmail: user.email });
+    throw new TRPCError({ code: "FORBIDDEN", message: ACCOUNT_AUTH_ERRORS.notAuthorisedForAdmin });
+  }
+
   const memberships = await loadMemberships(db, user.id);
   const session = await db.transaction(async tx => {
     await tx.update(userCredentials).set({ failedAttempts: 0, lockedUntil: null }).where(eq(userCredentials.id, credential.id));
@@ -282,7 +294,6 @@ export async function signInAccount(req: Request, res: Response, rawInput: { ema
   });
   releaseRateLimit("signin", req, email);
   setSessionCookie(req, res, session.token);
-  const authority = await loadAuthority(db, user);
   return buildView(user, authority, memberships, session.restored);
 }
 

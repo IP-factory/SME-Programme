@@ -60,11 +60,31 @@ export const accountProcedure = t.procedure.use(
   }),
 );
 
+/**
+ * Entry to the internal/administrator area. Two channels, one rule set:
+ *  - account channel: a universal email-and-password session whose person holds an internal platform role. The
+ *    password already proved who they are, so the separate administrator-password session is not required.
+ *  - legacy channel: platform OAuth identity with `users.role = 'admin'` AND the administrator-password session,
+ *    exactly as before.
+ * What a person may DO inside is decided per action by the central authority resolver (adminPermissionProcedure).
+ */
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || ctx.user.role !== 'admin') {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+
+    if (ctx.authChannel === "account") {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const authority = await loadAuthority(db, ctx.user);
+      if (authority.roles.length === 0) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+      return next({ ctx: { ...ctx, user: ctx.user } });
+    }
+
+    if (ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 

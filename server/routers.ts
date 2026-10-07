@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "../shared/const";
+import { hasAccountSessionCookie, signOutAccount } from "./accountAuth";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -21,9 +22,11 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      // Staff may be signed in with the universal account session instead: end that too (only when there is one).
+      if (hasAccountSessionCookie(ctx.req)) await signOutAccount(ctx.req, ctx.res);
       return {
         success: true,
       } as const;

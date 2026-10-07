@@ -1,4 +1,4 @@
-import { startLogin } from "@/const";
+import { ADMIN_LOGIN_PATH } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
@@ -9,10 +9,7 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  // Login is started via startLogin() in the effect below, only when we actually
-  // navigate — never during render. startLogin() mints a one-time nonce + writes
-  // the state cookie, so calling it per render would overwrite the cookie and
-  // desync it from an in-flight login's `state`.
+  // Staff sign in at /admin/login (email and password). The redirect below navigates only inside an effect, never during render.
   const { redirectOnUnauthenticated = false, redirectPath } = options ?? {};
   const utils = trpc.useUtils();
 
@@ -76,12 +73,8 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (redirectPath && window.location.pathname === redirectPath) return;
 
-    // Navigate at this moment only. startLogin() mints the nonce + cookie itself.
-    if (redirectPath) {
-      window.location.href = redirectPath;
-    } else {
-      startLogin();
-    }
+    // Navigate at this moment only. The default destination is the staff email-and-password sign-in.
+    window.location.href = redirectPath ?? ADMIN_LOGIN_PATH;
   }, [
     redirectOnUnauthenticated,
     redirectPath,

@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Admin from "./pages/Admin";
 import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminLegacyLoginPage from "./pages/AdminLegacyLoginPage";
 import AdminPasswordResetPage from "./pages/AdminPasswordResetPage";
 import AdminInvitationPage from "./pages/AdminInvitationPage";
 import BusinessCheck from "./pages/BusinessCheck";
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/dashboard" component={AccountDashboard} />
       <Route path="/settings/business" component={BusinessSettingsPage} />
       <Route path="/settings/account" component={AccountSettingsPage} />
+      <Route path="/admin/login/legacy" component={AdminLegacyLoginPage} />
       <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/admin/reset" component={AdminPasswordResetPage} />
       <Route path="/admin/invite" component={AdminInvitationPage} />

@@ -5,7 +5,7 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { startLogin } from "./const";
+import { ADMIN_LOGIN_PATH } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -18,7 +18,9 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  startLogin();
+  // Staff sign in with email and password; the old Manus OAuth redirect is no longer the default entry.
+  if (window.location.pathname.startsWith(ADMIN_LOGIN_PATH)) return;
+  window.location.href = ADMIN_LOGIN_PATH;
 };
 
 queryClient.getQueryCache().subscribe(event => {

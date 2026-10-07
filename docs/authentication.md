@@ -120,8 +120,7 @@ none. `admin_permission_profiles`, `admin_access_sessions` and `users.role` are 
 **Legacy `users.role` migration path.** Today `users.role = 'admin'` still gates entry to the admin area (together with the
 administrator password session). Long term: assign real roles in `user_platform_roles`, move each admin gate onto
 `adminPermissionProcedure` / `platformPermissionProcedure`, stop reading `users.role`, then drop it in a later migration.
-Staff do not yet have a unified email/password sign-in into the admin area: the internal landing (`/admin`) uses the existing
-admin sign-in.
+Staff now sign in with email and password (see "Staff sign-in" below).
 
 **Super Admin safeguards** (`server/platformAccess.ts`): only a Super Admin grants or revokes `super_admin`; nobody but a Super
 Admin changes their own roles; the last Super Admin (counting the owner bridge) cannot be removed; the owner-email Super Admin
@@ -143,7 +142,44 @@ revoke. Details hold identifiers and field names only, never secrets or values.
 memberships and platform role assignments are separate numbers, never derived from one another.
 
 **Deferred:** team invitations, member management, ownership transfer, second-business creation, engagement assignments, logo
-upload, email change, password-reset email, a role-management UI, and a unified staff sign-in.
+upload, email change, password-reset email, and a role-management UI.
+
+## Staff sign-in (`/admin/login`)
+
+Internal staff and administrators use the SAME email-and-password identity as everyone else; there is no third identity or
+session system.
+
+- **Flow:** `/admin/login` -> `account.signInInternal` -> `/admin`. It is `account.signIn` plus one rule: a person with no
+  internal platform role is refused with one generic message ("This account is not authorised for the IPF administrator
+  area.") **before any session is created**, and the refusal is audited. Wrong passwords, lockout and the generic
+  wrong-credentials message are identical to the client sign-in.
+- **Who may enter:** anyone holding an internal platform role (`super_admin`, `admin`, `desk_lead`, `analyst`, `partner`,
+  `subject_matter_expert`, `finance`), including the legacy `users.role = 'admin'` flag and the owner-email Super Admin bridge.
+  A business owner, business admin or member has none of these, so no client can reach the admin area.
+- **Server-side:** `createContext` treats a universal session as the staff identity ONLY when the person holds an internal
+  role (`ctx.authChannel = "account"`); for a client `ctx.user` stays empty. `adminProcedure` then re-checks the role, and each
+  action is decided by `adminPermissionProcedure` through the central authority resolver. Nothing relies on hiding the route
+  or on `users.role` alone. Every internal role can enter; none can do everything.
+- **No second password:** the separate administrator-password session (`jump_admin_access`) is not required on this channel,
+  because the password already proved who the person is. The legacy channel (below) still requires it, unchanged.
+- **Sign-out:** `auth.logout` also ends the account session.
+
+**Owner bootstrap.** The Super Admin's first password is set with `pnpm owner:bootstrap` (add `--reset` to replace an existing
+one deliberately). It reads `OWNER_ADMIN_EMAIL` and `DATABASE_URL`, asks for the password at a hidden terminal prompt (it
+refuses piped input; the password is never an argument, an environment variable, a log line or a fixed value), stores only a
+scrypt hash, uses the administrator password policy, signs the owner out everywhere on a reset, and is audited. It accepts only
+the recognised owner address and adds a credential to the existing owner row rather than creating a second identity. There
+is no web endpoint for it.
+
+**Legacy OAuth.** The Manus Google sign-in and the administrator-password flow are not removed: they remain at
+`/admin/login/legacy` (offered as a small link only where `VITE_OAUTH_PORTAL_URL` and `VITE_APP_ID` are set). `startLogin` no
+longer throws when those settings are missing or invalid: it logs a non-secret diagnostic, shows a message and does nothing.
+The automatic "please sign in" redirect now goes to `/admin/login`.
+
+**Content-Security-Policy.** The production CSP stays `script-src 'self' https://www.instagram.com`, with no `'unsafe-inline'`.
+The inline script it was blocking is `<script id="manus-runtime">` that `vite-plugin-manus-runtime` injects into `index.html`
+for the Manus-hosted preview. Builds made on Vercel (`VERCEL` set, including `vercel build`) leave the Manus plugins out
+(`manusPluginsFor` in `vite.config.ts`); other hosts keep them. A test fails if the policy ever gains `'unsafe-inline'`.
 
 ## Legacy authentication that remains (unchanged in Phase 1)
 

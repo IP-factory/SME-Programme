@@ -167,8 +167,17 @@ function analyticsPlugin(): Plugin {
   };
 }
 
-// The Manus plugins keep the project editable and previewable inside Manus, where v0.1 is hosted.
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), analyticsPlugin()];
+/**
+ * The Manus plugins keep the project editable and previewable inside Manus, where v0.1 is hosted. The runtime plugin
+ * injects a large INLINE script (`<script id="manus-runtime">`) into index.html. That is fine on Manus but is blocked
+ * by the production Content-Security-Policy on Vercel (`script-src 'self' ...`, deliberately without 'unsafe-inline'),
+ * so builds made on Vercel (`VERCEL` is set, including `vercel build`) leave them out instead of weakening the policy.
+ */
+export function manusPluginsFor(env: NodeJS.ProcessEnv): Plugin[] {
+  return env.VERCEL ? [] : [vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+}
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), ...manusPluginsFor(process.env), analyticsPlugin()];
 
 export default defineConfig({
   plugins,

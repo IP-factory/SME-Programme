@@ -21,6 +21,12 @@ import { accountProcedure, publicProcedure, router } from "../_core/trpc";
 export const accountRouter = router({
   signIn: publicProcedure.input(signInInputSchema).mutation(({ ctx, input }) => signInAccount(ctx.req, ctx.res, input)),
 
+  /**
+   * Sign-in for the IPF administrator area. Same email, password, lockout and session as `signIn`, but a person with
+   * no internal platform role is refused BEFORE any session exists, with one generic message.
+   */
+  signInInternal: publicProcedure.input(signInInputSchema).mutation(({ ctx, input }) => signInAccount(ctx.req, ctx.res, input, { internalOnly: true })),
+
   signOut: publicProcedure.mutation(({ ctx }) => signOutAccount(ctx.req, ctx.res)),
 
   /** Who is signed in, or null. Public so the client can decide where to send a visitor. */

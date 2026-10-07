@@ -18,6 +18,7 @@ import {
 } from "../adminSecurity";
 import { getDb } from "../db";
 import { deliverEmail, JUMP_MONITORING_BCC } from "../email";
+import { loadAuthority } from "../platformAccess";
 import { ownerAdminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getTrustedApplicationOrigin } from "../security";
 import { emailEquals } from "../dbHelpers";
@@ -36,16 +37,23 @@ export const adminAccessRouter = router({
     const db = await getDb();
     if (!db || !ctx.user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const credentials = await db.select({ id: adminCredentials.id }).from(adminCredentials).where(eq(adminCredentials.userId, ctx.user.id)).limit(1);
-    const passwordVerified = ctx.user.role === "admin" && await hasVerifiedAdminAccess(ctx.req, ctx.user.id);
-    const profile = (await db.select({ permissionsJson: adminPermissionProfiles.permissionsJson })
-      .from(adminPermissionProfiles).where(eq(adminPermissionProfiles.userId, ctx.user.id)).limit(1))[0];
+    const authority = await loadAuthority(db, ctx.user);
+    const internal = authority.roles.length > 0;
+    const viaAccount = ctx.authChannel === "account";
+    // The universal sign-in already verified the person's password, so internal access needs no second administrator
+    // password; the legacy channel still does.
+    const passwordVerified = viaAccount ? internal : ctx.user.role === "admin" && await hasVerifiedAdminAccess(ctx.req, ctx.user.id);
     return {
       email: ctx.user.email,
-      isAdmin: ctx.user.role === "admin",
+      isAdmin: ctx.user.role === "admin" || internal,
       isOwner: isOwnerAdmin(ctx.user),
       hasPassword: credentials.length > 0,
       passwordVerified,
-      permissions: isOwnerAdmin(ctx.user) ? ADMIN_PERMISSION_IDS : parseAdminPermissions(profile?.permissionsJson),
+      signedInVia: ctx.authChannel ?? "legacy",
+      platformRoles: authority.roles,
+      // Resolved by the central authority resolver: the Super Admin has everything, everyone else what their roles and
+      // legacy administrator profile grant.
+      permissions: authority.legacyCapabilities,
     };
   }),
 

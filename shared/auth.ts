@@ -36,6 +36,7 @@ export const ACCOUNT_AUTH_ERRORS = {
   emailTaken: "An account with this email already exists. Try signing in.",
   noBusinessAccess: "You do not have access to this business.",
   crossSite: "This request did not come from this site.",
+  notAuthorisedForAdmin: "This account is not authorised for the IPF administrator area.",
   noActiveBusiness: "You are not working inside a business.",
   cannotEditBusiness: "Your role in this business does not allow you to change its profile.",
   wrongCurrentPassword: "Your current password is not correct.",

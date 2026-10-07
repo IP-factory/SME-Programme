@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const routerSource = readFileSync(resolve(process.cwd(), "server/routers/adminAccess.ts"), "utf8");
-const loginPageSource = readFileSync(resolve(process.cwd(), "client/src/pages/AdminLoginPage.tsx"), "utf8");
+// The Google + administrator-password flow moved, unchanged, to the legacy page when email-and-password staff sign-in took over /admin/login.
+const loginPageSource = readFileSync(resolve(process.cwd(), "client/src/pages/AdminLegacyLoginPage.tsx"), "utf8");
 
 describe("JUMP administrator password reset safeguards", () => {
   it("requires an authenticated authorised administrator to request an email-delivered recovery link", () => {

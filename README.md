@@ -46,6 +46,7 @@ pnpm dev               # http://localhost:3000
 | `pnpm build:preview` | Static, clickable preview of the site into `dist/preview` (simulated server; no hosting, database or secrets needed) |
 | `pnpm start` | Run the production bundle |
 | `pnpm db:generate` / `pnpm db:migrate` | Generate / apply Drizzle migrations (`db:migrate` requires `MIGRATION_DATABASE_URL`) |
+| `pnpm owner:bootstrap` | Set the Super Admin's sign-in password (hidden prompt; `--reset` to replace) |
 | `pnpm test:db` | PostgreSQL contract tests against a real database (requires `TEST_DATABASE_URL`) |
 
 CI (`.github/workflows/ci.yml`) runs check, check:tests, test and build on every push and pull request. Working rules for contributors and agents are in [`AGENTS.md`](AGENTS.md).

@@ -128,7 +128,7 @@ for (const target of targets) {
     describe("public entry creates no account", () => {
       it("has no public sign-up procedure at all", async () => {
         const procedures = Object.keys((appRouter as unknown as { _def: { procedures: Record<string, unknown> } })._def.procedures);
-        expect(procedures.filter(name => name.startsWith("account.")).sort()).toEqual(["account.business", "account.changePassword", "account.me", "account.signIn", "account.signOut", "account.switchWorkspace", "account.updateBusiness", "account.updateProfile", "account.workspace"]);
+        expect(procedures.filter(name => name.startsWith("account.")).sort()).toEqual(["account.business", "account.changePassword", "account.me", "account.signIn", "account.signInInternal", "account.signOut", "account.switchWorkspace", "account.updateBusiness", "account.updateProfile", "account.workspace"]);
         expect(procedures.filter(name => /sign-?up|register/i.test(name))).toEqual([]);
         // Calling the old procedure by name does not create anything: there is nothing to call.
         const before = await total(schema.users);
