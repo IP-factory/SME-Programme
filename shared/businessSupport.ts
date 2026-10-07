@@ -52,6 +52,19 @@ export const PRICES = {
   standardEngagementCap: 2_500_000,
 } as const;
 
+/** The paid full report offered on the business check result. Independent of the discovery call. */
+export const FULL_REPORT = {
+  name: "Your full business check report",
+  pitch: "The summary tells you where you stand. The full report tells you what to do about it.",
+  includes: [
+    "Every area of your outline in depth: what your answers show and what it means for your business",
+    "The root cause behind each red and amber, and how they connect",
+    "What to fix first, in order, with the one number to watch for each",
+    "The services that fit your business, and what each step would involve",
+  ],
+  delivery: "Written for your business and sent to you by email.",
+} as const;
+
 export type JourneyStep = {
   id: "business-check" | "discovery-call" | "current-state" | "fix" | "plan";
   name: string;

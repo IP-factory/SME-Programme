@@ -70,7 +70,7 @@ export function applySecurityHeaders(req: Request, res: Response, next: NextFunc
     const analyticsSource = analyticsCspSource();
     res.setHeader(
       "Content-Security-Policy",
-      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com;`,
+      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com https://calendly.com;`,
     );
   }
 

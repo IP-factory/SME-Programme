@@ -13,7 +13,6 @@ import {
   businessDetails,
   businessOutline,
   cleanAnswers,
-  DISC_STYLES,
   exampleFor,
   exampleHeading,
   isAnswered,
@@ -22,13 +21,14 @@ import {
   placeholderFor,
   promptFor,
   questionPath,
-  READINESS_LABELS,
   sectionPath,
   type Step,
 } from "@shared/businessCheck/engine";
 import { AREA_NAMES, GAP_LABELS, SECTIONS, stageOf, type Answers, type Health, type Question, type SectionId } from "@shared/businessCheck/questions";
-import { formatNaira, PRICES, PROMISE } from "@shared/businessSupport";
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, CheckCircle2, Clock3, Lightbulb, LockKeyhole, Mail, PencilLine, PhoneCall, RotateCcw, type LucideIcon } from "lucide-react";
+import { FULL_REPORT, formatNaira, PRICES, PROMISE } from "@shared/businessSupport";
+import { bookingTarget, isCalendlyBooking } from "@shared/booking";
+import { describeFounder, STRENGTH_LABELS, type Strength } from "@shared/businessCheck/founderNarrative";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarDays, Check, CheckCircle2, Clock3, FileText, Lightbulb, LockKeyhole, Mail, PencilLine, RotateCcw, type LucideIcon } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EASE } from "@/components/motion";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform, type Variants } from "framer-motion";
@@ -76,6 +76,9 @@ const screenMotion: Variants = {
 
 const listMotion: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.08 } } };
 const itemMotion: Variants = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } } };
+
+/** Founder readiness strengths use the outline's colours: strong is green, building amber, gap red. */
+const STRENGTH_HEALTH: Record<Strength, Health> = { strong: "clear", building: "watch", gap: "stuck" };
 
 const HEALTH_STYLE: Record<Health | "pending", { dot: string; row: string; label: string }> = {
   clear: { dot: "bg-health-clear", row: "border-health-clear/40 bg-health-clear-tint text-health-clear", label: "Clear" },
@@ -180,7 +183,7 @@ export default function BusinessCheck() {
   let screenKey: string;
   if (state.response) {
     screenKey = "result";
-    screen = <Result response={state.response} contact={state.contact} businessName={businessDetails(answers).businessName} onRestart={restart} />;
+    screen = <Result response={state.response} contact={state.contact} answers={answers} businessName={businessDetails(answers).businessName} onRestart={restart} />;
   } else if (!state.started) {
     screenKey = "intro";
     screen = <Intro hasProgress={state.history.length > 0} onStart={() => update({ started: true })} onRestart={restart} />;
@@ -689,20 +692,40 @@ function CountUp({ value }: { value: number }) {
   return <motion.span>{rounded}</motion.span>;
 }
 
-function Result({ response, contact, businessName, onRestart }: { response: BusinessCheckResponse; contact: Contact; businessName: string; onRestart: () => void }) {
+function Result({ response, contact, answers, businessName, onRestart }: { response: BusinessCheckResponse; contact: Contact; answers: Answers; businessName: string; onRestart: () => void }) {
   const { result, summary } = response;
   const founder = result.founder;
-  const style = founder.instinct ? DISC_STYLES[founder.instinct] : undefined;
+  const narrative = founder.instinct ? describeFounder(answers, founder) : undefined;
   const [requested, setRequested] = useState<{ call?: boolean; report?: boolean }>({});
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const requestNext = trpc.businessCheck.requestNext.useMutation({
     onSuccess: (data) => setRequested((current) => ({ ...current, [data.choice]: true })),
   });
   const tally = (["stuck", "watch", "clear"] as const).map((health) => ({ health, count: result.outline.filter((row) => row.health === health).length }));
+  const booking = bookingTarget(response.discoveryCallUrl, { name: contact.fullName, email: contact.email, host: window.location.host });
+  const recordCall = () => {
+    if (!requested.call && !requestNext.isPending) requestNext.mutate({ token: response.token, choice: "call" });
+  };
+
+  // Calendly tells the page when a time has been booked; that is when the call counts as booked.
+  useEffect(() => {
+    if (booking.kind !== "calendly") return undefined;
+    const listener = (event: MessageEvent) => {
+      if (isCalendlyBooking(event)) recordCall();
+    };
+    window.addEventListener("message", listener);
+    return () => window.removeEventListener("message", listener);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bookCall = () => {
-    if (response.discoveryCallUrl) window.open(response.discoveryCallUrl, "_blank", "noopener,noreferrer");
-    requestNext.mutate({ token: response.token, choice: "call" });
+    if (booking.kind === "calendly") {
+      setCalendarOpen(true);
+      return;
+    }
+    if (booking.kind === "link") window.open(booking.pageUrl, "_blank", "noopener,noreferrer");
+    recordCall();
   };
+  const scrollToOffers = () => document.getElementById("next-steps")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <motion.div className="space-y-10" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12 } } }} initial="hidden" animate="show">
@@ -728,6 +751,22 @@ function Result({ response, contact, businessName, onRestart }: { response: Busi
         <SummaryCard title="What we think it is" body={summary.think} accent />
       </motion.section>
 
+      <motion.button
+        type="button"
+        variants={itemMotion}
+        onClick={scrollToOffers}
+        whileHover={{ y: -2 }}
+        className="group flex w-full flex-col gap-3 border-2 border-highlight-ink/30 bg-paper-raised p-5 text-left transition-colors hover:border-highlight-ink sm:flex-row sm:items-center sm:justify-between"
+      >
+        <span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">This is the summary</span>
+          <span className="mt-1 block font-serif text-xl font-bold text-ink">{FULL_REPORT.pitch}</span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-2 font-semibold text-highlight-ink">
+          Get the full report · {formatNaira(PRICES.fullReport)} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        </span>
+      </motion.button>
+
       {result.outline.length > 0 && (
         <motion.section variants={itemMotion}>
           <SectionHeading>Your business outline</SectionHeading>
@@ -748,30 +787,24 @@ function Result({ response, contact, businessName, onRestart }: { response: Busi
         </motion.section>
       )}
 
-      {founder.instinct && (
+      {narrative && (
         <motion.section variants={itemMotion} className="border border-line bg-paper-raised p-6">
           <SectionHeading>Founder readiness</SectionHeading>
-          <p className="font-serif text-2xl font-bold">{READINESS_LABELS[founder.level]}</p>
-          <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            {([["Capacity", founder.capacity, "Time and people to work on the business"], ["Competence", founder.competence, "Confidence with the numbers"], ["Exposure", founder.exposure, "Training and years of experience"]] as const).map(([name, score, hint], index) => (
-              <div key={name}>
-                <p className="flex justify-between text-sm font-semibold"><span>{name}</span><span className="text-ink-muted">{score} of 2</span></p>
-                <div className="mt-1.5 flex gap-1">
-                  {[0, 1].map((cell) => (
-                    <span key={cell} className="relative h-1.5 flex-1 overflow-hidden bg-line">
-                      <motion.span className="absolute inset-0 origin-left bg-brand" initial={{ scaleX: 0 }} whileInView={{ scaleX: cell < score ? 1 : 0 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: EASE, delay: 0.2 + index * 0.15 + cell * 0.2 }} />
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-xs text-ink-muted">{hint}</p>
-              </div>
+          <p className="font-serif text-2xl font-bold">{narrative.heading}</p>
+          <p className="mt-2 leading-relaxed text-ink-700">{narrative.summary}</p>
+          <ul className="mt-5 grid gap-3">
+            {narrative.lines.map((line, index) => (
+              <motion.li key={line.key} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, ease: EASE, delay: 0.2 + index * 0.1 }} className="flex flex-col gap-2 border-l-4 bg-paper p-4 sm:flex-row sm:items-start sm:gap-4" style={{ borderLeftColor: `var(--color-health-${STRENGTH_HEALTH[line.strength]})` }}>
+                <span className="flex shrink-0 items-center gap-2 sm:w-60">
+                  <span className="whitespace-nowrap font-semibold text-ink">{line.title}</span>
+                  <span className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${HEALTH_STYLE[STRENGTH_HEALTH[line.strength]].row}`}>{STRENGTH_LABELS[line.strength]}</span>
+                </span>
+                <span className="text-sm leading-relaxed text-ink-soft">{line.text}</span>
+              </motion.li>
             ))}
-          </div>
-          {style && (
-            <p className="mt-5 text-sm leading-relaxed text-ink-soft">
-              <span className="font-semibold text-ink">How you lead: {style.name}.</span> {style.strength} {style.watch}
-              {founder.seen && founder.seen !== founder.instinct ? ` Others see you more as a ${DISC_STYLES[founder.seen].name.toLowerCase()}.` : ""}
-            </p>
+          </ul>
+          {narrative.lead && (
+            <p className="mt-5 text-sm leading-relaxed text-ink-soft"><span className="font-semibold text-ink">How you lead.</span> {narrative.lead}</p>
           )}
           {founder.needsDriver && (
             <p className="mt-3 border-l-4 border-health-watch bg-health-watch-tint p-3 text-sm leading-relaxed text-ink-700">
@@ -800,38 +833,66 @@ function Result({ response, contact, businessName, onRestart }: { response: Busi
         </motion.section>
       )}
 
-      <motion.section variants={itemMotion} className="relative overflow-hidden bg-gradient-to-br from-brand-plum via-brand-deep to-brand-deep p-6 text-paper sm:p-8">
-        <motion.div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-highlight/25 blur-3xl" animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.9, 0.5] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} />
-        <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-highlight">Next step</p>
-          <p className="mt-3 font-serif text-2xl font-bold leading-snug">{summary.next}</p>
-          <p className="mt-2 text-sm leading-relaxed text-on-dark-muted">Twenty minutes, free, by phone or video. If we're not the right fit, we'll say so and point you to who is.</p>
-          <AnimatePresence mode="wait" initial={false}>
-            {requested.call ? (
-              <motion.p key="booked" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="mt-6 flex items-start gap-3 border border-highlight/40 p-4 text-sm leading-relaxed">
-                <motion.span initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-highlight" /></motion.span>
-                {response.discoveryCallUrl ? "Pick a time on the booking page that opened. If it didn't open, we'll contact you to agree a time." : `Thank you. Your request has been sent to the IPF team. We will contact you by ${contact.whatsapp ? "WhatsApp or " : ""}email to agree a time.`}
-              </motion.p>
-            ) : (
-              <motion.div key="book" exit={{ opacity: 0, scale: 0.96 }}>
-                <motion.button type="button" onClick={bookCall} disabled={requestNext.isPending} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} className="group mt-6 inline-flex h-14 w-full items-center justify-center bg-highlight px-8 text-sm font-semibold uppercase tracking-widest text-brand-deep shadow-[0_18px_40px_-18px_rgba(54,183,224,0.9)] transition-colors hover:bg-highlight-hover disabled:opacity-60 sm:w-auto">
-                  <PhoneCall className="mr-2 h-4 w-4 transition-transform group-hover:-rotate-12" /> {response.discoveryCallUrl ? "Book my free call" : "Request my free 20-minute call"}
-                </motion.button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <div className="mt-6 border-t border-paper/15 pt-5 text-sm text-on-dark-muted">
-            {requested.report ? (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-highlight" />We'll email you the payment details for the full report.</motion.p>
-            ) : (
-              <p>
-                Want it in writing? The full report goes deeper on each area and comes by email for {formatNaira(PRICES.fullReport)}.{" "}
-                <button type="button" onClick={() => requestNext.mutate({ token: response.token, choice: "report" })} disabled={requestNext.isPending} className="font-semibold text-paper underline underline-offset-4 hover:text-highlight">Request the full report</button>
-              </p>
-            )}
+      <motion.section variants={itemMotion} id="next-steps" className="scroll-mt-24">
+        <SectionHeading>Your next steps</SectionHeading>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* The free call */}
+          <div className="relative flex flex-col overflow-hidden bg-gradient-to-br from-brand-plum via-brand-deep to-brand-deep p-6 text-paper sm:p-8">
+            <motion.div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-highlight/25 blur-3xl" animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.9, 0.5] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} />
+            <div className="relative flex flex-1 flex-col">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-highlight">Free · 20 minutes</p>
+              <p className="mt-3 font-serif text-2xl font-bold leading-snug">{summary.next}</p>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-on-dark-muted">By phone or video. If we're not the right fit, we'll say so and point you to who is.</p>
+              <AnimatePresence mode="wait" initial={false}>
+                {requested.call ? (
+                  <motion.p key="booked" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="mt-6 flex items-start gap-3 border border-highlight/40 p-4 text-sm leading-relaxed">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-highlight" />
+                    {booking.kind === "none" ? "Thank you. Your request has been sent to the IPF team. We'll email you to agree a time." : `Booked. The confirmation is on its way to ${contact.email}.`}
+                  </motion.p>
+                ) : (
+                  <motion.button key="book" type="button" onClick={bookCall} disabled={requestNext.isPending} exit={{ opacity: 0, scale: 0.96 }} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} className="group mt-6 inline-flex h-14 w-full items-center justify-center bg-highlight px-8 text-sm font-semibold uppercase tracking-widest text-brand-deep shadow-[0_18px_40px_-18px_rgba(54,183,224,0.9)] transition-colors hover:bg-highlight-hover disabled:opacity-60">
+                    <CalendarDays className="mr-2 h-4 w-4" /> {booking.kind === "calendly" && calendarOpen ? "Choose a time below" : booking.kind === "none" ? "Request my free 20-minute call" : "Book my free call"}
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-          {requestNext.error && <p className="mt-4 text-sm text-highlight">{requestNext.error.message}</p>}
+
+          {/* The paid full report */}
+          <div className="flex flex-col border-2 border-highlight-ink bg-paper-raised p-6 sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">The full report</p>
+            <p className="mt-3 font-serif text-2xl font-bold leading-snug text-ink">{FULL_REPORT.name}</p>
+            <p className="mt-3 font-serif text-5xl font-black tracking-tight text-ink">{formatNaira(PRICES.fullReport)}</p>
+            <ul className="mt-5 flex-1 space-y-2.5">
+              {FULL_REPORT.includes.map((item) => (
+                <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-ink-700"><Check className="mt-0.5 h-4 w-4 shrink-0 text-highlight-ink" />{item}</li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-ink-muted">{FULL_REPORT.delivery}</p>
+            <AnimatePresence mode="wait" initial={false}>
+              {requested.report ? (
+                <motion.p key="requested" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="mt-6 flex items-start gap-3 border border-highlight-ink/40 bg-paper p-4 text-sm leading-relaxed text-ink-700">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-highlight-ink" />
+                  Thank you. We'll email the payment details to {contact.email}, and your report follows once payment is confirmed.
+                </motion.p>
+              ) : (
+                <motion.button key="get" type="button" onClick={() => requestNext.mutate({ token: response.token, choice: "report" })} disabled={requestNext.isPending} exit={{ opacity: 0, scale: 0.96 }} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} className="group mt-6 inline-flex h-14 w-full items-center justify-center bg-highlight-ink px-8 text-sm font-semibold uppercase tracking-widest text-paper shadow-[0_18px_40px_-18px_rgba(203,55,86,0.8)] transition-opacity hover:opacity-90 disabled:opacity-60">
+                  <FileText className="mr-2 h-4 w-4" /> Get my full report
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
+
+        <AnimatePresence>
+          {booking.kind === "calendly" && calendarOpen && !requested.call && (
+            <motion.div key="calendar" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.45, ease: EASE }} className="mt-4 overflow-hidden border border-line bg-paper-raised">
+              <p className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">Choose a time for your free call</p>
+              <iframe title="Book your free call" src={booking.embedUrl} className="h-[720px] w-full" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {requestNext.error && <p className="mt-4 text-sm text-danger-strong">{requestNext.error.message}</p>}
       </motion.section>
 
       <motion.p variants={itemMotion} className="text-xs leading-relaxed text-ink-faint">

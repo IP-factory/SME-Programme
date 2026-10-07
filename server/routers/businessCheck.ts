@@ -3,7 +3,6 @@ import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { businessChecks, type BusinessCheck } from "../../drizzle/schema";
-import { BRAND } from "../../shared/brand";
 import { businessDetails, cleanAnswers, evaluate, isComplete } from "../../shared/businessCheck/engine";
 import { advancePipeline } from "../../shared/businessCheck/pipeline";
 import { stageOf, type Answers } from "../../shared/businessCheck/questions";
@@ -11,6 +10,7 @@ import { officeEmail, ownerEmail, summariseCheck, type CheckContact, type CheckS
 import { getDb } from "../db";
 import { databaseNow } from "../dbHelpers";
 import { deliverEmail, JUMP_ADMINISTRATION_MAILBOX } from "../email";
+import { ENV } from "../_core/env";
 import { publicProcedure, router } from "../_core/trpc";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -138,7 +138,7 @@ export const businessCheckRouter = router({
     if (check.completedAt && check.resultJson && check.summaryJson && check.summarySource) {
       // Already submitted (a double click or a retry): return what was recorded, without emailing again.
       // The owner's own delivery status is not stored; the office copy goes through the same provider, so its status stands in.
-      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: check.notificationStatus };
+      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: ENV.discoveryCallUrl, emailStatus: check.notificationStatus };
     }
     const answers = cleanAnswers(input.answers);
     if (!isComplete(answers)) {
@@ -171,7 +171,7 @@ export const businessCheckRouter = router({
       completedAt: databaseNow(),
     }).where(eq(businessChecks.id, check.id));
 
-    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: ownerDelivery.status === "Sent" ? "Sent" : ownerDelivery.status === "Failed" ? "Failed" : "Simulated" };
+    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: ENV.discoveryCallUrl, emailStatus: ownerDelivery.status === "Sent" ? "Sent" : ownerDelivery.status === "Failed" ? "Failed" : "Simulated" };
   }),
 
   /** The owner asks for the free call or the full report from the result screen. */

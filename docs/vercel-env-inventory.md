@@ -27,6 +27,7 @@ Requirement groups: **A** basic API, **B** database, **C** registration, **D** p
 | `BUILT_IN_FORGE_API_KEY` | same as above | Server | Required for uploads (G) | Bearer key for Forge API | Secret. |
 | `VITE_FRONTEND_FORGE_API_URL` | client/src/components/Map.tsx | Client | Optional | Maps proxy URL | Build time; only for map component. |
 | `VITE_FRONTEND_FORGE_API_KEY` | client/src/components/Map.tsx | Client | Optional | Maps key | Public by design (bundled); build time. |
+| `DISCOVERY_CALL_URL` | env.ts → routers/businessCheck.ts, businessCheck.ts (owner email) | Server | Required to book calls | Booking page for the free 20-minute discovery call | A Calendly event link (e.g. `https://calendly.com/<account>/discovery-call`) is embedded on the business check result with the owner's name and email filled in; any other https booking page opens in a new tab. Not secret. |
 | `RESEND_API_KEY` | env.ts → email.ts, scripts/send-test-email.mjs | Server | Required for primary email (F) | Resend transport | Secret. |
 | `EMAIL_FROM` | env.ts → email.ts | Server | Optional (F) | Sender display/address | Defaults to the brand administration mailbox. Sender domain must be verified in Resend. |
 | `EMAIL_REPLY_TO` | env.ts → email.ts, gmail.ts | Server | Optional (F) | Reply-To address | Defaults to the brand administration mailbox. |
