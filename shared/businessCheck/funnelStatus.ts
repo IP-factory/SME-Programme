@@ -1,4 +1,4 @@
-import type { PipelineStage } from "./pipeline";
+import { PIPELINE_LABELS, type PipelineStage } from "./pipeline";
 
 /**
  * What the admin console calls the state of a business check. This is DISPLAY wording only: the stored pipeline stage
@@ -66,3 +66,10 @@ export function funnelStatus(input: {
 export const isReadyToOnboard = (status: FunnelStatus) => status === "fit";
 
 export const funnelStatusLabel = (status: FunnelStatus) => FUNNEL_STATUS_LABELS[status].label;
+
+/**
+ * The name the admin console gives a stored stage (stage tabs, "Move to" buttons, stage history). It is the agreed
+ * pipeline name, except `call_booked`, which reads "Call requested" for the reason above: nothing is booked until a time
+ * is recorded. Change it here, and only here, once confirmed bookings (e.g. from Calendly) reach the admin console.
+ */
+export const stageDisplayName = (stage: PipelineStage) => (stage === "call_booked" ? "Call requested" : PIPELINE_LABELS[stage].name);

@@ -1,7 +1,8 @@
 import { Input } from "@/components/ui/input";
 import type { AdminSectionId } from "@/lib/adminSections";
 import { trpc } from "@/lib/trpc";
-import { FUNNEL_STATUSES, FUNNEL_STATUS_LABELS, funnelStatus, isReadyToOnboard } from "@shared/businessCheck/funnelStatus";
+import { funnelStatus, isReadyToOnboard, stageDisplayName } from "@shared/businessCheck/funnelStatus";
+import { PIPELINE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@shared/businessCheck/pipeline";
 import { AREA_NAMES } from "@shared/businessCheck/questions";
 import React, { useMemo, useState } from "react";
 import { AdminMetricCard, ClickableRow, ProspectCell, RecordDrawer, RowButton, StatusBadge, TD, TH } from "./AdminPrimitives";
@@ -15,7 +16,7 @@ import { formatDate, readinessShort } from "./format";
 export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (section: AdminSectionId) => void }) {
   const checks = trpc.businessSupport.checks.useQuery(undefined, { retry: false });
   const [search, setSearch] = useState("");
-  const [stage, setStage] = useState("all");
+  const [stage, setStage] = useState<PipelineStage | "all">("all");
   const [callOnly, setCallOnly] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
 
@@ -23,13 +24,19 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return rows.filter(row => {
-      if (stage !== "all" && row.status !== stage) return false;
+      if (stage !== "all" && row.pipelineStage !== stage) return false;
       if (callOnly && !row.callRequestedAt) return false;
       if (!needle) return true;
       return [row.fullName, row.businessName, row.email, row.whatsapp].some(value => value?.toLowerCase().includes(needle));
     });
   }, [rows, search, stage, callOnly]);
   const opened = rows.find(row => row.id === openId) ?? null;
+  /** How many checks sit in each stored pipeline stage: the whole funnel at a glance. */
+  const stageCounts = useMemo(() => {
+    const counts = Object.fromEntries(PIPELINE_STAGES.map(item => [item, 0])) as Record<PipelineStage, number>;
+    for (const row of rows) counts[row.pipelineStage] += 1;
+    return counts;
+  }, [rows]);
 
   if (checks.error) return <p role="alert" className="p-6 text-sm text-rose-900">{checks.error.message}</p>;
   return (
@@ -41,12 +48,27 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
         <AdminMetricCard label="Ready to onboard" value={rows.filter(row => isReadyToOnboard(row.status)).length} />
       </dl>
 
+      <div role="tablist" aria-label="Pipeline stage" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+        {(["all", ...PIPELINE_STAGES] as const).map(item => {
+          const active = stage === item;
+          return (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={item === "all" ? undefined : PIPELINE_LABELS[item].meaning}
+              onClick={() => setStage(item)}
+              className={`shrink-0 border px-3 py-1.5 text-xs font-medium ${active ? "border-brand bg-brand text-white" : "border-line bg-white text-ink hover:border-brand-line-strong"}`}
+            >
+              {item === "all" ? "All" : stageDisplayName(item)} <span className={active ? "text-white/80" : "text-ink-muted"}>{item === "all" ? rows.length : stageCounts[item]}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Input aria-label="Search business checks" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name, business, email or WhatsApp" className="h-9 rounded-none sm:max-w-xs" />
-        <select aria-label="Filter by stage" value={stage} onChange={event => setStage(event.target.value)} className="h-9 border border-line bg-white px-2 text-sm">
-          <option value="all">All stages</option>
-          {FUNNEL_STATUSES.map(item => <option key={item} value={item}>{FUNNEL_STATUS_LABELS[item].label}</option>)}
-        </select>
         <label className="flex items-center gap-2 text-sm text-ink-muted"><input type="checkbox" checked={callOnly} onChange={event => setCallOnly(event.target.checked)} /> Call requested only</label>
         <span className="text-xs text-ink-muted sm:ml-auto">{visible.length} of {rows.length}</span>
       </div>

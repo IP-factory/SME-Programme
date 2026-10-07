@@ -9,6 +9,7 @@ export const AUDIT_ACTIONS = [
   "admin_sign_in_refused",
   "business_check_call_scheduled",
   "business_check_call_outcome",
+  "business_check_stage_changed",
   "owner_credential_bootstrapped",
   "owner_credential_reset",
   "workspace_switched",

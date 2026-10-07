@@ -307,6 +307,51 @@ for (const target of targets) {
       });
     });
 
+    describe("moving a check through the pipeline", () => {
+      it("moves a check to any later stage, including Won and Nurture, and shows each move with who, from, to and the note", async () => {
+        const check = await finishedCheck("pipeline");
+        const id = (await rowFor(check.token)).id as number;
+        await requestCall(check.visitor, check.token);
+        await (await superAdmin.call()).businessSupport.recordOutcome({ businessCheckId: id, outcome: "fit" });
+        expect(await (await superAdmin.call()).businessSupport.setStage({ businessCheckId: id, stage: "nurture", note: " Not ready to pay until January " })).toEqual({ success: true, pipelineStage: "nurture", changed: true });
+        expect(await (await superAdmin.call()).businessSupport.setStage({ businessCheckId: id, stage: "won" })).toMatchObject({ pipelineStage: "won", changed: true });
+        expect((await rowFor(check.token)).pipelineStage).toBe("won");
+
+        const detail = await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: id });
+        expect(detail.stageHistory.map(event => [event.action, event.from, event.to])).toEqual([
+          ["business_check_stage_changed", "nurture", "won"],
+          ["business_check_stage_changed", "opportunity", "nurture"],
+          ["business_check_call_outcome", "call_booked", "opportunity"],
+        ]);
+        expect(detail.stageHistory[1]).toMatchObject({ note: "Not ready to pay until January", by: "Owner" });
+        expect(detail.stageHistory[0].note).toBeNull();
+      });
+
+      it("does nothing when the stage is unchanged, never reopens a won business, and never moves a check back to Lead", async () => {
+        const check = await finishedCheck("pipeline-rules");
+        const id = (await rowFor(check.token)).id as number;
+        expect(await (await superAdmin.call()).businessSupport.setStage({ businessCheckId: id, stage: "qualified_lead" })).toMatchObject({ changed: false });
+        await expect((await superAdmin.call()).businessSupport.setStage({ businessCheckId: id, stage: "lead" as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await (await superAdmin.call()).businessSupport.setStage({ businessCheckId: id, stage: "won" });
+        await expect((await superAdmin.call()).businessSupport.setStage({ businessCheckId: id, stage: "lost" })).rejects.toMatchObject({ code: "CONFLICT" });
+        expect((await rowFor(check.token)).pipelineStage).toBe("won");
+        await expect((await superAdmin.call()).businessSupport.setStage({ businessCheckId: 2_000_000_000, stage: "won" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+        const events = await db.select().from(schema.adminAccessAuditEvents).where(eq(schema.adminAccessAuditEvents.action, "business_check_stage_changed"));
+        expect(events.filter((event: { details: string }) => event.details.includes(`"businessCheckId":${id}`))).toHaveLength(1);
+      });
+
+      it("refuses everyone without the funnel permission", async () => {
+        const check = await finishedCheck("pipeline-refused");
+        const id = (await rowFor(check.token)).id as number;
+        const bareAdmin = await signInStaff(await person({ role: "admin" }));
+        const deskLead = await signInStaff(await person({}, ["desk_lead"]));
+        for (const b of [browser(), bareAdmin, deskLead]) {
+          await expect((await b.call()).businessSupport.setStage({ businessCheckId: id, stage: "won" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+        }
+        expect((await rowFor(check.token)).pipelineStage).toBe("qualified_lead");
+      });
+    });
+
     describe("the record drawer's data (read-only)", () => {
       it("returns the saved result for one check exactly as stored, without the answers or the public token", async () => {
         const { token, email } = await finishedCheck("detail");

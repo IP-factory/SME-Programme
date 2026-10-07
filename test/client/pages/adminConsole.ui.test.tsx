@@ -16,7 +16,7 @@ const hoisted = vi.hoisted(() => {
     details: {} as Record<number, unknown>,
     metrics: { businessChecks: 3, users: 2, portalUsers: 1, businesses: 1, memberships: 1, pendingInvitations: 0, platformRoleAssignments: 0 },
     error: undefined as { message: string } | undefined,
-    mutations: { schedule: [] as unknown[], outcome: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[] },
+    mutations: { schedule: [] as unknown[], outcome: [] as unknown[], stage: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[] },
     inviteResult: { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 } as Record<string, unknown>,
   };
   const query = (key: "checks" | "calls" | "clients" | "candidates" | "invitations" | "metrics") => () => ({ data: api[key], isLoading: false, error: api.error });
@@ -45,6 +45,7 @@ vi.mock("@/lib/trpc", () => ({
       clients: { useQuery: hoisted.query("clients") },
       scheduleCall: { useMutation: hoisted.mutation("schedule") },
       recordOutcome: { useMutation: hoisted.mutation("outcome") },
+      setStage: { useMutation: hoisted.mutation("stage", () => ({ success: true, pipelineStage: "won", changed: true })) },
     },
     onboarding: {
       candidates: { useQuery: hoisted.query("candidates") },
@@ -83,6 +84,7 @@ const detailFor = (over: Record<string, unknown> = {}) => ({
     { area: 7, name: "Financials", health: "stuck" },
   ],
   primaryAreaNumber: 7,
+  stageHistory: [],
   ...over,
 });
 const renderConsole = (access: Record<string, unknown> = SUPER, onSection?: (id: string) => void) => {
@@ -104,7 +106,7 @@ beforeEach(() => {
   api.invitations = [];
   api.details = { 1: detailFor(), 2: detailFor({ id: 2, fullName: "Bola Quiet", businessName: "Bola Bakes", email: "bola@example.test", whatsapp: null, pipelineStage: "qualified_lead", callRequestedAt: null }) };
   api.error = undefined;
-  api.mutations = { schedule: [], outcome: [], invite: [], revoke: [] };
+  api.mutations = { schedule: [], outcome: [], stage: [], invite: [], revoke: [] };
   api.inviteResult = { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 };
 });
 afterEach(cleanup);
@@ -241,7 +243,7 @@ describe("Business Checks table", () => {
     fireEvent.click(screen.getByLabelText("Call requested only"));
     expect(screen.queryByText("Bola Quiet")).toBeNull();
     fireEvent.click(screen.getByLabelText("Call requested only"));
-    fireEvent.change(screen.getByLabelText("Filter by stage"), { target: { value: "completed" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Qualified lead 1" }));
     expect(screen.queryByText("Ada Okafor")).toBeNull();
     expect(screen.getByText("Bola Quiet")).toBeTruthy();
     // Open and close a record: the table is exactly as it was.
@@ -249,7 +251,7 @@ describe("Business Checks table", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect((screen.getByLabelText("Filter by stage") as HTMLSelectElement).value).toBe("completed");
+    expect(screen.getByRole("tab", { name: "Qualified lead 1" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByText("Ada Okafor")).toBeNull();
     expect(screen.getByText("Bola Quiet")).toBeTruthy();
   });
@@ -568,5 +570,60 @@ describe("Clients view", () => {
     renderConsole();
     openSection("Clients");
     expect(screen.getByText("No clients have been onboarded yet.")).toBeTruthy();
+  });
+});
+
+describe("the commercial pipeline in Business Checks", () => {
+  it("shows every pipeline stage as a tab with its count, and filters the table by stage", () => {
+    api.checks = [
+      check({ id: 1, fullName: "P One", pipelineStage: "opportunity" }),
+      check({ id: 2, fullName: "P Two", pipelineStage: "won" }),
+      check({ id: 3, fullName: "P Three", pipelineStage: "nurture" }),
+      check({ id: 4, fullName: "P Four", pipelineStage: "won" }),
+      check({ id: 5, fullName: "P Five", pipelineStage: "lead", completedAt: null, callRequestedAt: null }),
+    ];
+    renderConsole();
+    const names = within(screen.getByRole("tablist", { name: "Pipeline stage" })).getAllByRole("tab").map(tab => tab.textContent);
+    expect(names).toEqual(["All 5", "Lead 1", "Qualified lead 0", "Call requested 0", "Opportunity 1", "Won 2", "Lost 0", "Nurture 1", "Referred 0"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Won 2" }));
+    expect(screen.getByText("P Two")).toBeTruthy();
+    expect(screen.getByText("P Four")).toBeTruthy();
+    expect(screen.queryByText("P One")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "All 5" }));
+    expect(screen.getByText("P One")).toBeTruthy();
+  });
+
+  it("moves a check to any later stage, including Won and Nurture, with an optional note", () => {
+    renderConsole();
+    openRow("Ada Okafor");
+    const move = within(drawer().getByText("Move to").closest("section")!);
+    // The current stage and the starting stage are not offered.
+    expect(move.queryByRole("button", { name: "Call requested" })).toBeNull();
+    expect(move.queryByRole("button", { name: "Lead" })).toBeNull();
+    for (const name of ["Qualified lead", "Opportunity", "Won", "Lost", "Nurture", "Referred"]) expect(move.getByRole("button", { name })).toBeTruthy();
+    fireEvent.change(move.getByLabelText("Note (optional)"), { target: { value: "  Paid by transfer  " } });
+    fireEvent.click(move.getByRole("button", { name: "Won" }));
+    fireEvent.click(move.getByRole("button", { name: "Nurture" }));
+    expect(api.mutations.stage).toEqual([{ businessCheckId: 1, stage: "won", note: "Paid by transfer" }, { businessCheckId: 1, stage: "nurture", note: undefined }]);
+  });
+
+  it("shows the team's moves with who, when, from, to and the note, and treats a won business as final", () => {
+    api.details[1] = detailFor({
+      pipelineStage: "won",
+      stageHistory: [
+        { id: 3, action: "business_check_stage_changed", from: "opportunity", to: "won", note: "Paid by transfer", scheduledFor: null, by: "Emmanuel Tarfa", at: new Date("2026-10-07T10:00:00Z") },
+        { id: 2, action: "business_check_call_outcome", from: "call_booked", to: "opportunity", note: null, scheduledFor: null, by: "Emmanuel Tarfa", at: new Date("2026-10-06T10:00:00Z") },
+        { id: 1, action: "business_check_call_scheduled", from: null, to: null, note: null, scheduledFor: "2026-10-06T09:00:00.000Z", by: null, at: new Date("2026-10-05T10:00:00Z") },
+      ],
+    });
+    renderConsole();
+    openRow("Ada Okafor");
+    const history = drawer().getByRole("list", { name: "Stage history" });
+    const items = within(history).getAllByRole("listitem").map(item => item.textContent);
+    expect(items[0]).toMatch(/^Won from Opportunity.*Emmanuel Tarfa · 7 Oct 2026.*Paid by transfer$/);
+    expect(items[1]).toMatch(/^Opportunity from Call requested/);
+    expect(items[2]).toMatch(/^Call time recorded for 6 Oct 2026.*Team ·/);
+    expect(drawer().getByText("This business has been won, so its stage is final.")).toBeTruthy();
+    expect(drawer().queryByLabelText("Note (optional)")).toBeNull();
   });
 });

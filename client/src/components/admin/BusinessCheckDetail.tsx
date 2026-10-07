@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import type { AdminSectionId } from "@/lib/adminSections";
 import { READINESS_LABELS } from "@shared/businessCheck/engine";
-import { funnelStatus, isReadyToOnboard } from "@shared/businessCheck/funnelStatus";
+import { funnelStatus, isReadyToOnboard, stageDisplayName } from "@shared/businessCheck/funnelStatus";
+import { PIPELINE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@shared/businessCheck/pipeline";
 import { AREA_NAMES, type Health } from "@shared/businessCheck/questions";
-import React from "react";
+import React, { useState } from "react";
+import { toast } from "sonner";
 import { CopyButton, DetailField, DetailSection, StatusBadge } from "./AdminPrimitives";
 import { formatDate, formatDateTime, ROUTE_LABELS, whatsappLink } from "./format";
 
@@ -41,6 +45,48 @@ export function ContactLines({ email, whatsapp }: { email: string; whatsapp: str
  * The whole business check for one prospect, as it was saved when they finished it. Nothing is recalculated, no
  * recommendation is created here, and the owner's raw answers are not shown.
  */
+const stageName = (stage: string | null) => (stage && stage in PIPELINE_LABELS ? stageDisplayName(stage as PipelineStage) : stage ?? "-");
+/** "lead" is where every check starts, so the team never moves a check back to it. */
+const MOVABLE_STAGES = PIPELINE_STAGES.filter((stage): stage is Exclude<PipelineStage, "lead"> => stage !== "lead");
+
+/**
+ * Moves the check to any later stage, with an optional note for the team. The server checks the permission, refuses to
+ * reopen a won business and records who moved it, from where, to where and why.
+ */
+function MoveStage({ businessCheckId, current }: { businessCheckId: number; current: PipelineStage }) {
+  const utils = trpc.useUtils();
+  const [note, setNote] = useState("");
+  const move = trpc.businessSupport.setStage.useMutation({
+    onSuccess: result => {
+      toast.success(`Moved to ${stageName(result.pipelineStage)}.`);
+      setNote("");
+      void utils.businessSupport.checkDetail.invalidate({ businessCheckId });
+      void utils.businessSupport.checks.invalidate();
+      void utils.businessSupport.discoveryCalls.invalidate();
+      void utils.onboarding.candidates.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+  if (current === "won") return <p className="text-sm text-ink-muted">This business has been won, so its stage is final.</p>;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {MOVABLE_STAGES.filter(stage => stage !== current).map(stage => (
+          <Button key={stage} type="button" variant="outline" size="sm" title={PIPELINE_LABELS[stage].meaning} disabled={move.isPending}
+            className={`rounded-none text-xs ${stage === "won" ? "border-emerald-300 text-emerald-900 hover:bg-emerald-50" : stage === "lost" ? "border-rose-200 text-rose-800 hover:bg-rose-50" : ""}`}
+            onClick={() => move.mutate({ businessCheckId, stage, note: note.trim() || undefined })}>
+            {stageDisplayName(stage)}
+          </Button>
+        ))}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor={`stage-note-${businessCheckId}`} className="text-xs text-ink-muted">Note (optional)</Label>
+        <Textarea id={`stage-note-${businessCheckId}`} value={note} onChange={event => setNote(event.target.value)} maxLength={500} rows={2} placeholder="For example, what was agreed on the call" className="rounded-none text-sm" />
+      </div>
+    </div>
+  );
+}
+
 export default function BusinessCheckDetail({ businessCheckId, onOpenSection, onClose }: { businessCheckId: number; onOpenSection: (section: AdminSectionId) => void; onClose: () => void }) {
   const detail = trpc.businessSupport.checkDetail.useQuery({ businessCheckId }, { retry: false, refetchOnWindowFocus: false });
   if (detail.isLoading) return <p className="text-sm text-ink-muted">Loading the record…</p>;
@@ -127,6 +173,28 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
           ))}
           <li className="flex items-center justify-between gap-4 border-t border-line-soft pt-2"><span className="text-ink-muted">Current stage</span><StatusBadge status={status} /></li>
         </ol>
+      </DetailSection>
+
+      <DetailSection title="Move to">
+        <MoveStage businessCheckId={check.id} current={check.pipelineStage} />
+      </DetailSection>
+
+      <DetailSection title="Stage history">
+        {check.stageHistory.length ? (
+          <ol className="space-y-2.5 text-sm" aria-label="Stage history">
+            {check.stageHistory.map(event => (
+              <li key={event.id} className="border-l-2 border-brand-line pl-3">
+                <p className="text-ink">
+                  {event.action === "business_check_call_scheduled"
+                    ? <>Call time recorded{event.scheduledFor ? ` for ${formatDateTime(event.scheduledFor)}` : ""}</>
+                    : <><span className="font-medium">{stageName(event.to)}</span> <span className="text-ink-muted">from {stageName(event.from)}</span></>}
+                </p>
+                <p className="text-xs text-ink-muted">{event.by ?? "Team"} · {formatDateTime(event.at)}</p>
+                {event.note && <p className="mt-0.5 text-[13px] text-ink">{event.note}</p>}
+              </li>
+            ))}
+          </ol>
+        ) : <p className="text-sm text-ink-muted">No changes by the team yet. The first stages move by themselves as the owner goes through the check.</p>}
       </DetailSection>
 
       {/* Only the action that fits where this prospect is. A check with nothing to do next shows no actions. */}
