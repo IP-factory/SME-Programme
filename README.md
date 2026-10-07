@@ -29,7 +29,7 @@ docs/        Operational and migration documentation
 
 ## Getting started
 
-Requirements: Node 22, pnpm 10 (`corepack enable`), a PostgreSQL database for anything beyond tests and builds.
+Requirements: Node 22.22.2 or newer 22.x (run `nvm use`; the browser-like tests need it), pnpm 10 (`corepack enable`), a PostgreSQL database for anything beyond tests and builds.
 
 ```bash
 pnpm install

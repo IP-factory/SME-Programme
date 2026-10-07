@@ -14,7 +14,7 @@ Read this before changing anything. It applies to every agent and person working
 
 | Command | What it does |
 |---|---|
-| `pnpm install` | Install dependencies (Node 22, pnpm 10) |
+| `pnpm install` | Install dependencies (Node 22.22.2 or newer 22.x, pnpm 10; `nvm use` reads `.nvmrc`). `pnpm test` stops with an instruction on an older Node |
 | `pnpm dev` | Run the app locally on http://localhost:3000 |
 | `pnpm verify` | **Run before every push:** `check`, `check:tests`, `test`, `build` |
 | `pnpm check` | Typecheck the app |

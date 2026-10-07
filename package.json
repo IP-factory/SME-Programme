@@ -13,6 +13,7 @@
     "check:tests": "tsc --noEmit -p tsconfig.test.json",
     "verify": "pnpm check && pnpm check:tests && pnpm test && pnpm build",
     "format": "prettier --write .",
+    "pretest": "node scripts/requireNodeForTests.mjs",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
