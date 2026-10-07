@@ -22,3 +22,26 @@ describe("brand settings", () => {
     expect(token("brand-deep")).toBe(BRAND.colorBrandDeep.toUpperCase());
   });
 });
+
+describe("product name", () => {
+  const read = (file: string) => readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
+
+  it("is The Shift, written in full with its maker", () => {
+    expect(BRAND.productName).toBe("The Shift");
+    expect(BRAND.productEndorsement).toBe(`${BRAND.productName}, by ${BRAND.organisationName}`);
+  });
+
+  it("names the product in the page title and search description, without the retired headline", () => {
+    const page = read("client/index.html");
+    expect(page).toContain(`<title>${BRAND.productEndorsement} · Support for business owners</title>`);
+    expect(page).toMatch(/<meta name="description" content="[^"]*The Shift, by IP Factory/);
+    expect(page).not.toContain("You know what your business needs");
+  });
+
+  it("never puts \"your\" or \"a\" directly before the name, which already starts with \"The\"", () => {
+    for (const file of ["client/src/pages/Home.tsx", "client/src/components/home/HomeSections.tsx", "client/src/pages/BusinessCheck.tsx"]) {
+      expect(read(file), file).not.toMatch(/\b(your|a|an|the)\s+\{BRAND\.productName\}/i);
+    }
+    expect(read("client/src/pages/Home.tsx") + read("client/src/components/home/HomeSections.tsx")).not.toContain("Operating Partner");
+  });
+});

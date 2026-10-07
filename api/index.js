@@ -25,10 +25,11 @@ var init_brand = __esm({
       organisationName: "IP Factory",
       organisationLegalName: "Intellectual Property Factory",
       /**
-       * The business-support offer's public name ([NAME] in the concept note's site copy).
-       * "Operating Partner" is the working name until Lewis closes the name.
+       * The business-support offer's public name ([NAME] in the concept note's site copy), chosen
+       * 7 October 2026. Written out in full with its maker as productEndorsement.
        */
-      productName: "Operating Partner",
+      productName: "The Shift",
+      productEndorsement: "The Shift, by IP Factory",
       productTagline: "Support for business owners",
       /** External page for the free business check, if it runs elsewhere. Empty: the on-site form opens. */
       applyUrl: "",

@@ -87,7 +87,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
       <div className="relative container mx-auto max-w-5xl px-4 text-center">
         <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }} className="mx-auto mb-8 inline-flex items-center gap-2 border border-brand-line bg-paper-raised/70 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand backdrop-blur">
           <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-highlight opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-highlight" /></span>
-          {BRAND.productName} · Support for business owners
+          {BRAND.productEndorsement}
         </motion.p>
 
         <motion.h1 initial="hidden" animate="show" transition={{ staggerChildren: 0.18 }} className="mb-8 font-serif text-5xl font-black leading-[1.05] tracking-tight text-ink sm:text-7xl md:text-8xl">
@@ -104,7 +104,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
             &ldquo;Some owners know exactly what their business needs. Most can only feel the problem. Either way, we start there.&rdquo;
           </p>
           <p className="mx-auto mb-12 max-w-2xl text-lg leading-relaxed text-ink-600">
-            {BRAND.productName} gets in with you, names the real problem, shows you exactly what to do, gives you the tools, and checks your work every week until the number moves.
+            On {BRAND.productName}, we get in with you, name the real problem, show you exactly what to do, give you the tools, and check your work every week until the number moves.
           </p>
           <div className="flex flex-col items-center gap-4">
             <CtaButton onClick={onStart} className="w-full max-w-sm">Start with a free business check</CtaButton>

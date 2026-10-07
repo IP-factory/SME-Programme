@@ -83,7 +83,7 @@ export default function Home() {
       <ScrollProgress />
       <header className={`border-b bg-paper/85 backdrop-blur-md sticky top-0 z-50 transition-[box-shadow,border-color] duration-300 ${scrolled ? "border-line shadow-[0_8px_30px_-12px_rgba(18,50,79,0.25)]" : "border-transparent"}`}>
         <div className={`container flex items-center justify-between transition-[height] duration-300 ${scrolled ? "h-16" : "h-20"}`}>
-          <a href="#top" onClick={onSectionLinkClick} className="flex items-center gap-3" aria-label={`${BRAND.organisationName} ${BRAND.productName}`}>
+          <a href="#top" onClick={onSectionLinkClick} className="flex items-center gap-3" aria-label={BRAND.productEndorsement}>
             <img src={BRAND.markUrl} alt={BRAND.organisationName} className="h-10 w-auto shrink-0" />
             <span className="hidden sm:inline-block border-l border-line pl-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">{BRAND.productName}</span>
           </a>
@@ -209,7 +209,7 @@ export default function Home() {
         <DialogContent className="max-w-md bg-paper border border-line text-ink">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl font-bold">Client sign in</DialogTitle>
-            <DialogDescription className="text-xs text-ink-soft">Sign in with the email address and password for your {BRAND.productName} client area.</DialogDescription>
+            <DialogDescription className="text-xs text-ink-soft">Sign in with the email address and password for your client area on {BRAND.productName}.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -273,7 +273,7 @@ export default function Home() {
         <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-ink-muted">
           <div className="flex items-center gap-4">
             <img src={BRAND.logoUrl} alt={BRAND.organisationName} className="h-16 w-auto" />
-            <p>© 2026 {BRAND.organisationLegalName} ({BRAND.organisationName}). {BRAND.productTagline}.</p>
+            <p>© 2026 {BRAND.organisationLegalName} ({BRAND.organisationName}). {BRAND.productName}: {BRAND.productTagline.toLowerCase()}.</p>
           </div>
           <div className="flex items-center gap-6">
             <a href="#how" onClick={onSectionLinkClick} className="hover:text-ink">How it works</a>
