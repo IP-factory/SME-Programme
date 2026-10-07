@@ -11,6 +11,7 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "check:tests": "tsc --noEmit -p tsconfig.test.json",
+    "verify": "pnpm check && pnpm check:tests && pnpm test && pnpm build",
     "format": "prettier --write .",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",

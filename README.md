@@ -17,10 +17,12 @@ React 19 + Vite + Tailwind 4 (client) · Express 5 + tRPC 11 (server) · Drizzle
 
 ```
 client/      React app (pages/, components/, lib/)
-server/      Express + tRPC server, routers/, domain modules, tests
+server/      Express + tRPC server, routers/, domain modules
 server/_core Platform plumbing (env, auth context, cookies, storage proxy, Vite integration)
 shared/      Code shared by client and server (programme rules, templates, permissions)
-drizzle/     Schema (schema.ts) and SQL migrations
+drizzle/     PostgreSQL schema (schema.ts) and migrations
+api/         Generated Vercel function bundle (do not edit; `pnpm build` regenerates it)
+test/        All tests, mirroring client/src, server and shared
 scripts/     One-off operational scripts (JUMP-era; do not run against an IPF database without review)
 docs/        Operational and migration documentation
 ```
@@ -37,6 +39,7 @@ pnpm dev               # http://localhost:3000
 
 | Command | Purpose |
 |---|---|
+| `pnpm verify` | Everything CI runs: both typechecks, all tests and the build. Run before every push |
 | `pnpm check` | TypeScript typecheck |
 | `pnpm test` | Unit and UI tests (no network or secrets required) |
 | `pnpm build` | Production client + server bundle into `dist/` |
@@ -45,7 +48,7 @@ pnpm dev               # http://localhost:3000
 | `pnpm db:generate` / `pnpm db:migrate` | Generate / apply Drizzle migrations (`db:migrate` requires `MIGRATION_DATABASE_URL`) |
 | `pnpm test:db` | PostgreSQL contract tests against a real database (requires `TEST_DATABASE_URL`) |
 
-CI (`.github/workflows/ci.yml`) runs check, test and build on every push and pull request.
+CI (`.github/workflows/ci.yml`) runs check, check:tests, test and build on every push and pull request. Working rules for contributors and agents are in [`AGENTS.md`](AGENTS.md).
 
 ### Live integration tests
 
