@@ -437,7 +437,7 @@ function writeSummary(input: {
     };
   }
 
-  const founderLine = `Founder readiness reads as ${READINESS_LABELS[founder.level].split(":")[0].toLowerCase()}.${style ? ` Under pressure you lead as a ${style.name.toLowerCase()}: ${lower(style.strength)}` : ""}${founder.needsDriver ? " Nobody in the business reliably makes the hard call yet; that role needs an owner." : ""}`;
+  const founderLine = `Founder readiness reads as ${READINESS_LABELS[founder.level].split(":")[0].toLowerCase()}.${style ? ` Under pressure you lead as ${/^[aeiou]/i.test(style.name) ? "an" : "a"} ${style.name.toLowerCase()}: ${lower(style.strength)}` : ""}${founder.needsDriver ? " Nobody in the business reliably makes the hard call yet; that role needs an owner." : ""}`;
 
   if (route === "idea") {
     const ideaRow = outline.find((row) => row.area === 1);

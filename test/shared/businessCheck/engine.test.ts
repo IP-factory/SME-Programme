@@ -337,3 +337,16 @@ describe("result", () => {
     expect(evaluate(answers)).toEqual(evaluate(answers));
   });
 });
+
+describe("rules summary wording", () => {
+  it("uses 'an' before a style that starts with a vowel and 'a' before one that does not", () => {
+    const summaryFor = (instinct: string) => {
+      const { found, think, next } = evaluate(completeWith({ ...operating("2to5"), f_instinct: instinct })).summary;
+      return [found, think, next].join(" ");
+    };
+    expect(summaryFor("I")).toContain("you lead as an influencer");
+    expect(summaryFor("C")).toContain("you lead as an analyst");
+    expect(summaryFor("D")).toContain("you lead as a driver");
+    expect(summaryFor("S")).toContain("you lead as a steady hand");
+  });
+});
