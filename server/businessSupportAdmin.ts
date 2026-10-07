@@ -2,8 +2,11 @@ import { desc, eq, isNotNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { businessChecks, businessMemberships, businesses, users } from "../drizzle/schema";
 import { advancePipeline, type PipelineStage } from "../shared/businessCheck/pipeline";
+import type { CheckResult } from "../shared/businessCheck/engine";
 import type { Database } from "./accountAuth";
 import { recordAudit } from "./audit";
+import type { CheckSummary } from "./businessCheck";
+import { latestInvitationStatuses } from "./clientOnboarding";
 import { getDb } from "./db";
 
 async function requireDatabase() {
@@ -33,12 +36,54 @@ const CHECK_COLUMNS = {
 
 /** Every business check: leads who only left their details, and finished checks. These are prospects, not clients. */
 export async function listBusinessChecks(db: Pick<Database, "select">) {
-  return db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc(businessChecks.createdAt)).limit(500);
+  const [rows, invitations] = await Promise.all([
+    db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc(businessChecks.createdAt)).limit(500),
+    latestInvitationStatuses(db),
+  ]);
+  return rows.map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
 }
 
 /** Business checks whose owner asked for the free discovery call, newest request first. */
 export async function listDiscoveryCalls(db: Pick<Database, "select">) {
-  return db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull(businessChecks.callRequestedAt)).orderBy(desc(businessChecks.callRequestedAt)).limit(500);
+  const [rows, invitations] = await Promise.all([
+    db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull(businessChecks.callRequestedAt)).orderBy(desc(businessChecks.callRequestedAt)).limit(500),
+    latestInvitationStatuses(db),
+  ]);
+  return rows.map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+}
+
+const parseJson = <T>(text: string | null): T | null => {
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * One business check in full, for the record drawer: the saved result and summary exactly as they were stored when the
+ * owner finished the check. Nothing is recomputed and the owner's raw answers are not returned.
+ */
+export async function getBusinessCheckDetail(db: Pick<Database, "select">, businessCheckId: number) {
+  const row = (await db.select({
+    ...CHECK_COLUMNS,
+    heardFrom: businessChecks.heardFrom,
+    resultJson: businessChecks.resultJson,
+    summaryJson: businessChecks.summaryJson,
+  }).from(businessChecks).where(eq(businessChecks.id, businessCheckId)).limit(1))[0];
+  if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "That business check does not exist." });
+  const { resultJson, summaryJson, ...fields } = row;
+  const result = parseJson<Pick<CheckResult, "outline" | "primaryArea" | "founder">>(resultJson);
+  const summary = parseJson<CheckSummary>(summaryJson);
+  const invitations = await latestInvitationStatuses(db);
+  return {
+    ...fields,
+    invitationStatus: invitations.get(row.id) ?? null,
+    summary: summary ? { found: summary.found, think: summary.think, next: summary.next, offerings: summary.offerings ?? [] } : null,
+    outline: result?.outline ?? null,
+    primaryAreaNumber: result?.primaryArea?.area ?? row.primaryArea ?? null,
+  };
 }
 
 async function requestedCheck(db: Pick<Database, "select">, businessCheckId: number) {

@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { BUSINESS_ROLE_LABELS } from "@shared/businessCapabilities";
 import React from "react";
-import { formatDate } from "./BusinessChecksView";
+import { formatDate } from "./format";
 
 /** Onboarded clients only: businesses and the people who belong to them. A business check is never listed here. */
 export default function ClientsView() {

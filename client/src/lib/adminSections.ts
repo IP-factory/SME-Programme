@@ -24,7 +24,7 @@ export const ADMIN_SECTIONS = [
   { id: "onboarding", label: "Client Onboarding" },
   { id: "clients", label: "Clients" },
   { id: "team", label: "Admin Team" },
-  { id: "jump", label: "JUMP programme (legacy)" },
+  { id: "jump", label: "JUMP Programme (Legacy)" },
 ] as const;
 export type AdminSectionId = (typeof ADMIN_SECTIONS)[number]["id"];
 

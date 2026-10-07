@@ -39,7 +39,9 @@ import { ACCOUNT_SESSION_COOKIE, ONBOARDING_ERRORS, type PlatformRole } from "@s
 import { cleanAnswers } from "@shared/businessCheck/engine";
 import type { TrpcContext } from "@server/_core/context";
 
-const REMOTE_TEST_TIMEOUT_MS = 30_000;
+// Every test here runs the whole public flow (start, save, submit, request a call) before it asserts, which is dozens of
+// network round trips on a real database, so the ceiling there is generous. Local targets keep the default 5 s.
+const REMOTE_TEST_TIMEOUT_MS = 90_000;
 const targets = [
   { name: "PGlite", enabled: true, timeout: undefined, make: () => createPgliteHarness() },
   { name: "TEST_DATABASE_URL", enabled: Boolean(process.env.TEST_DATABASE_URL), timeout: REMOTE_TEST_TIMEOUT_MS, make: () => createRemoteHarness(process.env.TEST_DATABASE_URL!) },
@@ -108,7 +110,7 @@ for (const target of targets) {
       const owner = (await db.select().from(schema.users).where(sql`lower(${schema.users.email}) = ${OWNER_ADMIN_EMAIL.toLowerCase()}`))[0];
       await db.insert(schema.userCredentials).values({ userId: owner.id, passwordHash });
       superAdmin = await signInStaff(owner);
-    }, 60_000);
+    }, 120_000);
     afterAll(async () => {
       await harness?.close();
     });
@@ -161,13 +163,21 @@ for (const target of targets) {
         await expect(ensureOwnerSuperAdminRole(db, { email: uniqueEmail("not-owner") })).rejects.toThrow(/recognised owner/);
 
         await db.delete(schema.userPlatformRoles).where(eq(schema.userPlatformRoles.userId, owner.id));
-        await bootstrapOwnerCredential(db, { email: OWNER_ADMIN_EMAIL, password: "Owner-Pass-12345!", replaceExisting: true });
-        expect((await db.select().from(schema.userPlatformRoles).where(eq(schema.userPlatformRoles.userId, owner.id))).map((row: { role: string }) => row.role)).toEqual(["super_admin"]);
-        superAdmin = await signInStaff({ email: OWNER_ADMIN_EMAIL }).catch(async () => {
-          const b = browser();
-          await (await b.call()).account.signInInternal({ email: OWNER_ADMIN_EMAIL, password: "Owner-Pass-12345!" });
-          return b;
-        });
+        try {
+          await bootstrapOwnerCredential(db, { email: OWNER_ADMIN_EMAIL, password: "Owner-Pass-12345!", replaceExisting: true });
+          expect((await db.select().from(schema.userPlatformRoles).where(eq(schema.userPlatformRoles.userId, owner.id))).map((row: { role: string }) => row.role)).toEqual(["super_admin"]);
+        } finally {
+          // A reset signs the owner out everywhere. This session is shared by every test below, so restore it even if the
+          // steps above failed or ran out of time; otherwise one slow call would fail all of its neighbours.
+          for (const password of ["Owner-Pass-12345!", PASSWORD]) {
+            const restored = browser();
+            const ok = await (await restored.call()).account.signInInternal({ email: OWNER_ADMIN_EMAIL, password }).then(() => true, () => false);
+            if (ok) {
+              superAdmin = restored;
+              break;
+            }
+          }
+        }
       });
     });
 
@@ -294,6 +304,77 @@ for (const target of targets) {
         const { id } = await requested("invalid");
         await expect((await superAdmin.call()).businessSupport.recordOutcome({ businessCheckId: id, outcome: "won" as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
         await expect((await superAdmin.call()).businessSupport.scheduleCall({ businessCheckId: id, scheduledFor: "not a date" as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      });
+    });
+
+    describe("the record drawer's data (read-only)", () => {
+      it("returns the saved result for one check exactly as stored, without the answers or the public token", async () => {
+        const { token, email } = await finishedCheck("detail");
+        const id = (await rowFor(token)).id;
+        const detail = await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: id });
+        expect(detail).toMatchObject({ id, email, pipelineStage: "qualified_lead", invitationStatus: null, whatsapp: "+2348000000001" });
+        expect(detail.summary).toMatchObject({ found: expect.any(String), think: expect.any(String), offerings: expect.any(Array) });
+        expect(detail.outline!.length).toBeGreaterThan(0);
+        expect(detail.outline![0]).toMatchObject({ area: expect.any(Number), name: expect.any(String), health: expect.stringMatching(/clear|watch|stuck/) });
+        expect(detail.primaryAreaNumber).toEqual(expect.any(Number));
+        expect(JSON.stringify(detail)).not.toMatch(/answersJson|publicToken|resultJson|summaryJson/);
+        expect(detail).not.toHaveProperty("publicToken");
+      });
+
+      it("returns the stored summary, not a fresh calculation", async () => {
+        const { token } = await finishedCheck("stored");
+        const row = await rowFor(token);
+        const edited = { ...JSON.parse(row.summaryJson), found: "A sentence the rules would never write.", offerings: [{ id: "x", name: "Stored Offering", why: "Stored reason." }] };
+        await db.update(schema.businessChecks).set({ summaryJson: JSON.stringify(edited) }).where(eq(schema.businessChecks.id, row.id));
+        const detail = await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: row.id });
+        expect(detail.summary!.found).toBe("A sentence the rules would never write.");
+        expect(detail.summary!.offerings).toEqual([{ id: "x", name: "Stored Offering", why: "Stored reason." }]);
+      });
+
+      it("copes with a check that was never finished, and with damaged stored JSON", async () => {
+        const visitor = browser();
+        const email = uniqueEmail("unfinished-detail");
+        const { token } = await (await visitor.call()).businessCheck.start({ fullName: "Not Done", email });
+        const row = await rowFor(token);
+        const unfinished = await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: row.id });
+        expect(unfinished).toMatchObject({ completedAt: null, summary: null, outline: null, primaryAreaNumber: null, pipelineStage: "lead" });
+        await db.update(schema.businessChecks).set({ resultJson: "{not json", summaryJson: "also not json" }).where(eq(schema.businessChecks.id, row.id));
+        const damaged = await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: row.id });
+        expect(damaged).toMatchObject({ summary: null, outline: null });
+      });
+
+      it("rejects an unknown check and refuses everyone without the funnel permission", async () => {
+        await expect((await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: 2_000_000_000 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+        const client = await person();
+        const business = (await db.insert(schema.businesses).values({ name: "Client Co", slug: unique("slug"), createdByUserId: client.id }).returning())[0];
+        await db.insert(schema.businessMemberships).values({ businessId: business.id, userId: client.id, role: "owner" });
+        const clientSession = browser();
+        await (await clientSession.call()).account.signIn({ email: client.email, password: PASSWORD });
+        const bareAdmin = await signInStaff(await person({ role: "admin" }));
+        const deskLead = await signInStaff(await person({}, ["desk_lead"]));
+        for (const b of [clientSession, browser(), bareAdmin, deskLead]) {
+          await expect((await b.call()).businessSupport.checkDetail({ businessCheckId: 1 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+        }
+      });
+
+      it("tells both lists where each prospect's onboarding link stands", async () => {
+        const { token, email, visitor } = await finishedCheck("link-state");
+        await requestCall(visitor, token);
+        const id = (await rowFor(token)).id;
+        await (await superAdmin.call()).businessSupport.recordOutcome({ businessCheckId: id, outcome: "fit" });
+        const stateIn = async () => ({
+          checks: (await (await superAdmin.call()).businessSupport.checks()).find((row: { email: string }) => row.email === email)!.invitationStatus,
+          calls: (await (await superAdmin.call()).businessSupport.discoveryCalls()).find((row: { email: string }) => row.email === email)!.invitationStatus,
+        });
+        expect(await stateIn()).toEqual({ checks: null, calls: null });
+        await (await superAdmin.call()).onboarding.invite({ businessCheckId: id });
+        expect(await stateIn()).toEqual({ checks: "pending", calls: "pending" });
+      });
+
+      it("tells the admin header who is signed in, by name", async () => {
+        const status = await (await superAdmin.call()).adminAccess.status();
+        expect(status.name).toEqual(expect.any(String));
+        expect(status.email).toBe(OWNER_ADMIN_EMAIL);
       });
     });
 

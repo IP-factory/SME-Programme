@@ -4,19 +4,21 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { adminCan, visibleAdminSections } from "@/lib/adminSections";
+import { READINESS_LABELS } from "@shared/businessCheck/engine";
 
 const hoisted = vi.hoisted(() => {
   const api = {
-  checks: [] as unknown[],
-  calls: [] as unknown[],
-  clients: [] as unknown[],
-  candidates: [] as unknown[],
-  invitations: [] as unknown[],
-  metrics: { businessChecks: 3, users: 2, portalUsers: 1, businesses: 1, memberships: 1, pendingInvitations: 0, platformRoleAssignments: 0 },
-  error: undefined as { message: string } | undefined,
-  mutations: { schedule: [] as unknown[], outcome: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[] },
-  inviteResult: { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 } as Record<string, unknown>,
-};
+    checks: [] as unknown[],
+    calls: [] as unknown[],
+    clients: [] as unknown[],
+    candidates: [] as unknown[],
+    invitations: [] as unknown[],
+    details: {} as Record<number, unknown>,
+    metrics: { businessChecks: 3, users: 2, portalUsers: 1, businesses: 1, memberships: 1, pendingInvitations: 0, platformRoleAssignments: 0 },
+    error: undefined as { message: string } | undefined,
+    mutations: { schedule: [] as unknown[], outcome: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[] },
+    inviteResult: { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 } as Record<string, unknown>,
+  };
   const query = (key: "checks" | "calls" | "clients" | "candidates" | "invitations" | "metrics") => () => ({ data: api[key], isLoading: false, error: api.error });
   const mutation = (bucket: keyof typeof api.mutations, result?: () => unknown) => (options?: { onSuccess?: (data: unknown, variables: unknown) => void }) => ({
     isPending: false,
@@ -32,9 +34,13 @@ const { api } = hoisted;
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
-    useUtils: () => ({ businessSupport: { discoveryCalls: hoisted.invalidate, checks: hoisted.invalidate }, onboarding: { candidates: hoisted.invalidate, invitations: hoisted.invalidate, metrics: hoisted.invalidate } }),
+    useUtils: () => ({
+      businessSupport: { discoveryCalls: hoisted.invalidate, checks: hoisted.invalidate, checkDetail: hoisted.invalidate },
+      onboarding: { candidates: hoisted.invalidate, invitations: hoisted.invalidate, metrics: hoisted.invalidate },
+    }),
     businessSupport: {
       checks: { useQuery: hoisted.query("checks") },
+      checkDetail: { useQuery: (input: { businessCheckId: number }) => ({ data: hoisted.api.details[input.businessCheckId], isLoading: false, error: hoisted.api.error }) },
       discoveryCalls: { useQuery: hoisted.query("calls") },
       clients: { useQuery: hoisted.query("clients") },
       scheduleCall: { useMutation: hoisted.mutation("schedule") },
@@ -52,14 +58,43 @@ vi.mock("@/lib/trpc", () => ({
 
 import BusinessSupportConsole from "@/components/admin/BusinessSupportConsole";
 
-const SUPER = { isSuperAdmin: true, isOwner: true, permissions: ["manage_client_onboarding", "view_participants"], platformPermissions: ["manage_client_onboarding", "view_all_businesses"], email: "owner@example.test", platformRoles: ["super_admin", "admin"] };
+const SUPER = {
+  isSuperAdmin: true, isOwner: true, permissions: ["manage_client_onboarding", "view_participants"], platformPermissions: ["manage_client_onboarding", "view_all_businesses"],
+  email: "owner@example.test", name: "Emmanuel Tarfa", platformRoles: ["super_admin", "admin"],
+};
 const check = (over: Record<string, unknown> = {}) => ({
-  id: 1, fullName: "Ada Okafor", businessName: "Ada Foods", email: "ada@example.test", whatsapp: "+2348000000001", stage: "operating", route: "programme", readiness: "intermediate", primaryArea: 7,
+  id: 1, fullName: "Ada Okafor", businessName: "Ada Foods", email: "ada@example.test", whatsapp: "+234 800 000 0001", stage: "operating", route: "programme", readiness: "intermediate", primaryArea: 7,
   pipelineStage: "call_booked", callRequestedAt: new Date("2026-10-05T10:00:00Z"), callScheduledFor: null, reportRequestedAt: null, completedAt: new Date("2026-10-05T09:00:00Z"), createdAt: new Date("2026-10-05T08:00:00Z"), invitationStatus: null, ...over,
 });
-const renderConsole = (access: Record<string, unknown> = SUPER) =>
-  render(<BusinessSupportConsole access={access as never} team={<div>TEAM PANEL</div>} jump={<div>JUMP REGISTRATION DESK</div>} />);
+const detailFor = (over: Record<string, unknown> = {}) => ({
+  ...check(), heardFrom: null,
+  summary: {
+    found: "Your prices are guesses and cash is tight.",
+    think: "The main problem is financial visibility.",
+    next: "Book the free call.",
+    offerings: [
+      { id: "financial-performance", name: "Financial Performance & Decision Support", why: "Your prices are guesses." },
+      { id: "business-model", name: "Business Model & Commercial Strategy", why: "Margins are unclear." },
+    ],
+  },
+  outline: [
+    { area: 0, name: "Founder readiness", health: "watch" },
+    { area: 1, name: "Strategic intent", health: "clear" },
+    { area: 7, name: "Financials", health: "stuck" },
+  ],
+  primaryAreaNumber: 7,
+  ...over,
+});
+const renderConsole = (access: Record<string, unknown> = SUPER, onSection?: (id: string) => void) => {
+  void onSection;
+  return render(<BusinessSupportConsole access={access as never} team={<div>TEAM PANEL</div>} jump={<div>JUMP REGISTRATION DESK</div>} />);
+};
 const tabs = () => within(screen.getByRole("navigation", { name: "Admin sections" })).getAllByRole("button").map(button => button.textContent);
+const headers = () => screen.getAllByRole("columnheader").map(header => header.textContent);
+const rowOf = (name: string) => screen.getByText(name).closest("tr")!;
+const openRow = (name: string) => fireEvent.click(rowOf(name));
+const drawer = () => within(screen.getByRole("dialog"));
+const openSection = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
 beforeEach(() => {
   api.checks = [check(), check({ id: 2, fullName: "Bola Quiet", businessName: "Bola Bakes", email: "bola@example.test", whatsapp: null, pipelineStage: "qualified_lead", callRequestedAt: null })];
@@ -67,6 +102,7 @@ beforeEach(() => {
   api.clients = [];
   api.candidates = [check()];
   api.invitations = [];
+  api.details = { 1: detailFor(), 2: detailFor({ id: 2, fullName: "Bola Quiet", businessName: "Bola Bakes", email: "bola@example.test", whatsapp: null, pipelineStage: "qualified_lead", callRequestedAt: null }) };
   api.error = undefined;
   api.mutations = { schedule: [], outcome: [], invite: [], revoke: [] };
   api.inviteResult = { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 };
@@ -77,7 +113,7 @@ describe("which sections each person sees (decided from what the server resolved
   it("shows the Super Admin every section, in funnel order, opening on Business Checks", () => {
     expect(visibleAdminSections(SUPER).map(section => section.id)).toEqual(["checks", "calls", "onboarding", "clients", "team", "jump"]);
     renderConsole();
-    expect(tabs()).toEqual(["Business Checks", "Discovery Calls", "Client Onboarding", "Clients", "Admin Team", "JUMP programme (legacy)"]);
+    expect(tabs()).toEqual(["Business Checks", "Discovery Calls", "Client Onboarding", "Clients", "Admin Team", "JUMP Programme (Legacy)"]);
     expect(screen.getByRole("button", { name: "Business Checks" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("heading", { name: "Business Checks" })).toBeTruthy();
     expect(screen.queryByText("JUMP REGISTRATION DESK")).toBeNull();
@@ -86,16 +122,15 @@ describe("which sections each person sees (decided from what the server resolved
   it("keeps the JUMP desk, unmixed, in its own legacy section", () => {
     renderConsole();
     expect(screen.queryByText("JUMP REGISTRATION DESK")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "JUMP programme (legacy)" }));
+    openSection("JUMP Programme (Legacy)");
     expect(screen.getByText("JUMP REGISTRATION DESK")).toBeTruthy();
     expect(screen.queryByText("Ada Okafor")).toBeNull();
   });
 
-  it("shows the Client Onboarding section to the Super Admin without any hardcoded identity", () => {
+  it("keeps Client Onboarding reachable for the Super Admin, from the server's answer alone", () => {
     renderConsole();
-    fireEvent.click(screen.getByRole("button", { name: "Client Onboarding" }));
+    openSection("Client Onboarding");
     expect(screen.getByRole("heading", { name: "Client Onboarding" })).toBeTruthy();
-    // Even a Super Admin reported only by the flag (no listed permissions) sees it: the server's answer decides.
     expect(adminCan({ isSuperAdmin: true, permissions: [] }, "manage_client_onboarding")).toBe(true);
     expect(visibleAdminSections({ isSuperAdmin: true, permissions: [] }).map(section => section.id)).toContain("onboarding");
   });
@@ -111,28 +146,93 @@ describe("which sections each person sees (decided from what the server resolved
   });
 
   it("says plainly when an account has no responsibilities yet, instead of showing an empty console", () => {
-    renderConsole({ permissions: [], platformPermissions: [], email: "analyst@example.test", platformRoles: ["analyst"] });
+    renderConsole({ permissions: [], platformPermissions: [], email: "analyst@example.test", name: "Ayo Analyst", platformRoles: ["analyst"] });
     expect(screen.getByRole("note").textContent).toMatch(/no admin responsibilities/);
     expect(screen.queryByRole("navigation", { name: "Admin sections" })).toBeNull();
-    expect(screen.getByText(/analyst@example\.test · analyst/)).toBeTruthy();
+    expect(screen.getByText("Ayo Analyst")).toBeTruthy();
+    expect(screen.getByText("Analyst")).toBeTruthy();
   });
 
-  it("tells the person who is signed in and with which roles", () => {
+  it("shows who is signed in as a name and a role, with the address underneath, not one noisy line", () => {
     renderConsole();
-    expect(screen.getByText("Signed in as owner@example.test · super admin, admin")).toBeTruthy();
+    const who = screen.getByLabelText("Signed in");
+    expect(within(who).getByText("Emmanuel Tarfa")).toBeTruthy();
+    expect(within(who).getByText("Super Admin")).toBeTruthy();
+    expect(within(who).getByText("owner@example.test")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Signed in as|super admin, admin/);
+  });
+
+  it("falls back to the email when no name is known, and lists several roles without repeating Admin", () => {
+    renderConsole({ ...SUPER, name: null, platformRoles: ["super_admin", "admin", "desk_lead"] });
+    const who = screen.getByLabelText("Signed in");
+    expect(within(who).getByText("owner@example.test")).toBeTruthy();
+    expect(within(who).getByText("Super Admin · Desk Lead")).toBeTruthy();
   });
 });
 
-describe("Business Checks view", () => {
-  it("lists prospects with the details the team needs", () => {
+describe("Business Checks table", () => {
+  it("shows five compact columns and nothing else", () => {
     renderConsole();
-    const row = screen.getByText("Ada Okafor").closest("tr")!;
-    for (const text of ["Ada Foods", "ada@example.test", "+2348000000001", "5 Oct 2026", "Financials", "Yes, 5 Oct 2026", "Call booked"]) expect(row.textContent).toContain(text);
-    expect(row.textContent).toMatch(/Intermediate|intermediate/);
-    expect(within(screen.getByText("Bola Quiet").closest("tr")!).getByText("No")).toBeTruthy();
+    expect(headers()).toEqual(["Prospect", "Business", "Business Check", "Main Finding", "Status"]);
   });
 
-  it("searches and filters without any new data", () => {
+  it("does not spread database fields across the table", () => {
+    renderConsole();
+    for (const raw of ["Email", "WhatsApp", "Route", "Readiness", "Completed", "Call requested", "Call requested date", "Stage", "Main area"]) expect(headers()).not.toContain(raw);
+    const text = rowOf("Ada Okafor").textContent!;
+    expect(text).not.toContain("Programme");
+    expect(text).not.toContain(READINESS_LABELS.intermediate);
+    expect(within(rowOf("Ada Okafor")).queryByRole("button", { name: /^View$/ })).toBeNull();
+  });
+
+  it("identifies the prospect on three lines and shows the finding and check state compactly", () => {
+    renderConsole();
+    const row = rowOf("Ada Okafor");
+    for (const text of ["Ada Okafor", "ada@example.test", "+234 800 000 0001", "Ada Foods", "Completed", "5 Oct 2026", "Financials", "Intermediate readiness"]) expect(row.textContent).toContain(text);
+  });
+
+  it("shows an unfinished check as not finished, with when it started", () => {
+    api.checks = [check({ completedAt: null, readiness: null, route: null, primaryArea: null, pipelineStage: "lead", callRequestedAt: null })];
+    renderConsole();
+    const row = rowOf("Ada Okafor");
+    expect(row.textContent).toContain("Not finished");
+    expect(row.textContent).toContain("Started 5 Oct 2026");
+    expect(row.textContent).toContain("Check in progress");
+  });
+
+  it("shows a call request as 'Call requested', never 'Call booked'", () => {
+    renderConsole();
+    expect(within(rowOf("Ada Okafor")).getByText("Call requested")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Call booked/i);
+    cleanup();
+    api.checks = [check({ callScheduledFor: new Date("2026-10-08T13:00:00Z") })];
+    renderConsole();
+    expect(within(rowOf("Ada Okafor")).getByText("Call scheduled")).toBeTruthy();
+  });
+
+  it("labels each stage in plain words", () => {
+    api.checks = [
+      check({ id: 1, fullName: "P One", pipelineStage: "opportunity" }),
+      check({ id: 2, fullName: "P Two", pipelineStage: "referred" }),
+      check({ id: 3, fullName: "P Three", pipelineStage: "lost" }),
+      check({ id: 4, fullName: "P Four", pipelineStage: "opportunity", invitationStatus: "pending" }),
+      check({ id: 5, fullName: "P Five", pipelineStage: "opportunity", invitationStatus: "accepted" }),
+      check({ id: 6, fullName: "P Six", pipelineStage: "qualified_lead", callRequestedAt: null }),
+    ];
+    renderConsole();
+    for (const [name, label] of [["P One", "Fit"], ["P Two", "Referred"], ["P Three", "Declined"], ["P Four", "Onboarding"], ["P Five", "Onboarded"], ["P Six", "Check completed"]]) {
+      expect(within(rowOf(name)).getByText(label)).toBeTruthy();
+    }
+  });
+
+  it("shows restrained summary counts from the data already loaded", () => {
+    api.checks = [check(), check({ id: 2, fullName: "B", callRequestedAt: null, pipelineStage: "qualified_lead" }), check({ id: 3, fullName: "C", pipelineStage: "opportunity" }), check({ id: 4, fullName: "D", completedAt: null, callRequestedAt: null, pipelineStage: "lead" })];
+    renderConsole();
+    const counts = Object.fromEntries(Array.from(screen.getByLabelText("Summary").children).map(item => [item.querySelector("dt")!.textContent, item.querySelector("dd")!.textContent]));
+    expect(counts).toEqual({ "Total checks": "4", Completed: "3", "Call requested": "2", "Ready to onboard": "1" });
+  });
+
+  it("searches and filters, and keeps them when a record is opened and closed", () => {
     renderConsole();
     fireEvent.change(screen.getByLabelText("Search business checks"), { target: { value: "bola" } });
     expect(screen.queryByText("Ada Okafor")).toBeNull();
@@ -140,17 +240,18 @@ describe("Business Checks view", () => {
     fireEvent.change(screen.getByLabelText("Search business checks"), { target: { value: "" } });
     fireEvent.click(screen.getByLabelText("Call requested only"));
     expect(screen.queryByText("Bola Quiet")).toBeNull();
-    expect(screen.getByText("Ada Okafor")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Call requested only"));
-    fireEvent.change(screen.getByLabelText("Filter by stage"), { target: { value: "qualified_lead" } });
+    fireEvent.change(screen.getByLabelText("Filter by stage"), { target: { value: "completed" } });
     expect(screen.queryByText("Ada Okafor")).toBeNull();
     expect(screen.getByText("Bola Quiet")).toBeTruthy();
-  });
-
-  it("shows an unfinished check as not finished", () => {
-    api.checks = [check({ completedAt: null, readiness: null, route: null, primaryArea: null, pipelineStage: "lead", callRequestedAt: null })];
-    renderConsole();
-    expect(screen.getByText("Not finished")).toBeTruthy();
+    // Open and close a record: the table is exactly as it was.
+    openRow("Bola Quiet");
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect((screen.getByLabelText("Filter by stage") as HTMLSelectElement).value).toBe("completed");
+    expect(screen.queryByText("Ada Okafor")).toBeNull();
+    expect(screen.getByText("Bola Quiet")).toBeTruthy();
   });
 
   it("shows the server's refusal", () => {
@@ -160,31 +261,156 @@ describe("Business Checks view", () => {
   });
 });
 
-describe("Discovery Calls view", () => {
-  const open = () => { renderConsole(); fireEvent.click(screen.getByRole("button", { name: "Discovery Calls" })); };
+describe("Business Check record drawer", () => {
+  it("opens from anywhere on the row, with the right prospect", () => {
+    renderConsole();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    openRow("Bola Quiet");
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Bola Quiet")).toBeTruthy();
+    expect(within(dialog).getByText("Bola Bakes")).toBeTruthy();
+    expect(within(dialog).queryByText("Ada Okafor")).toBeNull();
+    expect(within(dialog).getByText("bola@example.test")).toBeTruthy();
+    expect(within(dialog).getByText("Not given")).toBeTruthy();
+  });
 
-  it("lists people who asked for a call, with the actions to run it", () => {
+  it("is reachable by keyboard: each row has a real focusable button that opens the record", () => {
+    renderConsole();
+    const button = within(rowOf("Ada Okafor")).getByRole("button", { name: "Open record for Ada Okafor" }) as HTMLButtonElement;
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(rowOf("Ada Okafor").className).toMatch(/cursor-pointer/);
+    expect(rowOf("Ada Okafor").className).toMatch(/hover:/);
+    expect(rowOf("Ada Okafor").className).toMatch(/focus-within:/);
+    fireEvent.click(button); // what Enter and Space do on a button
+    expect(drawer().getByText("Ada Foods")).toBeTruthy();
+  });
+
+  it("shows the saved findings, outline and recommendations without recalculating anything", () => {
+    renderConsole();
+    openRow("Ada Okafor");
+    const detail = drawer();
+    expect(detail.getByText("Your prices are guesses and cash is tight.")).toBeTruthy();
+    expect(detail.getByText(/The main problem is financial visibility\./)).toBeTruthy();
+    expect(detail.getByText(READINESS_LABELS.intermediate)).toBeTruthy();
+    expect(detail.getByText("Programme")).toBeTruthy();
+    // Outline: every area with its health, and the starting point flagged.
+    const outline = detail.getByRole("heading", { name: "Business outline" }).closest("section")!;
+    expect(within(outline).getByText("Founder readiness").closest("li")!.textContent).toContain("Watch");
+    expect(within(outline).getByText("Strategic intent").closest("li")!.textContent).toContain("Clear");
+    const start = within(outline).getByText("Financials").closest("li")!;
+    expect(start.textContent).toContain("Stuck");
+    expect(start.textContent).toContain("Start here");
+    expect(within(outline).getAllByText("Start here")).toHaveLength(1);
+    // Recommended support: exactly what the check produced.
+    const support = detail.getByRole("heading", { name: "Recommended support" }).closest("section")!;
+    expect(within(support).getByText("Financial Performance & Decision Support")).toBeTruthy();
+    expect(within(support).getByText("Business Model & Commercial Strategy")).toBeTruthy();
+    expect(within(support).getByText("Margins are unclear.")).toBeTruthy();
+  });
+
+  it("shows the funnel with dates and the current stage in plain words", () => {
+    api.details[1] = detailFor({ callScheduledFor: new Date("2026-10-08T13:00:00Z") });
+    renderConsole();
+    openRow("Ada Okafor");
+    const funnel = drawer().getByRole("heading", { name: "Funnel" }).closest("section")!;
+    for (const text of ["Check completed", "Call requested", "Call scheduled for", "5 Oct 2026", "Current stage", "Call scheduled"]) expect(funnel.textContent).toContain(text);
+    expect(drawer().queryByText(/Call booked/)).toBeNull();
+  });
+
+  it("offers only the action that fits: a requested call leads to Discovery Calls", () => {
+    renderConsole();
+    openRow("Ada Okafor");
+    expect(drawer().queryByRole("button", { name: "Continue to Client Onboarding" })).toBeNull();
+    fireEvent.click(drawer().getByRole("button", { name: "Go to Discovery Call" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Discovery Calls" })).toBeTruthy();
+  });
+
+  it("offers Client Onboarding for a fit, and nothing for a check with no next step", () => {
+    api.checks = [check({ pipelineStage: "opportunity" }), check({ id: 2, fullName: "Bola Quiet", callRequestedAt: null, pipelineStage: "qualified_lead" })];
+    api.details = { 1: detailFor({ pipelineStage: "opportunity" }), 2: detailFor({ id: 2, fullName: "Bola Quiet", callRequestedAt: null, pipelineStage: "qualified_lead" }) };
+    renderConsole();
+    openRow("Bola Quiet");
+    expect(drawer().queryByText("Next step")).toBeNull();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    openRow("Ada Okafor");
+    fireEvent.click(drawer().getByRole("button", { name: "Continue to Client Onboarding" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Client Onboarding" })).toBeTruthy();
+  });
+
+  it("copes with a check that was never finished", () => {
+    api.checks = [check({ completedAt: null, readiness: null, route: null, primaryArea: null, pipelineStage: "lead", callRequestedAt: null })];
+    api.details[1] = detailFor({ completedAt: null, readiness: null, route: null, primaryArea: null, pipelineStage: "lead", callRequestedAt: null, summary: null, outline: null, primaryAreaNumber: null });
+    renderConsole();
+    openRow("Ada Okafor");
+    expect(drawer().getByText("The owner has not finished the check.")).toBeTruthy();
+    expect(drawer().getByText("No result yet.")).toBeTruthy();
+    expect(drawer().queryByRole("heading", { name: "Business outline" })).toBeNull();
+    expect(drawer().queryByRole("heading", { name: "Recommended support" })).toBeNull();
+  });
+
+  it("lets the admin copy the email and open WhatsApp, and uses only digits in the link", () => {
+    renderConsole();
+    openRow("Ada Okafor");
+    expect(drawer().getByRole("link", { name: "ada@example.test" }).getAttribute("href")).toBe("mailto:ada@example.test");
+    expect(drawer().getByRole("link", { name: "+234 800 000 0001" }).getAttribute("href")).toBe("https://wa.me/2348000000001");
+    expect(drawer().getByRole("button", { name: "Copy email" })).toBeTruthy();
+    expect(drawer().getByRole("button", { name: "Copy WhatsApp number" })).toBeTruthy();
+  });
+});
+
+describe("Discovery Calls table", () => {
+  const open = () => { renderConsole(); openSection("Discovery Calls"); };
+
+  it("shows five compact columns and nothing else", () => {
     open();
-    const row = screen.getByText("Ada Okafor").closest("tr")!;
-    expect(row.textContent).toContain("Not scheduled");
-    for (const name of ["Mark call scheduled", "Mark fit", "Refer", "Decline"]) expect(within(row).getByRole("button", { name })).toBeTruthy();
+    expect(headers()).toEqual(["Prospect", "Business", "Requested", "Scheduled For", "Status"]);
+    const row = rowOf("Ada Okafor");
+    for (const text of ["ada@example.test", "Ada Foods", "5 Oct 2026", "Not scheduled", "Call requested"]) expect(row.textContent).toContain(text);
+  });
+
+  it("keeps scheduling and outcome controls out of the table", () => {
+    open();
+    const table = screen.getByRole("table");
+    expect(table.querySelector("input")).toBeNull();
+    expect(table.querySelector("select")).toBeNull();
+    for (const name of ["Mark call scheduled", "Mark fit", "Refer", "Decline", "Fit", "Save call schedule"]) expect(within(table).queryByRole("button", { name })).toBeNull();
+    expect(within(table).getAllByRole("button")).toHaveLength(1); // only the row's own open button
+  });
+
+  it("shows when a call is scheduled", () => {
+    api.calls = [check({ callScheduledFor: new Date("2026-10-08T13:00:00Z") })];
+    open();
+    const row = rowOf("Ada Okafor");
+    expect(row.textContent).toContain("8 Oct 2026");
+    expect(row.textContent).toMatch(/\d{1,2}:\d{2} [AP]M/);
+    expect(row.textContent).toContain("Call scheduled");
+  });
+
+  it("shows restrained summary counts", () => {
+    api.calls = [check(), check({ id: 2, fullName: "Two", callScheduledFor: new Date("2026-10-08T13:00:00Z") }), check({ id: 3, fullName: "Three", pipelineStage: "opportunity" }), check({ id: 4, fullName: "Four", pipelineStage: "lost" })];
+    open();
+    const counts = Object.fromEntries(Array.from(screen.getByLabelText("Summary").children).map(item => [item.querySelector("dt")!.textContent, item.querySelector("dd")!.textContent]));
+    expect(counts).toEqual({ "Call requests": "4", "Not scheduled": "1", Scheduled: "1", Fit: "1" });
+  });
+
+  it("searches and filters by status", () => {
+    api.calls = [check(), check({ id: 2, fullName: "Bola Quiet", email: "bola@example.test", pipelineStage: "opportunity" }), check({ id: 3, fullName: "Cee Decline", email: "cee@example.test", pipelineStage: "lost" })];
+    open();
+    expect(Array.from((screen.getByLabelText("Filter by status") as HTMLSelectElement).options).map(option => option.textContent)).toEqual(["All", "Call requested", "Call scheduled", "Fit", "Referred", "Declined"]);
+    fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "fit" } });
+    expect(screen.queryByText("Ada Okafor")).toBeNull();
+    expect(screen.getByText("Bola Quiet")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "declined" } });
+    expect(screen.getByText("Cee Decline")).toBeTruthy();
     expect(screen.queryByText("Bola Quiet")).toBeNull();
-  });
-
-  it("records the agreed time only once a time is chosen", () => {
-    open();
-    const schedule = screen.getByRole("button", { name: "Mark call scheduled" }) as HTMLButtonElement;
-    expect(schedule.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("Call time for Ada Okafor"), { target: { value: "2026-10-12T14:30" } });
-    expect(schedule.disabled).toBe(false);
-    fireEvent.click(schedule);
-    expect(api.mutations.schedule).toEqual([{ businessCheckId: 1, scheduledFor: new Date("2026-10-12T14:30") }]);
-  });
-
-  it.each([["Mark fit", "fit"], ["Refer", "refer"], ["Decline", "decline"]])("%s records the outcome", (label, outcome) => {
-    open();
-    fireEvent.click(screen.getByRole("button", { name: label }));
-    expect(api.mutations.outcome).toEqual([{ businessCheckId: 1, outcome }]);
+    fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "all" } });
+    fireEvent.change(screen.getByLabelText("Search discovery calls"), { target: { value: "cee@" } });
+    expect(screen.queryByText("Ada Okafor")).toBeNull();
+    expect(screen.getByText("Cee Decline")).toBeTruthy();
   });
 
   it("says so when no one has asked yet", () => {
@@ -194,8 +420,96 @@ describe("Discovery Calls view", () => {
   });
 });
 
+describe("Discovery Call record drawer", () => {
+  const open = (name = "Ada Okafor") => { renderConsole(); openSection("Discovery Calls"); openRow(name); };
+
+  it("opens from the row with the prospect, contact and request details", () => {
+    open();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Ada Okafor")).toBeTruthy();
+    expect(within(dialog).getByText("Ada Foods")).toBeTruthy();
+    expect(within(dialog).getAllByText("Call requested").length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole("link", { name: "ada@example.test" }).getAttribute("href")).toBe("mailto:ada@example.test");
+    expect(within(dialog).getByRole("link", { name: "+234 800 000 0001" }).getAttribute("href")).toBe("https://wa.me/2348000000001");
+    const request = within(dialog).getByRole("heading", { name: "Request" }).closest("section")!;
+    for (const text of ["5 Oct 2026", "Financials", "Intermediate readiness"]) expect(request.textContent).toContain(text);
+  });
+
+  it("saves the call time with the existing action, only once a date and time are chosen", () => {
+    open();
+    const save = drawer().getByRole("button", { name: "Save call schedule" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(drawer().getByLabelText("Date"), { target: { value: "2026-10-12" } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(drawer().getByLabelText("Time"), { target: { value: "14:30" } });
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    expect(api.mutations.schedule).toEqual([{ businessCheckId: 1, scheduledFor: new Date("2026-10-12T14:30") }]);
+  });
+
+  it("shows the scheduled time and allows rescheduling", () => {
+    api.calls = [check({ callScheduledFor: new Date("2026-10-08T13:00:00Z") })];
+    open();
+    const schedule = drawer().getByRole("heading", { name: "Schedule discovery call" }).closest("section")!;
+    expect(schedule.textContent).toContain("Scheduled for");
+    expect(schedule.textContent).toContain("8 Oct 2026");
+    expect(drawer().queryByRole("button", { name: "Save call schedule" })).toBeNull();
+    fireEvent.click(drawer().getByRole("button", { name: "Reschedule call" }));
+    expect(api.mutations.schedule).toHaveLength(1);
+  });
+
+  it("offers Fit, Refer and Decline with different weight, and records them with the existing actions", () => {
+    open();
+    expect(drawer().getByRole("heading", { name: "Record call outcome" })).toBeTruthy();
+    const fit = drawer().getByRole("button", { name: "Fit" });
+    const refer = drawer().getByRole("button", { name: "Refer" });
+    const decline = drawer().getByRole("button", { name: "Decline" });
+    expect(fit.className).toMatch(/bg-brand/);
+    expect(refer.className).not.toMatch(/bg-brand/);
+    expect(decline.className).toMatch(/rose/);
+    fireEvent.click(fit);
+    fireEvent.click(refer);
+    fireEvent.click(decline);
+    expect(api.mutations.outcome).toEqual([
+      { businessCheckId: 1, outcome: "fit" },
+      { businessCheckId: 1, outcome: "refer" },
+      { businessCheckId: 1, outcome: "decline" },
+    ]);
+  });
+
+  it("after a fit, says it is suitable to proceed and leads to Client Onboarding without creating a link", () => {
+    api.calls = [check({ pipelineStage: "opportunity" })];
+    open();
+    const card = screen.getByRole("region", { name: "Suitable to proceed" });
+    expect(within(card).getByText("Confirm commercial approval/payment before sending the onboarding invitation.")).toBeTruthy();
+    expect(drawer().getByText(/Recorded:/).textContent).toContain("Fit");
+    fireEvent.click(within(card).getByRole("button", { name: "Continue to Client Onboarding" }));
+    expect(api.mutations.invite).toEqual([]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Client Onboarding" })).toBeTruthy();
+  });
+
+  it("does not offer the suitable-to-proceed card, or the outcome buttons, at the wrong time", () => {
+    open();
+    expect(screen.queryByRole("region", { name: "Suitable to proceed" })).toBeNull();
+    cleanup();
+    api.calls = [check({ pipelineStage: "opportunity", invitationStatus: "pending" })];
+    open();
+    expect(screen.queryByRole("heading", { name: "Record call outcome" })).toBeNull();
+    expect(drawer().getByText("An onboarding link has been generated for this prospect.")).toBeTruthy();
+  });
+
+  it("closes and leaves the table as it was", () => {
+    open();
+    fireEvent.click(drawer().getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Discovery Calls" })).toBeTruthy();
+    expect(screen.getByText("Ada Okafor")).toBeTruthy();
+  });
+});
+
 describe("Client Onboarding view", () => {
-  const open = () => { renderConsole(); fireEvent.click(screen.getByRole("button", { name: "Client Onboarding" })); };
+  const open = () => { renderConsole(); openSection("Client Onboarding"); };
 
   it("warns that payment is not automated before any link is generated", () => {
     open();
@@ -205,9 +519,9 @@ describe("Client Onboarding view", () => {
   it("shows the call, the stage, the email and the link state for each business check", () => {
     api.candidates = [check({ invitationStatus: "pending" }), check({ id: 2, fullName: "Bola Quiet", email: "bola@example.test", callRequestedAt: null, pipelineStage: "qualified_lead", invitationStatus: null })];
     open();
-    const ada = screen.getByText("Ada Okafor").closest("tr")!;
+    const ada = rowOf("Ada Okafor");
     for (const text of ["Ada Foods", "ada@example.test", "Requested 5 Oct 2026", "Call requested", "Link sent, waiting"]) expect(ada.textContent).toContain(text);
-    const bola = screen.getByText("Bola Quiet").closest("tr")!;
+    const bola = rowOf("Bola Quiet");
     for (const text of ["Not requested", "Qualified lead", "None"]) expect(bola.textContent).toContain(text);
   });
 
@@ -243,7 +557,7 @@ describe("Clients view", () => {
   it("lists onboarded businesses and their people, never prospects", () => {
     api.clients = [{ membershipId: 1, businessId: 7, businessName: "Richie Tech", businessStatus: "active", userId: 3, userName: "Richie Okafor", email: "richie@example.test", role: "owner", membershipStatus: "active", joinedAt: new Date("2026-10-06T10:00:00Z"), businessCreatedAt: new Date("2026-10-06T10:00:00Z") }];
     renderConsole();
-    fireEvent.click(screen.getByRole("button", { name: "Clients" }));
+    openSection("Clients");
     const row = screen.getByText("Richie Tech").closest("tr")!;
     for (const text of ["Richie Okafor", "richie@example.test", "Owner", "6 Oct 2026"]) expect(row.textContent).toContain(text);
     expect(screen.getByText(/1 business, 1 membership\./)).toBeTruthy();
@@ -252,7 +566,7 @@ describe("Clients view", () => {
 
   it("says so when there are no clients yet", () => {
     renderConsole();
-    fireEvent.click(screen.getByRole("button", { name: "Clients" }));
+    openSection("Clients");
     expect(screen.getByText("No clients have been onboarded yet.")).toBeTruthy();
   });
 });

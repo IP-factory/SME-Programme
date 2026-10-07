@@ -1,12 +1,12 @@
-import { Button } from "@/components/ui/button";
 import ClientOnboardingPanel from "@/components/ClientOnboardingPanel";
 import { ADMIN_SECTIONS, visibleAdminSections, type AdminAccessView, type AdminSectionId } from "@/lib/adminSections";
 import React, { useState } from "react";
 import BusinessChecksView from "./BusinessChecksView";
 import ClientsView from "./ClientsView";
 import DiscoveryCallsView from "./DiscoveryCallsView";
+import { roleDisplay } from "./format";
 
-type Access = AdminAccessView & { email?: string | null; platformRoles?: readonly string[] };
+type Access = AdminAccessView & { email?: string | null; name?: string | null; platformRoles?: readonly string[] };
 
 const TITLES: Record<AdminSectionId, string> = {
   checks: "Business Checks",
@@ -14,7 +14,7 @@ const TITLES: Record<AdminSectionId, string> = {
   onboarding: "Client Onboarding",
   clients: "Clients",
   team: "Administration Team",
-  jump: "JUMP programme (legacy)",
+  jump: "JUMP Programme (Legacy)",
 };
 
 /**
@@ -26,14 +26,23 @@ export default function BusinessSupportConsole({ access, team, jump }: { access:
   const sections = visibleAdminSections(access);
   const [chosen, setChosen] = useState<AdminSectionId | null>(null);
   const active = sections.find(section => section.id === chosen) ?? sections[0];
+  const roles = roleDisplay(access.platformRoles);
+  // Show the person, not their address, first; the address stays visible underneath.
+  const who = access.name?.trim() || access.email || "";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="mb-2 text-xs uppercase tracking-[0.22em] text-brand">IPF Business Support / Admin</p>
-        <h1 className="font-serif text-4xl font-bold tracking-tight">{active ? TITLES[active.id] : "Admin"}</h1>
-        {access.email && (
-          <p className="mt-2 text-xs text-ink-muted">Signed in as {access.email}{access.platformRoles?.length ? ` · ${access.platformRoles.map(role => role.replace(/_/g, " ")).join(", ")}` : ""}</p>
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-1.5 text-xs uppercase tracking-[0.22em] text-brand">IPF Business Support / Admin</p>
+          <h1 className="font-serif text-3xl font-bold tracking-tight sm:text-4xl">{active ? TITLES[active.id] : "Admin"}</h1>
+        </div>
+        {who && (
+          <div className="text-left sm:text-right" aria-label="Signed in">
+            <p className="text-sm font-medium text-ink">{who}</p>
+            {roles && <p className="text-xs text-ink-muted">{roles}</p>}
+            {access.name?.trim() && access.email && <p className="text-xs text-ink-muted">{access.email}</p>}
+          </div>
         )}
       </div>
 
@@ -41,23 +50,25 @@ export default function BusinessSupportConsole({ access, team, jump }: { access:
         <p role="note" className="border border-line bg-white p-6 text-sm text-ink-muted">Your account is signed in, but no admin responsibilities have been assigned to it yet. Ask the Super Admin to grant them.</p>
       ) : (
         <>
-          <nav aria-label="Admin sections" className="flex flex-wrap gap-2 border-b border-line pb-2">
-            {sections.map(section => (
-              <Button
-                key={section.id}
-                type="button"
-                variant={active?.id === section.id ? "default" : "outline"}
-                aria-current={active?.id === section.id ? "page" : undefined}
-                onClick={() => setChosen(section.id)}
-                className={`rounded-none text-xs uppercase tracking-wider ${active?.id === section.id ? "bg-brand text-paper" : "border-brand-line-strong text-brand"}`}
-              >
-                {ADMIN_SECTIONS.find(item => item.id === section.id)?.label}
-              </Button>
-            ))}
+          <nav aria-label="Admin sections" className="flex flex-wrap gap-x-1 gap-y-1 border-b border-line">
+            {sections.map(section => {
+              const isActive = active?.id === section.id;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => setChosen(section.id)}
+                  className={`-mb-px border-b-2 px-3 py-2 text-[13px] transition-colors focus:outline-none focus-visible:bg-brand-tint ${isActive ? "border-brand font-semibold text-brand" : "border-transparent text-ink-muted hover:text-ink"}`}
+                >
+                  {ADMIN_SECTIONS.find(item => item.id === section.id)?.label}
+                </button>
+              );
+            })}
           </nav>
           <div className="border border-line bg-paper shadow-sm">
-            {active?.id === "checks" && <BusinessChecksView />}
-            {active?.id === "calls" && <DiscoveryCallsView />}
+            {active?.id === "checks" && <BusinessChecksView onOpenSection={setChosen} />}
+            {active?.id === "calls" && <DiscoveryCallsView onOpenSection={setChosen} />}
             {active?.id === "onboarding" && <ClientOnboardingPanel />}
             {active?.id === "clients" && <ClientsView />}
             {active?.id === "team" && team}

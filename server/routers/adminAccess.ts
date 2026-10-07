@@ -45,6 +45,7 @@ export const adminAccessRouter = router({
     const passwordVerified = viaAccount ? internal : ctx.user.role === "admin" && await hasVerifiedAdminAccess(ctx.req, ctx.user.id);
     return {
       email: ctx.user.email,
+      name: ctx.user.name,
       isAdmin: ctx.user.role === "admin" || internal,
       // Super Admin by the central resolver (owner email OR stored super_admin role), not by the email alone.
       isOwner: authority.isSuperAdmin,

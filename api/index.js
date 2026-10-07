@@ -5454,6 +5454,7 @@ var adminAccessRouter = router({
     const passwordVerified = viaAccount ? internal : ctx.user.role === "admin" && await hasVerifiedAdminAccess(ctx.req, ctx.user.id);
     return {
       email: ctx.user.email,
+      name: ctx.user.name,
       isAdmin: ctx.user.role === "admin" || internal,
       // Super Admin by the central resolver (owner email OR stored super_admin role), not by the email alone.
       isOwner: authority.isSuperAdmin,
@@ -8038,9 +8039,19 @@ async function acceptOnboardingInvitation(req, res, rawInput) {
     created.business.id
   );
 }
+async function latestInvitationStatuses(db) {
+  const invitations = await db.select({
+    businessCheckId: clientOnboardingInvitations.businessCheckId,
+    status: clientOnboardingInvitations.status,
+    expiresAt: clientOnboardingInvitations.expiresAt
+  }).from(clientOnboardingInvitations).orderBy(desc8(clientOnboardingInvitations.id));
+  const latest = /* @__PURE__ */ new Map();
+  for (const invitation of invitations) if (!latest.has(invitation.businessCheckId)) latest.set(invitation.businessCheckId, effectiveInvitationStatus(invitation));
+  return latest;
+}
 async function listOnboardingCandidates() {
   const db = await requireDatabase();
-  const [checks, invitations] = await Promise.all([
+  const [checks, latest] = await Promise.all([
     db.select({
       id: businessChecks.id,
       fullName: businessChecks.fullName,
@@ -8053,15 +8064,8 @@ async function listOnboardingCandidates() {
       completedAt: businessChecks.completedAt,
       createdAt: businessChecks.createdAt
     }).from(businessChecks).orderBy(desc8(businessChecks.createdAt)).limit(200),
-    db.select({
-      businessCheckId: clientOnboardingInvitations.businessCheckId,
-      status: clientOnboardingInvitations.status,
-      expiresAt: clientOnboardingInvitations.expiresAt,
-      createdAt: clientOnboardingInvitations.createdAt
-    }).from(clientOnboardingInvitations).orderBy(desc8(clientOnboardingInvitations.id))
+    latestInvitationStatuses(db)
   ]);
-  const latest = /* @__PURE__ */ new Map();
-  for (const invitation of invitations) if (!latest.has(invitation.businessCheckId)) latest.set(invitation.businessCheckId, effectiveInvitationStatus(invitation));
   return checks.map((check) => ({ ...check, invitationStatus: latest.get(check.id) ?? null }));
 }
 async function listOnboardingInvitations() {
@@ -8155,10 +8159,46 @@ var CHECK_COLUMNS = {
   createdAt: businessChecks.createdAt
 };
 async function listBusinessChecks(db) {
-  return db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc9(businessChecks.createdAt)).limit(500);
+  const [rows, invitations] = await Promise.all([
+    db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc9(businessChecks.createdAt)).limit(500),
+    latestInvitationStatuses(db)
+  ]);
+  return rows.map((row) => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
 }
 async function listDiscoveryCalls(db) {
-  return db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull2(businessChecks.callRequestedAt)).orderBy(desc9(businessChecks.callRequestedAt)).limit(500);
+  const [rows, invitations] = await Promise.all([
+    db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull2(businessChecks.callRequestedAt)).orderBy(desc9(businessChecks.callRequestedAt)).limit(500),
+    latestInvitationStatuses(db)
+  ]);
+  return rows.map((row) => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+}
+var parseJson = (text2) => {
+  if (!text2) return null;
+  try {
+    return JSON.parse(text2);
+  } catch {
+    return null;
+  }
+};
+async function getBusinessCheckDetail(db, businessCheckId) {
+  const row = (await db.select({
+    ...CHECK_COLUMNS,
+    heardFrom: businessChecks.heardFrom,
+    resultJson: businessChecks.resultJson,
+    summaryJson: businessChecks.summaryJson
+  }).from(businessChecks).where(eq16(businessChecks.id, businessCheckId)).limit(1))[0];
+  if (!row) throw new TRPCError15({ code: "NOT_FOUND", message: "That business check does not exist." });
+  const { resultJson, summaryJson, ...fields } = row;
+  const result = parseJson(resultJson);
+  const summary = parseJson(summaryJson);
+  const invitations = await latestInvitationStatuses(db);
+  return {
+    ...fields,
+    invitationStatus: invitations.get(row.id) ?? null,
+    summary: summary ? { found: summary.found, think: summary.think, next: summary.next, offerings: summary.offerings ?? [] } : null,
+    outline: result?.outline ?? null,
+    primaryAreaNumber: result?.primaryArea?.area ?? row.primaryArea ?? null
+  };
 }
 async function requestedCheck(db, businessCheckId) {
   const check = (await db.select({ id: businessChecks.id, email: businessChecks.email, pipelineStage: businessChecks.pipelineStage, callRequestedAt: businessChecks.callRequestedAt }).from(businessChecks).where(eq16(businessChecks.id, businessCheckId)).limit(1))[0];
@@ -8210,6 +8250,7 @@ var prospects = adminPermissionProcedure("manage_client_onboarding");
 var clients = adminPermissionProcedure("view_all_businesses");
 var businessSupportRouter = router({
   checks: prospects.query(async () => listBusinessChecks(await businessSupportDb())),
+  checkDetail: prospects.input(z19.object({ businessCheckId: z19.number().int().positive() })).query(async ({ input }) => getBusinessCheckDetail(await businessSupportDb(), input.businessCheckId)),
   discoveryCalls: prospects.query(async () => listDiscoveryCalls(await businessSupportDb())),
   scheduleCall: prospects.input(z19.object({ businessCheckId: z19.number().int().positive(), scheduledFor: z19.coerce.date() })).mutation(async ({ ctx, input }) => scheduleDiscoveryCall(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
   recordOutcome: prospects.input(z19.object({ businessCheckId: z19.number().int().positive(), outcome: z19.enum(CALL_OUTCOMES) })).mutation(async ({ ctx, input }) => recordDiscoveryCallOutcome(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),

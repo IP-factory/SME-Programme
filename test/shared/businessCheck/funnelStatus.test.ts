@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import { FUNNEL_STATUSES, FUNNEL_STATUS_LABELS, funnelStatus, funnelStatusLabel, isReadyToOnboard } from "@shared/businessCheck/funnelStatus";
+import { PIPELINE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@shared/businessCheck/pipeline";
+
+const done = new Date("2026-10-05T09:00:00Z");
+const scheduled = new Date("2026-10-08T13:00:00Z");
+
+describe("funnelStatus: the plain words the admin console uses", () => {
+  it.each([
+    [{ pipelineStage: "lead" }, "in_progress", "Check in progress"],
+    [{ pipelineStage: "lead", completedAt: done }, "completed", "Check completed"],
+    [{ pipelineStage: "qualified_lead", completedAt: done }, "completed", "Check completed"],
+    [{ pipelineStage: "call_booked", completedAt: done }, "call_requested", "Call requested"],
+    [{ pipelineStage: "call_booked", completedAt: done, callScheduledFor: scheduled }, "call_scheduled", "Call scheduled"],
+    [{ pipelineStage: "opportunity", completedAt: done }, "fit", "Fit"],
+    [{ pipelineStage: "referred", completedAt: done }, "referred", "Referred"],
+    [{ pipelineStage: "lost", completedAt: done }, "declined", "Declined"],
+    [{ pipelineStage: "nurture", completedAt: done }, "nurture", "Follow up later"],
+    [{ pipelineStage: "won", completedAt: done }, "won", "Won"],
+  ] as const)("%j -> %s (%s)", (input, key, label) => {
+    expect(funnelStatus(input as never)).toBe(key);
+    expect(funnelStatusLabel(key)).toBe(label);
+  });
+
+  it("shows a call REQUEST as 'Call requested', never 'Call booked': nothing is booked until a time is recorded", () => {
+    const stored = funnelStatus({ pipelineStage: "call_booked", completedAt: done });
+    expect(funnelStatusLabel(stored)).toBe("Call requested");
+    expect(Object.values(FUNNEL_STATUS_LABELS).map(entry => entry.label)).not.toContain("Call booked");
+  });
+
+  it("puts an onboarding invitation ahead of the call outcome", () => {
+    expect(funnelStatus({ pipelineStage: "opportunity", invitationStatus: "pending" })).toBe("onboarding");
+    expect(funnelStatus({ pipelineStage: "opportunity", invitationStatus: "accepted" })).toBe("onboarded");
+    // A revoked or expired link puts the prospect back where the call left them.
+    expect(funnelStatus({ pipelineStage: "opportunity", invitationStatus: "revoked" })).toBe("fit");
+    expect(funnelStatus({ pipelineStage: "opportunity", invitationStatus: "expired" })).toBe("fit");
+  });
+
+  it("names a status for every stored stage, so no stage can show a blank", () => {
+    for (const stage of PIPELINE_STAGES) {
+      const status = funnelStatus({ pipelineStage: stage as PipelineStage, completedAt: done });
+      expect(FUNNEL_STATUSES).toContain(status);
+      expect(FUNNEL_STATUS_LABELS[status].label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("treats only a fit as ready to onboard", () => {
+    expect(FUNNEL_STATUSES.filter(isReadyToOnboard)).toEqual(["fit"]);
+  });
+
+  it("changes the wording only: the stored stage names are untouched", () => {
+    expect(PIPELINE_STAGES.map(stage => PIPELINE_LABELS[stage].name)).toEqual(["Lead", "Qualified lead", "Call booked", "Opportunity", "Won", "Lost", "Nurture", "Referred"]);
+  });
+});

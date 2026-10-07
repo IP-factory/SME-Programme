@@ -226,10 +226,22 @@ export async function acceptOnboardingInvitation(req: Request, res: Response, ra
   );
 }
 
+/** The state of each business check's most recent onboarding invitation (a check with none is absent from the map). */
+export async function latestInvitationStatuses(db: Pick<Database, "select">) {
+  const invitations = await db.select({
+    businessCheckId: clientOnboardingInvitations.businessCheckId,
+    status: clientOnboardingInvitations.status,
+    expiresAt: clientOnboardingInvitations.expiresAt,
+  }).from(clientOnboardingInvitations).orderBy(desc(clientOnboardingInvitations.id));
+  const latest = new Map<number, InvitationStatus>();
+  for (const invitation of invitations) if (!latest.has(invitation.businessCheckId)) latest.set(invitation.businessCheckId, effectiveInvitationStatus(invitation));
+  return latest;
+}
+
 /** Business checks an administrator can invite, with the call request and the state of their latest invitation. Prospects only. */
 export async function listOnboardingCandidates() {
   const db = await requireDatabase();
-  const [checks, invitations] = await Promise.all([
+  const [checks, latest] = await Promise.all([
     db.select({
       id: businessChecks.id,
       fullName: businessChecks.fullName,
@@ -242,15 +254,8 @@ export async function listOnboardingCandidates() {
       completedAt: businessChecks.completedAt,
       createdAt: businessChecks.createdAt,
     }).from(businessChecks).orderBy(desc(businessChecks.createdAt)).limit(200),
-    db.select({
-      businessCheckId: clientOnboardingInvitations.businessCheckId,
-      status: clientOnboardingInvitations.status,
-      expiresAt: clientOnboardingInvitations.expiresAt,
-      createdAt: clientOnboardingInvitations.createdAt,
-    }).from(clientOnboardingInvitations).orderBy(desc(clientOnboardingInvitations.id)),
+    latestInvitationStatuses(db),
   ]);
-  const latest = new Map<number, InvitationStatus>();
-  for (const invitation of invitations) if (!latest.has(invitation.businessCheckId)) latest.set(invitation.businessCheckId, effectiveInvitationStatus(invitation));
   return checks.map(check => ({ ...check, invitationStatus: latest.get(check.id) ?? null }));
 }
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   CALL_OUTCOMES,
   businessSupportDb,
+  getBusinessCheckDetail,
   listBusinessChecks,
   listClients,
   listDiscoveryCalls,
@@ -21,6 +22,9 @@ const clients = adminPermissionProcedure("view_all_businesses");
  */
 export const businessSupportRouter = router({
   checks: prospects.query(async () => listBusinessChecks(await businessSupportDb())),
+  checkDetail: prospects
+    .input(z.object({ businessCheckId: z.number().int().positive() }))
+    .query(async ({ input }) => getBusinessCheckDetail(await businessSupportDb(), input.businessCheckId)),
   discoveryCalls: prospects.query(async () => listDiscoveryCalls(await businessSupportDb())),
   scheduleCall: prospects
     .input(z.object({ businessCheckId: z.number().int().positive(), scheduledFor: z.coerce.date() }))
