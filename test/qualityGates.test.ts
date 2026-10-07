@@ -19,6 +19,11 @@ describe("quality gates (AGENTS.md)", () => {
     expect(ci).toMatch(/pull_request:/);
   });
 
+  it("fails CI when the committed Vercel bundle (api/index.js) is older than the source", () => {
+    const ci = read(".github/workflows/ci.yml");
+    expect(ci.indexOf("git diff --exit-code -- api/index.js")).toBeGreaterThan(ci.indexOf("- run: pnpm build\n"));
+  });
+
   it("keeps the agent rules where Claude Code and other agents read them", () => {
     expect(read("AGENTS.md")).toMatch(/ships with tests/);
     expect(read("AGENTS.md")).toMatch(/Nothing is pushed until `pnpm verify` passes/);

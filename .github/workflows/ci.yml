@@ -23,3 +23,5 @@ jobs:
       - run: pnpm check:tests
       - run: pnpm test
       - run: pnpm build
+      - name: Committed Vercel bundle matches the source
+        run: git diff --exit-code -- api/index.js || (echo "api/index.js is stale: run pnpm build and commit it" && exit 1)
