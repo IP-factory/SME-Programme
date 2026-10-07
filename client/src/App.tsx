@@ -10,6 +10,9 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminPasswordResetPage from "./pages/AdminPasswordResetPage";
 import AdminInvitationPage from "./pages/AdminInvitationPage";
 import BusinessCheck from "./pages/BusinessCheck";
+import SignUpPage from "./pages/SignUpPage";
+import LoginPage from "./pages/LoginPage";
+import AccountDashboard from "./pages/AccountDashboard";
 import Home from "./pages/Home";
 import Schedule from "./pages/Schedule";
 import ParticipantDashboard from "./pages/ParticipantDashboard";
@@ -20,6 +23,9 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/check" component={BusinessCheck} />
+      <Route path="/signup" component={SignUpPage} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/dashboard" component={AccountDashboard} />
       <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/admin/reset" component={AdminPasswordResetPage} />
       <Route path="/admin/invite" component={AdminInvitationPage} />

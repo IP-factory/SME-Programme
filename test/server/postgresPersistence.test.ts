@@ -105,15 +105,20 @@ describe("PostgreSQL schema and migration history", () => {
   const pgTables = allTables.map(table => getTableConfig(table).name).sort();
   const baseline = readFileSync(resolve(root, "drizzle/migrations/0000_postgres_baseline.sql"), "utf8");
 
-  it("keeps all 30 table names from the MySQL schema", () => {
+  // The 30 inherited tables are kept; later migrations may add tables, and each addition is listed here on purpose.
+  const ADDED_AFTER_MYSQL = ["business_memberships", "businesses", "user_credentials", "user_sessions"];
+
+  it("keeps all 30 table names from the MySQL schema and adds only the listed new tables", () => {
     expect(mysqlTables).toHaveLength(30);
-    expect(pgTables).toEqual(mysqlTables);
+    expect(pgTables.filter(name => mysqlTables.includes(name))).toEqual(mysqlTables);
+    expect(pgTables.filter(name => !mysqlTables.includes(name))).toEqual(ADDED_AFTER_MYSQL);
   });
 
   // Columns added after the migration (in later migrations) are allowed; none from MySQL may be lost.
   it("keeps every column name from the MySQL schema", () => {
     for (const table of allTables) {
       const { name, columns } = getTableConfig(table);
+      if (ADDED_AFTER_MYSQL.includes(name)) continue;
       const block = archive.split(`mysqlTable("${name}"`)[1]!.split("export type")[0]!;
       const mysqlColumns = [...block.matchAll(/^\s+\w+: \w+\("(\w+)"/gm)].map(match => match[1]).sort();
       expect(columns.map(column => column.name), name).toEqual(expect.arrayContaining(mysqlColumns));
@@ -162,8 +167,8 @@ describe("updatedAt uses one authoritative clock (the database)", () => {
   const dialect = new PgDialect();
   const updatedAtColumns = allTables.flatMap(table => getTableConfig(table).columns.filter(column => column.name === "updatedAt").map(column => ({ table: getTableConfig(table).name, column })));
 
-  it("defaults to now() on insert and rewrites to now() on every update for all 16 tables", () => {
-    expect(updatedAtColumns).toHaveLength(16);
+  it("defaults to now() on insert and rewrites to now() on every update for all 19 tables", () => {
+    expect(updatedAtColumns).toHaveLength(19);
     for (const { table, column } of updatedAtColumns) {
       expect(column.hasDefault, `${table} default`).toBe(true);
       const onUpdate = (column as unknown as { onUpdateFn?: () => unknown }).onUpdateFn?.();

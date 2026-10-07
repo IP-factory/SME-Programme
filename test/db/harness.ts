@@ -86,6 +86,24 @@ export function pgErrorCode(error: unknown): string | undefined {
 
 let counter = 0;
 
+/**
+ * Inserts a minimal valid row, first inserting a parent row for every foreign key (recursively), and returns it.
+ * Lets generic per-table tests cover tables that reference others.
+ */
+export async function insertFixture(db: AnyPgDb, table: PgTable, overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  const values = fixtureRow(table, overrides);
+  for (const foreignKey of getTableConfig(table).foreignKeys) {
+    const reference = foreignKey.reference();
+    const [local] = reference.columns;
+    const [remote] = reference.foreignColumns;
+    if (overrides[local.name] !== undefined) continue;
+    const parent = await insertFixture(db, reference.foreignTable as PgTable);
+    values[local.name] = parent[remote.name];
+  }
+  const [row] = await db.insert(table).values(values as never).returning();
+  return row as Record<string, unknown>;
+}
+
 /** A minimal valid row for any table: only columns that are NOT NULL and have no default. */
 export function fixtureRow(table: PgTable, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const row: Record<string, unknown> = {};

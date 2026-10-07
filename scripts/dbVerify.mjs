@@ -20,7 +20,11 @@ const list = (label, items) => line(`${label} (${items.length}): ${items.length 
 
 // Critical columns beyond every primary and unique key.
 const CRITICAL = {
-  users: ["openId", "role", "email"],
+  users: ["openId", "role", "email", "status"],
+  user_credentials: ["userId", "passwordHash", "failedAttempts", "lockedUntil"],
+  user_sessions: ["userId", "tokenHash", "expiresAt", "revokedAt"],
+  businesses: ["name", "slug", "status", "createdByUserId"],
+  business_memberships: ["businessId", "userId", "role", "status"],
   registrations: ["email", "status", "package", "depositPaid", "bookingToken"],
   business_checks: ["publicToken", "pipelineStage", "answersJson", "resultJson", "summaryJson", "callRequestedAt", "reportRequestedAt", "completedAt"],
   schedule_slots: ["bookedCount", "capacity", "status"],
@@ -102,8 +106,8 @@ async function main() {
     list("Actual tables", actualTableNames);
     list("Missing tables", missingTables);
     list("Unexpected tables", unexpectedTables);
-    check("exactly 30 expected tables defined", expectedTableNames.length === 30, `${expectedTableNames.length}`);
-    check("exactly 30 application tables present", actualTableNames.length === 30, `${actualTableNames.length}`);
+    check(`exactly ${expectedTableNames.length} expected tables defined (from the latest snapshot)`, expectedTableNames.length > 0, `${expectedTableNames.length}`);
+    check(`exactly ${expectedTableNames.length} application tables present`, actualTableNames.length === expectedTableNames.length, `${actualTableNames.length}`);
     check("no missing tables", missingTables.length === 0);
     check("no unexpected tables", unexpectedTables.length === 0);
 
@@ -190,6 +194,21 @@ async function main() {
     check(`primary keys on all ${expectedTables.length} tables`, pkFailures.length === 0, pkFailures.join("; "));
     check(`all ${uniqueCount} unique constraints match`, uniqueFailures.length === 0, uniqueFailures.join("; "));
 
+    // ---- indexes (including the unique lower(email) index that backs account email uniqueness) and foreign keys ----
+    const indexRows = await query("select indexname from pg_indexes where schemaname = $1", [SCHEMA]);
+    const actualIndexes = new Set(indexRows.map(row => row.indexname));
+    const expectedIndexes = expectedTables.flatMap(table => Object.values(table.indexes ?? {}).map(index => index.name));
+    const missingIndexes = expectedIndexes.filter(name => !actualIndexes.has(name));
+    check(`all ${expectedIndexes.length} declared indexes present`, missingIndexes.length === 0, missingIndexes.join(", "));
+    const foreignKeyRows = await query(
+      `select k.conname as name, k.confdeltype as on_delete from pg_constraint k join pg_namespace n on n.oid = k.connamespace where n.nspname = $1 and k.contype = 'f'`, [SCHEMA],
+    );
+    const actualForeignKeys = new Map(foreignKeyRows.map(row => [row.name, row.on_delete]));
+    const deleteCodes = { cascade: "c", "no action": "a", restrict: "r", "set null": "n", "set default": "d" };
+    const expectedForeignKeys = expectedTables.flatMap(table => Object.values(table.foreignKeys ?? {}));
+    const foreignKeyProblems = expectedForeignKeys.filter(key => actualForeignKeys.get(key.name) !== (deleteCodes[key.onDelete ?? "no action"] ?? "a")).map(key => key.name);
+    check(`all ${expectedForeignKeys.length} foreign keys present with the declared delete behaviour`, foreignKeyProblems.length === 0, foreignKeyProblems.join(", "));
+
     const criticalMissing = [];
     let criticalCount = 0;
     for (const [table, columns] of Object.entries(CRITICAL)) {
@@ -199,7 +218,7 @@ async function main() {
       }
     }
     check(`${criticalCount} critical columns present`, criticalMissing.length === 0, criticalMissing.join(", "));
-    for (const result of results.filter(entry => entry.name.match(/columns present|column types|nullability|defaults|identity|primary keys|unique constraints|critical|extra columns/))) {
+    for (const result of results.filter(entry => entry.name.match(/columns present|column types|nullability|defaults|identity|primary keys|unique constraints|critical|extra columns|indexes|foreign keys/))) {
       line(`  ${result.pass ? "PASS" : "FAIL"}  ${result.name}${result.pass || !result.detail ? "" : ` -> ${result.detail}`}`);
     }
 

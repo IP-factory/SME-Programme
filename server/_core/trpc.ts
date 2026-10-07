@@ -3,6 +3,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { getAuthenticatedParticipant } from "../participantAuth";
+import { resolveAccountSession } from "../accountAuth";
+import { ACCOUNT_AUTH_ERRORS } from "../../shared/auth";
 import { hasVerifiedAdminAccess, isOwnerAdmin } from "../adminSecurity";
 import { getDb } from "../db";
 import { adminPermissionProfiles } from "../../drizzle/schema";
@@ -43,6 +45,19 @@ export const participantProcedure = t.procedure.use(
         ? { ...input, token: participant.bookingToken, bookingToken: participant.bookingToken }
         : input,
     });
+  }),
+);
+
+/**
+ * Requires a universal-account session (cookie checked against user_sessions). Independent of the legacy
+ * `protectedProcedure` (platform OAuth) and `participantProcedure`. Uses its own message so the client's
+ * legacy redirect to the OAuth login is never triggered.
+ */
+export const accountProcedure = t.procedure.use(
+  t.middleware(async ({ ctx, next }) => {
+    const account = await resolveAccountSession(ctx.req);
+    if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: ACCOUNT_AUTH_ERRORS.signInRequired });
+    return next({ ctx: { ...ctx, account } });
   }),
 );
 

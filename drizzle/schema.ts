@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { PIPELINE_STAGES } from "../shared/businessCheck/pipeline";
 
 /**
@@ -7,7 +7,15 @@ import { PIPELINE_STAGES } from "../shared/businessCheck/pipeline";
  * this model mirrors it exactly so role-gated admin access remains reliable.
  */
 export const usersRoleEnum = pgEnum("users_role", ["user", "admin"]);
+export const usersStatusEnum = pgEnum("users_status", ["active", "suspended", "disabled"]);
 
+/**
+ * The universal human identity. Historically this held platform OAuth users; password accounts (shared/auth.ts)
+ * live in the same table so there is one identity per person. `openId` is the external-identity key: for a
+ * password account it is a generated `local:<uuid>`. `role` stays the legacy user/admin flag that gates the
+ * existing admin area; it is NOT a business role and not the future platform-role system.
+ * Email is unique case-insensitively. Business data never lives here.
+ */
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
@@ -15,10 +23,72 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: usersRoleEnum("role").default("user").notNull(),
+  status: usersStatusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
+}, table => [uniqueIndex("users_email_lower_unique").on(sql`lower(${table.email})`)]);
+
+/** Password credential for a universal account: one row per user. */
+export const userCredentials = pgTable("user_credentials", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  passwordHash: varchar("passwordHash", { length: 512 }).notNull(),
+  failedAttempts: integer("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
+
+/** Server-side sessions. Only the SHA-256 of the cookie token is stored. */
+export const userSessions = pgTable("user_sessions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const businessesStatusEnum = pgEnum("businesses_status", ["active", "suspended", "archived"]);
+
+/**
+ * A business is a workspace, separate from any person. It will own client-facing engagement data
+ * (User -> membership -> Business -> Engagement -> diagnostics, measures, check-ins, files).
+ * Signup requires only `name`; the nullable profile fields are completed later.
+ */
+export const businesses = pgTable("businesses", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 80 }).notNull().unique(),
+  status: businessesStatusEnum("status").default("active").notNull(),
+  createdByUserId: integer("createdByUserId").notNull().references(() => users.id),
+  description: text("description"),
+  yearFounded: integer("yearFounded"),
+  logoUrl: varchar("logoUrl", { length: 1024 }),
+  sector: varchar("sector", { length: 128 }),
+  website: varchar("website", { length: 512 }),
+  staffBand: varchar("staffBand", { length: 64 }),
+  revenueBand: varchar("revenueBand", { length: 64 }),
+  country: varchar("country", { length: 64 }),
+  state: varchar("state", { length: 64 }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
+});
+
+export const businessMembershipsRoleEnum = pgEnum("business_memberships_role", ["owner", "business_admin", "member"]);
+export const businessMembershipsStatusEnum = pgEnum("business_memberships_status", ["active", "invited", "suspended", "removed"]);
+
+/** Many-to-many link between users and businesses. Business roles are independent of platform roles. */
+export const businessMemberships = pgTable("business_memberships", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  businessId: integer("businessId").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: businessMembershipsRoleEnum("role").default("member").notNull(),
+  status: businessMembershipsStatusEnum("status").default("active").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
+}, table => [unique("business_memberships_business_user_unique").on(table.businessId, table.userId), index("business_memberships_user_idx").on(table.userId)]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

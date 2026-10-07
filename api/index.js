@@ -176,7 +176,7 @@ var init_ics = __esm({
 // server/_core/app.ts
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { TRPCError as TRPCError11 } from "@trpc/server";
+import { TRPCError as TRPCError12 } from "@trpc/server";
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
@@ -210,7 +210,7 @@ import pg from "pg";
 
 // drizzle/schema.ts
 import { sql } from "drizzle-orm";
-import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 // shared/businessCheck/pipeline.ts
 var PIPELINE_STAGES = ["lead", "qualified_lead", "call_booked", "opportunity", "won", "lost", "nurture", "referred"];
@@ -222,6 +222,7 @@ function advancePipeline(current, event) {
 
 // drizzle/schema.ts
 var usersRoleEnum = pgEnum("users_role", ["user", "admin"]);
+var usersStatusEnum = pgEnum("users_status", ["active", "suspended", "disabled"]);
 var users = pgTable("users", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
@@ -229,10 +230,58 @@ var users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: usersRoleEnum("role").default("user").notNull(),
+  status: usersStatusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull()
+}, (table) => [uniqueIndex("users_email_lower_unique").on(sql`lower(${table.email})`)]);
+var userCredentials = pgTable("user_credentials", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  passwordHash: varchar("passwordHash", { length: 512 }).notNull(),
+  failedAttempts: integer("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
+var userSessions = pgTable("user_sessions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+});
+var businessesStatusEnum = pgEnum("businesses_status", ["active", "suspended", "archived"]);
+var businesses = pgTable("businesses", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 80 }).notNull().unique(),
+  status: businessesStatusEnum("status").default("active").notNull(),
+  createdByUserId: integer("createdByUserId").notNull().references(() => users.id),
+  description: text("description"),
+  yearFounded: integer("yearFounded"),
+  logoUrl: varchar("logoUrl", { length: 1024 }),
+  sector: varchar("sector", { length: 128 }),
+  website: varchar("website", { length: 512 }),
+  staffBand: varchar("staffBand", { length: 64 }),
+  revenueBand: varchar("revenueBand", { length: 64 }),
+  country: varchar("country", { length: 64 }),
+  state: varchar("state", { length: 64 }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
+});
+var businessMembershipsRoleEnum = pgEnum("business_memberships_role", ["owner", "business_admin", "member"]);
+var businessMembershipsStatusEnum = pgEnum("business_memberships_status", ["active", "invited", "suspended", "removed"]);
+var businessMemberships = pgTable("business_memberships", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  businessId: integer("businessId").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: businessMembershipsRoleEnum("role").default("member").notNull(),
+  status: businessMembershipsStatusEnum("status").default("active").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
+}, (table) => [unique("business_memberships_business_user_unique").on(table.businessId, table.userId), index("business_memberships_user_idx").on(table.userId)]);
 var adminCredentials = pgTable("admin_credentials", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   userId: integer("userId").notNull().unique(),
@@ -751,6 +800,14 @@ function getAdminAccessCookieOptions(req) {
     path: "/",
     sameSite: "lax",
     secure: isSecureRequest(req)
+  };
+}
+function getAccountSessionCookieOptions(req, nodeEnv = process.env.NODE_ENV) {
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure: isSecureRequest(req) || nodeEnv === "production"
   };
 }
 
@@ -2051,7 +2108,7 @@ function registerStorageProxy(app) {
 }
 
 // server/_core/systemRouter.ts
-import { z } from "zod";
+import { z as z2 } from "zod";
 
 // server/_core/notification.ts
 init_brand();
@@ -2103,9 +2160,282 @@ async function notifyOwner(payload) {
 }
 
 // server/_core/trpc.ts
-import { initTRPC, TRPCError as TRPCError3 } from "@trpc/server";
+import { initTRPC, TRPCError as TRPCError4 } from "@trpc/server";
 import superjson from "superjson";
-import { eq as eq5 } from "drizzle-orm";
+
+// server/accountAuth.ts
+import { randomBytes as randomBytes3, randomUUID } from "crypto";
+import { and as and4, eq as eq5, gt as gt3, isNull as isNull3 } from "drizzle-orm";
+import { TRPCError as TRPCError3 } from "@trpc/server";
+
+// shared/auth.ts
+import { z } from "zod";
+
+// shared/businessMemberships.ts
+var BUSINESS_NAME_MAX_LENGTH = 255;
+var BUSINESS_PROFILE_FIELDS = ["description", "sector", "country"];
+function isBusinessProfileComplete(business) {
+  return BUSINESS_PROFILE_FIELDS.every((field) => Boolean(business[field]?.trim()));
+}
+
+// shared/auth.ts
+var ACCOUNT_SESSION_COOKIE = "ipf_session";
+var ACCOUNT_SESSION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1e3;
+var ACCOUNT_PASSWORD_MIN_LENGTH = 10;
+var ACCOUNT_PASSWORD_MAX_LENGTH = 128;
+var ACCOUNT_MAX_FAILED_ATTEMPTS = 5;
+var ACCOUNT_LOCKOUT_MS = 15 * 60 * 1e3;
+var ACCOUNT_FULL_NAME_MAX_LENGTH = 255;
+var ACCOUNT_EMAIL_MAX_LENGTH = 320;
+var ACCOUNT_AUTH_ERRORS = {
+  signInRequired: "Please sign in to continue.",
+  invalidCredentials: "Your email or password is not correct.",
+  locked: "Too many attempts. Kindly try again in 15 minutes.",
+  tooManyRequests: "Too many attempts. Kindly wait a few minutes and try again.",
+  emailTaken: "An account with this email already exists. Try signing in.",
+  noBusinessAccess: "You do not have access to this business.",
+  crossSite: "This request did not come from this site."
+};
+function normaliseAccountEmail(email) {
+  return (email ?? "").trim().toLowerCase();
+}
+function validateAccountPassword(password) {
+  if (password.length < ACCOUNT_PASSWORD_MIN_LENGTH) return `Use at least ${ACCOUNT_PASSWORD_MIN_LENGTH} characters.`;
+  if (password.length > ACCOUNT_PASSWORD_MAX_LENGTH) return `Use no more than ${ACCOUNT_PASSWORD_MAX_LENGTH} characters.`;
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return "Use at least one letter and one number.";
+  return null;
+}
+var signUpInputSchema = z.object({
+  fullName: z.string().trim().min(2, "Enter your full name.").max(ACCOUNT_FULL_NAME_MAX_LENGTH),
+  email: z.string().trim().email("Enter a valid email address.").max(ACCOUNT_EMAIL_MAX_LENGTH).transform(normaliseAccountEmail),
+  password: z.string().max(ACCOUNT_PASSWORD_MAX_LENGTH + 1),
+  confirmPassword: z.string().max(ACCOUNT_PASSWORD_MAX_LENGTH + 1),
+  businessName: z.string().trim().min(2, "Enter your business name.").max(BUSINESS_NAME_MAX_LENGTH)
+}).superRefine((value, context) => {
+  const policy = validateAccountPassword(value.password);
+  if (policy) context.addIssue({ code: "custom", path: ["password"], message: policy });
+  if (value.password !== value.confirmPassword) {
+    context.addIssue({ code: "custom", path: ["confirmPassword"], message: "The password confirmation does not match." });
+  }
+});
+var signInInputSchema = z.object({
+  email: z.string().trim().max(ACCOUNT_EMAIL_MAX_LENGTH).transform(normaliseAccountEmail),
+  // No policy check on sign-in: a wrong or short password must fail like any other wrong password.
+  password: z.string().min(1).max(ACCOUNT_PASSWORD_MAX_LENGTH + 1)
+});
+
+// server/accountAuth.ts
+var PG_UNIQUE_VIOLATION2 = "23505";
+var RATE_LIMIT_WINDOW_MS = ACCOUNT_LOCKOUT_MS;
+var rateLimits = /* @__PURE__ */ new Map();
+function isUniqueViolation(error) {
+  const candidate = error;
+  return candidate?.code === PG_UNIQUE_VIOLATION2 || candidate?.cause?.code === PG_UNIQUE_VIOLATION2;
+}
+function requestIp(req) {
+  return (req.ip || "unknown").trim().toLowerCase();
+}
+function consumeRateLimit(action, req, email, maximum) {
+  const key = `${action}:${requestIp(req)}:${email}`;
+  const now = Date.now();
+  const existing = rateLimits.get(key);
+  if (!existing || existing.resetAt <= now) {
+    rateLimits.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (existing.count >= maximum) return false;
+  existing.count += 1;
+  return true;
+}
+function releaseRateLimit(action, req, email) {
+  rateLimits.delete(`${action}:${requestIp(req)}:${email}`);
+}
+function assertSameOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return;
+  const host = req.headers["x-forwarded-host"] ?? req.headers.host;
+  if (isTrustedBrowserOrigin(origin) || isSameHostOrigin(origin, host)) return;
+  throw new TRPCError3({ code: "FORBIDDEN", message: ACCOUNT_AUTH_ERRORS.crossSite });
+}
+var dummyPasswordHash;
+function burnPasswordCheck(password) {
+  dummyPasswordHash ??= hashAdminPassword(randomBytes3(16).toString("hex"));
+  verifyAdminPasswordHash(password, dummyPasswordHash);
+}
+function slugify(name) {
+  const base = name.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  return `${base || "business"}-${randomBytes3(3).toString("hex")}`;
+}
+async function createSession(tx, userId) {
+  const token = randomBytes3(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + ACCOUNT_SESSION_MAX_AGE_MS);
+  await tx.insert(userSessions).values({ userId, tokenHash: sha256(token), expiresAt });
+  return { token, expiresAt };
+}
+function setSessionCookie(req, res, token) {
+  res.cookie(ACCOUNT_SESSION_COOKIE, token, { ...getAccountSessionCookieOptions(req), maxAge: ACCOUNT_SESSION_MAX_AGE_MS });
+}
+function clearSessionCookie(req, res) {
+  res.clearCookie(ACCOUNT_SESSION_COOKIE, { ...getAccountSessionCookieOptions(req), maxAge: -1 });
+}
+function readSessionToken(req) {
+  const header = req.headers.cookie || "";
+  for (const item of header.split(";")) {
+    const [key, ...rest] = item.trim().split("=");
+    if (key === ACCOUNT_SESSION_COOKIE) {
+      try {
+        return decodeURIComponent(rest.join("="));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+async function loadMemberships(db, userId) {
+  const rows = await db.select({
+    businessId: businesses.id,
+    businessName: businesses.name,
+    role: businessMemberships.role,
+    description: businesses.description,
+    sector: businesses.sector,
+    country: businesses.country
+  }).from(businessMemberships).innerJoin(businesses, eq5(businessMemberships.businessId, businesses.id)).where(and4(eq5(businessMemberships.userId, userId), eq5(businessMemberships.status, "active"), eq5(businesses.status, "active"))).orderBy(businessMemberships.id);
+  return rows.map((row) => ({
+    businessId: row.businessId,
+    businessName: row.businessName,
+    role: row.role,
+    profileComplete: isBusinessProfileComplete(row)
+  }));
+}
+function chooseActiveBusiness(memberships) {
+  return memberships.length === 1 ? memberships[0] : null;
+}
+function buildView(user, memberships) {
+  return {
+    user: { id: user.id, fullName: user.name ?? "", email: user.email ?? "" },
+    memberships,
+    activeBusiness: chooseActiveBusiness(memberships)
+  };
+}
+async function resolveAccountSession(req) {
+  const token = readSessionToken(req);
+  if (!token) return null;
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select({ sessionId: userSessions.id, userId: users.id, name: users.name, email: users.email }).from(userSessions).innerJoin(users, eq5(userSessions.userId, users.id)).where(and4(eq5(userSessions.tokenHash, sha256(token)), isNull3(userSessions.revokedAt), gt3(userSessions.expiresAt, /* @__PURE__ */ new Date()), eq5(users.status, "active"))).limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  const memberships = await loadMemberships(db, row.userId);
+  return { sessionId: row.sessionId, ...buildView({ id: row.userId, name: row.name, email: row.email }, memberships) };
+}
+function toAccountView({ sessionId: _sessionId, ...view }) {
+  return view;
+}
+function requireBusinessMembership(session, businessId) {
+  const membership = session.memberships.find((item) => item.businessId === businessId);
+  if (!membership) throw new TRPCError3({ code: "FORBIDDEN", message: ACCOUNT_AUTH_ERRORS.noBusinessAccess });
+  return membership;
+}
+async function emailIsReserved(db, email) {
+  if (email === OWNER_ADMIN_EMAIL) return true;
+  const invited = await db.select({ id: adminInvitations.id }).from(adminInvitations).where(and4(emailEquals(adminInvitations.email, email), eq5(adminInvitations.status, "Pending"))).limit(1);
+  return invited.length > 0;
+}
+async function signUpAccount(req, res, rawInput) {
+  assertSameOrigin(req);
+  const parsed = signUpInputSchema.safeParse(rawInput);
+  if (!parsed.success) throw new TRPCError3({ code: "BAD_REQUEST", message: parsed.error.issues[0]?.message ?? "Check the details and try again." });
+  const input = parsed.data;
+  if (!consumeRateLimit("signup", req, input.email, 5)) {
+    throw new TRPCError3({ code: "TOO_MANY_REQUESTS", message: ACCOUNT_AUTH_ERRORS.tooManyRequests });
+  }
+  const db = await getDb();
+  if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  const passwordHash = hashAdminPassword(input.password);
+  let created;
+  try {
+    created = await db.transaction(async (tx) => {
+      const existing = await tx.select({ id: users.id }).from(users).where(emailEquals(users.email, input.email)).limit(1);
+      if (existing.length > 0 || await emailIsReserved(tx, input.email)) {
+        throw new TRPCError3({ code: "CONFLICT", message: ACCOUNT_AUTH_ERRORS.emailTaken });
+      }
+      const [user] = await tx.insert(users).values({
+        openId: `local:${randomUUID()}`,
+        name: input.fullName,
+        email: input.email,
+        loginMethod: "password",
+        role: "user",
+        status: "active"
+      }).returning({ id: users.id });
+      await tx.insert(userCredentials).values({ userId: user.id, passwordHash });
+      const [business] = await tx.insert(businesses).values({
+        name: input.businessName,
+        slug: slugify(input.businessName),
+        createdByUserId: user.id
+      }).returning({ id: businesses.id, name: businesses.name });
+      await tx.insert(businessMemberships).values({ businessId: business.id, userId: user.id, role: "owner", status: "active" });
+      const session = await createSession(tx, user.id);
+      return { userId: user.id, business, session };
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new TRPCError3({ code: "CONFLICT", message: ACCOUNT_AUTH_ERRORS.emailTaken });
+    throw error;
+  }
+  setSessionCookie(req, res, created.session.token);
+  const view = buildView(
+    { id: created.userId, name: input.fullName, email: input.email },
+    [{ businessId: created.business.id, businessName: created.business.name, role: "owner", profileComplete: false }]
+  );
+  return view;
+}
+async function signInAccount(req, res, rawInput) {
+  assertSameOrigin(req);
+  const email = normaliseAccountEmail(rawInput.email);
+  if (!consumeRateLimit("signin", req, email, ACCOUNT_MAX_FAILED_ATTEMPTS)) {
+    throw new TRPCError3({ code: "TOO_MANY_REQUESTS", message: ACCOUNT_AUTH_ERRORS.tooManyRequests });
+  }
+  const db = await getDb();
+  if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  const user = email ? (await db.select().from(users).where(emailEquals(users.email, email)).limit(1))[0] : void 0;
+  const credential = user ? (await db.select().from(userCredentials).where(eq5(userCredentials.userId, user.id)).limit(1))[0] : void 0;
+  if (!user || !credential || user.status !== "active") {
+    burnPasswordCheck(rawInput.password);
+    throw new TRPCError3({ code: "UNAUTHORIZED", message: ACCOUNT_AUTH_ERRORS.invalidCredentials });
+  }
+  if (credential.lockedUntil && credential.lockedUntil.getTime() > Date.now()) {
+    throw new TRPCError3({ code: "TOO_MANY_REQUESTS", message: ACCOUNT_AUTH_ERRORS.tooManyRequests });
+  }
+  if (!verifyAdminPasswordHash(rawInput.password, credential.passwordHash)) {
+    const attempts = credential.failedAttempts + 1;
+    const lock = attempts >= ACCOUNT_MAX_FAILED_ATTEMPTS ? new Date(Date.now() + ACCOUNT_LOCKOUT_MS) : null;
+    await db.update(userCredentials).set({ failedAttempts: lock ? 0 : attempts, lockedUntil: lock }).where(eq5(userCredentials.id, credential.id));
+    throw new TRPCError3({ code: "UNAUTHORIZED", message: ACCOUNT_AUTH_ERRORS.invalidCredentials });
+  }
+  const session = await db.transaction(async (tx) => {
+    await tx.update(userCredentials).set({ failedAttempts: 0, lockedUntil: null }).where(eq5(userCredentials.id, credential.id));
+    await tx.update(users).set({ lastSignedIn: databaseNow() }).where(eq5(users.id, user.id));
+    return createSession(tx, user.id);
+  });
+  releaseRateLimit("signin", req, email);
+  setSessionCookie(req, res, session.token);
+  return buildView(user, await loadMemberships(db, user.id));
+}
+async function signOutAccount(req, res) {
+  assertSameOrigin(req);
+  const token = readSessionToken(req);
+  if (token) {
+    const db = await getDb();
+    if (db) {
+      await db.update(userSessions).set({ revokedAt: databaseNow() }).where(and4(eq5(userSessions.tokenHash, sha256(token)), isNull3(userSessions.revokedAt)));
+    }
+  }
+  clearSessionCookie(req, res);
+  return { success: true };
+}
+
+// server/_core/trpc.ts
+import { eq as eq6 } from "drizzle-orm";
 
 // shared/adminPermissions.ts
 init_brand();
@@ -2189,7 +2519,7 @@ var publicProcedure = t.procedure;
 var requireUser = t.middleware(async (opts) => {
   const { ctx, next } = opts;
   if (!ctx.user) {
-    throw new TRPCError3({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    throw new TRPCError4({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
   return next({
     ctx: {
@@ -2208,14 +2538,21 @@ var participantProcedure = t.procedure.use(
     });
   })
 );
+var accountProcedure = t.procedure.use(
+  t.middleware(async ({ ctx, next }) => {
+    const account = await resolveAccountSession(ctx.req);
+    if (!account) throw new TRPCError4({ code: "UNAUTHORIZED", message: ACCOUNT_AUTH_ERRORS.signInRequired });
+    return next({ ctx: { ...ctx, account } });
+  })
+);
 var adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
     if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError3({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+      throw new TRPCError4({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
     if (!await hasVerifiedAdminAccess(ctx.req, ctx.user.id)) {
-      throw new TRPCError3({ code: "FORBIDDEN", message: `Kindly verify your ${BRAND.programmeShortName} administrator password to continue.` });
+      throw new TRPCError4({ code: "FORBIDDEN", message: `Kindly verify your ${BRAND.programmeShortName} administrator password to continue.` });
     }
     return next({
       ctx: {
@@ -2228,7 +2565,7 @@ var adminProcedure = t.procedure.use(
 var ownerAdminProcedure = adminProcedure.use(
   t.middleware(async ({ ctx, next }) => {
     if (!ctx.user || !isOwnerAdmin(ctx.user)) {
-      throw new TRPCError3({ code: "FORBIDDEN", message: `This action is reserved for the ${BRAND.programmeShortName} super administrator.` });
+      throw new TRPCError4({ code: "FORBIDDEN", message: `This action is reserved for the ${BRAND.programmeShortName} super administrator.` });
     }
     return next({ ctx: { ...ctx, user: ctx.user } });
   })
@@ -2236,13 +2573,13 @@ var ownerAdminProcedure = adminProcedure.use(
 function adminPermissionProcedure(permission) {
   return adminProcedure.use(
     t.middleware(async ({ ctx, next }) => {
-      if (!ctx.user) throw new TRPCError3({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+      if (!ctx.user) throw new TRPCError4({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
       if (isOwnerAdmin(ctx.user)) return next({ ctx: { ...ctx, user: ctx.user } });
       const db = await getDb();
-      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      const profile = (await db.select({ permissionsJson: adminPermissionProfiles.permissionsJson }).from(adminPermissionProfiles).where(eq5(adminPermissionProfiles.userId, ctx.user.id)).limit(1))[0];
+      if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const profile = (await db.select({ permissionsJson: adminPermissionProfiles.permissionsJson }).from(adminPermissionProfiles).where(eq6(adminPermissionProfiles.userId, ctx.user.id)).limit(1))[0];
       if (!parseAdminPermissions(profile?.permissionsJson).includes(permission)) {
-        throw new TRPCError3({ code: "FORBIDDEN", message: `Your ${BRAND.programmeShortName} administrator role does not include this responsibility.` });
+        throw new TRPCError4({ code: "FORBIDDEN", message: `Your ${BRAND.programmeShortName} administrator role does not include this responsibility.` });
       }
       return next({ ctx: { ...ctx, user: ctx.user } });
     })
@@ -2252,16 +2589,16 @@ function adminPermissionProcedure(permission) {
 // server/_core/systemRouter.ts
 var systemRouter = router({
   health: publicProcedure.input(
-    z.object({
-      timestamp: z.number().min(0, "timestamp cannot be negative")
+    z2.object({
+      timestamp: z2.number().min(0, "timestamp cannot be negative")
     })
   ).query(() => ({
     ok: true
   })),
   notifyOwner: adminProcedure.input(
-    z.object({
-      title: z.string().min(1, "title is required"),
-      content: z.string().min(1, "content is required")
+    z2.object({
+      title: z2.string().min(1, "title is required"),
+      content: z2.string().min(1, "content is required")
     })
   ).mutation(async ({ input }) => {
     const delivered = await notifyOwner(input);
@@ -2272,26 +2609,26 @@ var systemRouter = router({
 });
 
 // server/routers/registration.ts
-import { TRPCError as TRPCError4 } from "@trpc/server";
-import { and as and4, desc, eq as eq6, inArray, sql as sql3 } from "drizzle-orm";
-import { z as z3 } from "zod";
+import { TRPCError as TRPCError5 } from "@trpc/server";
+import { and as and5, desc, eq as eq7, inArray, sql as sql3 } from "drizzle-orm";
+import { z as z4 } from "zod";
 import { nanoid } from "nanoid";
 
 // server/diagnostic.ts
-import { z as z2 } from "zod";
-var diagnosticInputSchema = z2.object({
-  businessAge: z2.enum(["Idea stage, not trading yet", "Less than a year", "1 to 3 years", "3 to 7 years", "7 to 15 years", "More than 15 years"]),
-  revenueBand: z2.enum(["No revenue yet", "Under \u20A610m", "\u20A610m to \u20A650m", "\u20A650m to \u20A6250m", "\u20A6250m to \u20A61bn", "Above \u20A61bn", "I would rather not say"]),
-  teamSize: z2.enum(["Just me", "2 to 5", "6 to 20", "21 to 50", "51 to 200", "More than 200"]),
-  trajectory: z2.enum(["Growing fast", "Growing steadily", "Flat, stuck at the same level", "Declining", "Too early to tell"]),
-  moneyMechanism: z2.enum(["I turn input into units, I make things", "I buy, move and sell, I trade things", "I sell expertise, something you cannot hold", "A mix, and I am not sure which dominates"]),
-  primaryConstraint: z2.enum(["Not enough customers", "We sell, but we do not make money", "Cash is always tight", "Everything runs through me", "We cannot deliver consistently", "We have no plan, just activity", "We are stuck at a ceiling", "Something else"]),
-  weakAreas: z2.array(z2.enum(["Strategy and direction", "Business model and pricing", "Market and competition", "Brand, marketing and sales", "Operations and systems", "Finance, cash and funding", "People and organisation", "Risk and what could go wrong", "Exit and succession"])).length(2),
-  urgency: z2.enum(["We are in trouble now", "A big decision in the next 90 days", "Building towards next year", "I simply want to learn this properly"]),
-  packageInterest: z2.enum(["Foundation", "Engine Room", "Boardroom", "Not sure yet"]),
-  boardroomDecision: z2.string().max(1e3).optional(),
-  source: z2.enum(["A past participant", "Emmanuel directly", "LinkedIn", "WhatsApp", "Instagram or Facebook", "Somewhere else"]),
-  consent: z2.literal(true)
+import { z as z3 } from "zod";
+var diagnosticInputSchema = z3.object({
+  businessAge: z3.enum(["Idea stage, not trading yet", "Less than a year", "1 to 3 years", "3 to 7 years", "7 to 15 years", "More than 15 years"]),
+  revenueBand: z3.enum(["No revenue yet", "Under \u20A610m", "\u20A610m to \u20A650m", "\u20A650m to \u20A6250m", "\u20A6250m to \u20A61bn", "Above \u20A61bn", "I would rather not say"]),
+  teamSize: z3.enum(["Just me", "2 to 5", "6 to 20", "21 to 50", "51 to 200", "More than 200"]),
+  trajectory: z3.enum(["Growing fast", "Growing steadily", "Flat, stuck at the same level", "Declining", "Too early to tell"]),
+  moneyMechanism: z3.enum(["I turn input into units, I make things", "I buy, move and sell, I trade things", "I sell expertise, something you cannot hold", "A mix, and I am not sure which dominates"]),
+  primaryConstraint: z3.enum(["Not enough customers", "We sell, but we do not make money", "Cash is always tight", "Everything runs through me", "We cannot deliver consistently", "We have no plan, just activity", "We are stuck at a ceiling", "Something else"]),
+  weakAreas: z3.array(z3.enum(["Strategy and direction", "Business model and pricing", "Market and competition", "Brand, marketing and sales", "Operations and systems", "Finance, cash and funding", "People and organisation", "Risk and what could go wrong", "Exit and succession"])).length(2),
+  urgency: z3.enum(["We are in trouble now", "A big decision in the next 90 days", "Building towards next year", "I simply want to learn this properly"]),
+  packageInterest: z3.enum(["Foundation", "Engine Room", "Boardroom", "Not sure yet"]),
+  boardroomDecision: z3.string().max(1e3).optional(),
+  source: z3.enum(["A past participant", "Emmanuel directly", "LinkedIn", "WhatsApp", "Instagram or Facebook", "Somewhere else"]),
+  consent: z3.literal(true)
 });
 var constraintMeaning = {
   "Not enough customers": "Before we add customers we check whether the ones you already have are profitable. Growth on a broken model only loses money faster.",
@@ -2424,17 +2761,17 @@ function consumePortalLinkRateLimit(email, ip) {
   existing.count += 1;
   return true;
 }
-var registrationInputSchema = z3.object({
-  fullName: z3.string().min(2, "Full name is required"),
-  email: z3.string().email("Valid email address is required"),
-  phone: z3.string().min(5, "Phone number is required"),
-  businessName: z3.string().min(2, "Business name is required"),
-  businessDescription: z3.string().min(10, "Please provide a brief business description"),
-  businessModel: z3.enum(["Maker", "Trader", "Expert"]),
-  package: z3.enum(["Foundation", "Engine Room", "Boardroom"]),
-  question: z3.string().optional(),
+var registrationInputSchema = z4.object({
+  fullName: z4.string().min(2, "Full name is required"),
+  email: z4.string().email("Valid email address is required"),
+  phone: z4.string().min(5, "Phone number is required"),
+  businessName: z4.string().min(2, "Business name is required"),
+  businessDescription: z4.string().min(10, "Please provide a brief business description"),
+  businessModel: z4.enum(["Maker", "Trader", "Expert"]),
+  package: z4.enum(["Foundation", "Engine Room", "Boardroom"]),
+  question: z4.string().optional(),
   diagnostic: diagnosticInputSchema.optional(),
-  referralCode: z3.string().trim().min(8).max(64).optional()
+  referralCode: z4.string().trim().min(8).max(64).optional()
 });
 function registrationStatusForBoardroom(count) {
   return count >= BOARDROOM_CAPACITY ? "Waitlisted" : "Pending";
@@ -2467,9 +2804,9 @@ async function supersedeDuplicatePathways(db, duplicateRegistrationIds, canonica
 }
 async function recordReferralAttribution(db, referralCode, referredRegistrationId, referredEmail) {
   if (!referralCode) return;
-  const profile = (await db.select().from(participantReferralProfiles).where(eq6(participantReferralProfiles.referralCode, referralCode)).limit(1))[0];
+  const profile = (await db.select().from(participantReferralProfiles).where(eq7(participantReferralProfiles.referralCode, referralCode)).limit(1))[0];
   if (!profile) return;
-  const referrer = (await db.select({ id: registrations.id, email: registrations.email }).from(registrations).where(eq6(registrations.id, profile.registrationId)).limit(1))[0];
+  const referrer = (await db.select({ id: registrations.id, email: registrations.email }).from(registrations).where(eq7(registrations.id, profile.registrationId)).limit(1))[0];
   if (!referrer || referrer.email.trim().toLowerCase() === referredEmail.trim().toLowerCase()) return;
   try {
     await db.insert(participantReferrals).values({
@@ -2488,32 +2825,32 @@ var registrationRouter = router({
     if (!db) return [];
     return await db.select().from(users).orderBy(desc(users.lastSignedIn));
   }),
-  setUserRole: ownerAdminProcedure.input(z3.object({ userId: z3.string(), role: z3.enum(["admin", "user"]) })).mutation(async ({ input }) => {
+  setUserRole: ownerAdminProcedure.input(z4.object({ userId: z4.string(), role: z4.enum(["admin", "user"]) })).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    await db.update(users).set({ role: input.role }).where(eq6(users.id, Number(input.userId)));
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    await db.update(users).set({ role: input.role }).where(eq7(users.id, Number(input.userId)));
     return { success: true };
   }),
-  replaceParticipantPortalLink: adminPermissionProcedure("manage_portal_access").input(z3.object({ registrationId: z3.number().int().positive() })).mutation(async ({ input, ctx }) => ({
+  replaceParticipantPortalLink: adminPermissionProcedure("manage_portal_access").input(z4.object({ registrationId: z4.number().int().positive() })).mutation(async ({ input, ctx }) => ({
     portalUrl: await replaceParticipantPortalLink(input.registrationId, ctx.req)
   })),
-  sendEngagementBriefInvitation: ownerAdminProcedure.input(z3.object({ registrationId: z3.number().int().positive(), testRecipient: z3.string().email().optional() })).mutation(async ({ input, ctx }) => {
+  sendEngagementBriefInvitation: ownerAdminProcedure.input(z4.object({ registrationId: z4.number().int().positive(), testRecipient: z4.string().email().optional() })).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const applicants = await db.select().from(registrations).where(eq6(registrations.id, input.registrationId)).limit(1);
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const applicants = await db.select().from(registrations).where(eq7(registrations.id, input.registrationId)).limit(1);
     const applicant = applicants[0];
     if (!applicant || applicant.status === "Rejected") {
-      throw new TRPCError4({ code: "NOT_FOUND", message: "Eligible participant registration not found." });
+      throw new TRPCError5({ code: "NOT_FOUND", message: "Eligible participant registration not found." });
     }
     if (applicant.supersededByRegistrationId) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "CONFLICT",
         message: "This lower-pathway registration has been consolidated into the participant\u2019s highest selected pathway. Kindly send the canonical invitation instead."
       });
     }
     const packageName = applicant.package;
     if (!["Foundation", "Engine Room", "Boardroom"].includes(packageName)) {
-      throw new TRPCError4({ code: "BAD_REQUEST", message: `The participant does not have a recognised ${BRAND.programmeShortName} pathway.` });
+      throw new TRPCError5({ code: "BAD_REQUEST", message: `The participant does not have a recognised ${BRAND.programmeShortName} pathway.` });
     }
     const passwordLink = await createParticipantPasswordLink(applicant.id, ctx.req);
     const message = buildEngagementBriefInvitationEmail({
@@ -2534,7 +2871,7 @@ var registrationRouter = router({
       deliveryStatus: delivery.status,
       deliveryMessageId: delivery.status === "Sent" ? delivery.providerMessageId || null : null,
       revokedAt: delivery.status === "Sent" ? null : /* @__PURE__ */ new Date()
-    }).where(eq6(participantPasswordTokens.id, passwordLink.tokenId));
+    }).where(eq7(participantPasswordTokens.id, passwordLink.tokenId));
     await db.insert(emailLogs).values({
       registrationId: applicant.id,
       recipientEmail: recipient,
@@ -2543,7 +2880,7 @@ var registrationRouter = router({
       status: delivery.status
     });
     if (delivery.status !== "Sent") {
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "The Engagement Brief invitation could not be delivered." });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "The Engagement Brief invitation could not be delivered." });
     }
     return { status: delivery.status, recipient, packageName };
   }),
@@ -2551,9 +2888,9 @@ var registrationRouter = router({
     const db = await getDb();
     if (!db) return { boardroomCount: 0, boardroomAvailable: true };
     const result = await db.select({ count: sql3`count(*)` }).from(registrations).where(
-      and4(
-        eq6(registrations.package, "Boardroom"),
-        eq6(registrations.status, "Accepted")
+      and5(
+        eq7(registrations.package, "Boardroom"),
+        eq7(registrations.status, "Accepted")
       )
     );
     const boardroomCount = Number(result[0]?.count ?? 0);
@@ -2566,7 +2903,7 @@ var registrationRouter = router({
   submit: publicProcedure.input(registrationInputSchema).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const knownRegistrations = await db.select({
       id: registrations.id,
@@ -2582,7 +2919,7 @@ var registrationRouter = router({
     const relatedPathways = relatedActiveRegistrations.map((registration) => registration.package);
     const retainedPathway = relatedPathways.length > 0 ? selectHighestPathway(relatedPathways) : void 0;
     if (retainedPathway && !pathwaySupersedes(input.package, retainedPathway)) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "CONFLICT",
         message: `Your ${retainedPathway} registration is already active. Kindly use that single participant experience rather than submitting a second pathway entry.`
       });
@@ -2591,9 +2928,9 @@ var registrationRouter = router({
     const { diagnostic, registrationFields } = buildRegistrationInsertFields(input, bookingToken);
     if (input.package === "Boardroom") {
       const capacityCheck = await db.select({ count: sql3`count(*)` }).from(registrations).where(
-        and4(
-          eq6(registrations.package, "Boardroom"),
-          eq6(registrations.status, "Accepted")
+        and5(
+          eq7(registrations.package, "Boardroom"),
+          eq7(registrations.status, "Accepted")
         )
       );
       const count = Number(capacityCheck[0]?.count ?? 0);
@@ -2689,10 +3026,10 @@ Pre-submitted Question: ${input.question || "None"}`
   }),
   // Admin procedures
   list: adminPermissionProcedure("view_participants").input(
-    z3.object({
-      packageFilter: z3.string().optional(),
-      statusFilter: z3.string().optional(),
-      search: z3.string().optional()
+    z4.object({
+      packageFilter: z4.string().optional(),
+      statusFilter: z4.string().optional(),
+      search: z4.string().optional()
     }).optional()
   ).query(async ({ input }) => {
     const db = await getDb();
@@ -2737,77 +3074,77 @@ Pre-submitted Question: ${input.question || "None"}`
     }));
   }),
   updateStatus: adminPermissionProcedure("decide_applications").input(
-    z3.object({
-      id: z3.number(),
-      status: z3.enum(["Pending", "Accepted", "Rejected", "Waitlisted"])
+    z4.object({
+      id: z4.number(),
+      status: z4.enum(["Pending", "Accepted", "Rejected", "Waitlisted"])
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     if (input.status === "Accepted") {
-      const current = await db.select().from(registrations).where(eq6(registrations.id, input.id)).limit(1);
+      const current = await db.select().from(registrations).where(eq7(registrations.id, input.id)).limit(1);
       const applicant = current[0];
-      if (!applicant) throw new TRPCError4({ code: "NOT_FOUND", message: "Registration not found" });
+      if (!applicant) throw new TRPCError5({ code: "NOT_FOUND", message: "Registration not found" });
       if (applicant.package === "Boardroom") {
         const acceptedBoardroom = await db.select({ count: sql3`count(*)` }).from(registrations).where(
-          and4(
-            eq6(registrations.package, "Boardroom"),
-            eq6(registrations.status, "Accepted")
+          and5(
+            eq7(registrations.package, "Boardroom"),
+            eq7(registrations.status, "Accepted")
           )
         );
         if (Number(acceptedBoardroom[0]?.count ?? 0) >= BOARDROOM_CAPACITY && applicant.status !== "Accepted") {
-          throw new TRPCError4({
+          throw new TRPCError5({
             code: "CONFLICT",
             message: "Boardroom capacity is full. Move another applicant out of Accepted before accepting this registration."
           });
         }
       }
     }
-    await db.update(registrations).set({ status: input.status }).where(eq6(registrations.id, input.id));
+    await db.update(registrations).set({ status: input.status }).where(eq7(registrations.id, input.id));
     return { success: true };
   }),
-  archiveRegistration: ownerAdminProcedure.input(z3.object({ id: z3.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  archiveRegistration: ownerAdminProcedure.input(z4.object({ id: z4.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
-    const registration = (await db.select({ id: registrations.id, archivedAt: registrations.archivedAt }).from(registrations).where(eq6(registrations.id, input.id)).limit(1))[0];
-    if (!registration) throw new TRPCError4({ code: "NOT_FOUND", message: "Registration not found" });
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
+    const registration = (await db.select({ id: registrations.id, archivedAt: registrations.archivedAt }).from(registrations).where(eq7(registrations.id, input.id)).limit(1))[0];
+    if (!registration) throw new TRPCError5({ code: "NOT_FOUND", message: "Registration not found" });
     if (registration.archivedAt) return { success: true, alreadyArchived: true };
-    await db.update(registrations).set(archiveApplicationFields(ctx.user.id)).where(eq6(registrations.id, input.id));
+    await db.update(registrations).set(archiveApplicationFields(ctx.user.id)).where(eq7(registrations.id, input.id));
     return { success: true, alreadyArchived: false };
   }),
   updatePayment: adminPermissionProcedure("manage_payments").input(
-    z3.object({
-      id: z3.number(),
-      field: z3.enum(["depositPaid", "instalment1", "instalment2"]),
-      value: z3.enum(["Pending", "Paid"])
+    z4.object({
+      id: z4.number(),
+      field: z4.enum(["depositPaid", "instalment1", "instalment2"]),
+      value: z4.enum(["Pending", "Paid"])
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
-    await db.update(registrations).set({ [input.field]: input.value }).where(eq6(registrations.id, input.id));
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(registrations).set({ [input.field]: input.value }).where(eq7(registrations.id, input.id));
     return { success: true };
   }),
   updateCohort: adminPermissionProcedure("manage_cohorts").input(
-    z3.object({
-      id: z3.number(),
-      cohortGroup: z3.enum(["Unassigned", "Makers", "Traders", "Experts"])
+    z4.object({
+      id: z4.number(),
+      cohortGroup: z4.enum(["Unassigned", "Makers", "Traders", "Experts"])
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
-    await db.update(registrations).set({ cohortGroup: input.cohortGroup }).where(eq6(registrations.id, input.id));
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(registrations).set({ cohortGroup: input.cohortGroup }).where(eq7(registrations.id, input.id));
     return { success: true };
   }),
   sendEmail: ownerAdminProcedure.input(
-    z3.object({
-      registrationId: z3.number(),
-      recipientEmail: z3.string().email(),
-      subject: z3.string().min(2),
-      body: z3.string().min(5)
+    z4.object({
+      registrationId: z4.number(),
+      recipientEmail: z4.string().email(),
+      subject: z4.string().min(2),
+      body: z4.string().min(5)
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     const delivery = await deliverEmail({
       to: input.recipientEmail,
       subject: input.subject,
@@ -2823,25 +3160,25 @@ Pre-submitted Question: ${input.question || "None"}`
     return { success: true, status: delivery.status };
   }),
   sendBulkEmail: ownerAdminProcedure.input(
-    z3.object({
-      registrationIds: z3.array(z3.number()).min(1),
-      recipients: z3.array(z3.string().email()).min(1),
-      subject: z3.string().min(2),
-      body: z3.string().min(5)
+    z4.object({
+      registrationIds: z4.array(z4.number()).min(1),
+      recipients: z4.array(z4.string().email()).min(1),
+      subject: z4.string().min(2),
+      body: z4.string().min(5)
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     if (input.registrationIds.length !== input.recipients.length) {
-      throw new TRPCError4({ code: "BAD_REQUEST", message: "Recipients and registrations must match." });
+      throw new TRPCError5({ code: "BAD_REQUEST", message: "Recipients and registrations must match." });
     }
     const deliveries = await Promise.all(
       input.registrationIds.map(
-        (registrationId, index) => deliverEmail({
-          to: input.recipients[index],
+        (registrationId, index2) => deliverEmail({
+          to: input.recipients[index2],
           subject: input.subject,
           body: input.body
-        }).then((delivery) => ({ registrationId, recipientEmail: input.recipients[index], delivery }))
+        }).then((delivery) => ({ registrationId, recipientEmail: input.recipients[index2], delivery }))
       )
     );
     await db.insert(emailLogs).values(
@@ -2857,22 +3194,22 @@ Pre-submitted Question: ${input.question || "None"}`
     const failed = deliveries.filter(({ delivery }) => delivery.status === "Failed").length;
     return { success: true, count: deliveries.length, sent, failed, status: failed > 0 ? "Failed" : sent === deliveries.length ? "Sent" : "Simulated" };
   }),
-  getEmailLogs: adminPermissionProcedure("view_communications").input(z3.object({ registrationId: z3.number() })).query(async ({ input }) => {
+  getEmailLogs: adminPermissionProcedure("view_communications").input(z4.object({ registrationId: z4.number() })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    return await db.select().from(emailLogs).where(eq6(emailLogs.registrationId, input.registrationId)).orderBy(desc(emailLogs.sentAt));
+    return await db.select().from(emailLogs).where(eq7(emailLogs.registrationId, input.registrationId)).orderBy(desc(emailLogs.sentAt));
   }),
   getAllEmailLogs: adminPermissionProcedure("view_communications").query(async () => {
     const db = await getDb();
     if (!db) return [];
     return await db.select().from(emailLogs).orderBy(desc(emailLogs.sentAt)).limit(100);
   }),
-  requestPortalLink: publicProcedure.input(z3.object({ email: z3.string().email() })).mutation(async ({ input, ctx }) => {
+  requestPortalLink: publicProcedure.input(z4.object({ email: z4.string().email() })).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     const email = input.email.trim().toLowerCase();
     if (!consumePortalLinkRateLimit(email, ctx.req.ip || "unknown")) {
-      throw new TRPCError4({ code: "TOO_MANY_REQUESTS", message: "For your security, please wait a few minutes before requesting another sign-in link." });
+      throw new TRPCError5({ code: "TOO_MANY_REQUESTS", message: "For your security, please wait a few minutes before requesting another sign-in link." });
     }
     const rows = await db.select().from(registrations);
     const applicant = rows.find((row) => normalizeParticipantEmail(row.email) === email);
@@ -2896,7 +3233,7 @@ Pre-submitted Question: ${input.question || "None"}`
       deliveryStatus: delivery.status,
       deliveryMessageId: delivery.status === "Sent" ? delivery.providerMessageId || null : null,
       revokedAt: delivery.status === "Sent" ? null : /* @__PURE__ */ new Date()
-    }).where(eq6(participantPasswordTokens.id, passwordLink.tokenId));
+    }).where(eq7(participantPasswordTokens.id, passwordLink.tokenId));
     await db.insert(emailLogs).values({
       registrationId: applicant.id,
       recipientEmail: applicant.email,
@@ -2905,16 +3242,16 @@ Pre-submitted Question: ${input.question || "None"}`
       status: delivery.status
     });
     if (delivery.status !== "Sent") {
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: `We could not deliver your password link. Please try again shortly or contact ${BRAND.facilitatorFirstName} directly.` });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: `We could not deliver your password link. Please try again shortly or contact ${BRAND.facilitatorFirstName} directly.` });
     }
     return { success: true, message: `If this email is linked to an eligible ${BRAND.programmeShortName} registration, a secure password link will arrive shortly.` };
   }),
-  resendEmailLog: ownerAdminProcedure.input(z3.object({ logId: z3.number() })).mutation(async ({ input }) => {
+  resendEmailLog: ownerAdminProcedure.input(z4.object({ logId: z4.number() })).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
-    const logRecord = await db.select().from(emailLogs).where(eq6(emailLogs.id, input.logId)).limit(1);
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
+    const logRecord = await db.select().from(emailLogs).where(eq7(emailLogs.id, input.logId)).limit(1);
     const target = logRecord[0];
-    if (!target) throw new TRPCError4({ code: "NOT_FOUND", message: "Email log not found" });
+    if (!target) throw new TRPCError5({ code: "NOT_FOUND", message: "Email log not found" });
     const delivery = await deliverEmail({
       to: target.recipientEmail,
       subject: target.subject,
@@ -2930,20 +3267,20 @@ Pre-submitted Question: ${input.question || "None"}`
     return { success: true, status: delivery.status };
   }),
   sendSessionReminder: ownerAdminProcedure.input(
-    z3.object({
-      sessionTitle: z3.string().min(2),
-      sessionDate: z3.string(),
+    z4.object({
+      sessionTitle: z4.string().min(2),
+      sessionDate: z4.string(),
       // ISO string or formatted date
-      sessionTime: z3.string(),
-      meetingUrl: z3.string().url().optional(),
-      messageNotes: z3.string().optional()
+      sessionTime: z4.string(),
+      meetingUrl: z4.string().url().optional(),
+      messageNotes: z4.string().optional()
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
-    const acceptedApplicants = await db.select().from(registrations).where(eq6(registrations.status, "Accepted"));
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
+    const acceptedApplicants = await db.select().from(registrations).where(eq7(registrations.status, "Accepted"));
     if (acceptedApplicants.length === 0) {
-      throw new TRPCError4({ code: "BAD_REQUEST", message: "No accepted participants found to send reminder to." });
+      throw new TRPCError5({ code: "BAD_REQUEST", message: "No accepted participants found to send reminder to." });
     }
     const startTime = /* @__PURE__ */ new Date(`${input.sessionDate}T09:00:00Z`);
     const endTime = new Date(startTime.getTime() + 90 * 60 * 1e3);
@@ -2998,26 +3335,26 @@ Notes: ${input.messageNotes || "Please join on time."}`,
     };
   }),
   initializePaystack: publicProcedure.input(
-    z3.object({
-      registrationId: z3.number().int().positive(),
-      email: z3.string().email(),
-      amountInNaira: z3.number().positive(),
-      packageName: z3.enum(["Foundation", "Engine Room", "Boardroom"])
+    z4.object({
+      registrationId: z4.number().int().positive(),
+      email: z4.string().email(),
+      amountInNaira: z4.number().positive(),
+      packageName: z4.enum(["Foundation", "Engine Room", "Boardroom"])
     })
   ).mutation(async ({ input }) => {
     const secretKey = ENV.paystackSecretKey;
     if (!secretKey) {
-      throw new TRPCError4({ code: "PRECONDITION_FAILED", message: "Online card payments are not currently available. Kindly use the approved payment guidance in your participant portal." });
+      throw new TRPCError5({ code: "PRECONDITION_FAILED", message: "Online card payments are not currently available. Kindly use the approved payment guidance in your participant portal." });
     }
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const applicant = (await db.select({ id: registrations.id, email: registrations.email, package: registrations.package, status: registrations.status }).from(registrations).where(eq6(registrations.id, input.registrationId)).limit(1))[0];
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const applicant = (await db.select({ id: registrations.id, email: registrations.email, package: registrations.package, status: registrations.status }).from(registrations).where(eq7(registrations.id, input.registrationId)).limit(1))[0];
     if (!applicant || applicant.status === "Rejected" || applicant.email.trim().toLowerCase() !== input.email.trim().toLowerCase() || applicant.package !== input.packageName) {
-      throw new TRPCError4({ code: "FORBIDDEN", message: `This payment request does not match an eligible ${BRAND.programmeShortName} registration.` });
+      throw new TRPCError5({ code: "FORBIDDEN", message: `This payment request does not match an eligible ${BRAND.programmeShortName} registration.` });
     }
     const expectedAmount = PAYSTACK_COMMITMENT_AMOUNTS[applicant.package];
     if (input.amountInNaira !== expectedAmount) {
-      throw new TRPCError4({ code: "BAD_REQUEST", message: "The requested payment amount does not match this pathway\u2019s current commitment amount." });
+      throw new TRPCError5({ code: "BAD_REQUEST", message: "The requested payment amount does not match this pathway\u2019s current commitment amount." });
     }
     try {
       const res = await fetch("https://api.paystack.co/transaction/initialize", {
@@ -3039,7 +3376,7 @@ Notes: ${input.messageNotes || "Please join on time."}`,
       });
       const data = await res.json();
       if (!data.status || !data.data) {
-        throw new TRPCError4({ code: "BAD_REQUEST", message: data.message || "Failed to initialize Paystack transaction" });
+        throw new TRPCError5({ code: "BAD_REQUEST", message: data.message || "Failed to initialize Paystack transaction" });
       }
       return {
         success: true,
@@ -3048,18 +3385,18 @@ Notes: ${input.messageNotes || "Please join on time."}`,
         authorizationUrl: data.data.authorization_url
       };
     } catch (err) {
-      throw new TRPCError4({
+      throw new TRPCError5({
         code: "INTERNAL_SERVER_ERROR",
         message: err instanceof Error ? err.message : "Paystack initialization error"
       });
     }
   }),
-  verifyPaystack: publicProcedure.input(z3.object({ reference: z3.string().min(8).max(255), registrationId: z3.number().int().positive() })).mutation(async ({ input }) => {
+  verifyPaystack: publicProcedure.input(z4.object({ reference: z4.string().min(8).max(255), registrationId: z4.number().int().positive() })).mutation(async ({ input }) => {
     const secretKey = ENV.paystackSecretKey;
     const db = await getDb();
-    if (!db) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR" });
     if (!secretKey) {
-      throw new TRPCError4({ code: "PRECONDITION_FAILED", message: "Online card-payment verification is not currently available." });
+      throw new TRPCError5({ code: "PRECONDITION_FAILED", message: "Online card-payment verification is not currently available." });
     }
     try {
       const res = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(input.reference)}`, {
@@ -3068,24 +3405,24 @@ Notes: ${input.messageNotes || "Please join on time."}`,
         }
       });
       const data = await res.json();
-      const applicant = (await db.select({ id: registrations.id, package: registrations.package, status: registrations.status }).from(registrations).where(eq6(registrations.id, input.registrationId)).limit(1))[0];
+      const applicant = (await db.select({ id: registrations.id, package: registrations.package, status: registrations.status }).from(registrations).where(eq7(registrations.id, input.registrationId)).limit(1))[0];
       const expectedAmount = applicant ? PAYSTACK_COMMITMENT_AMOUNTS[applicant.package] * 100 : void 0;
       const providerRegistrationId = Number(data.data?.metadata?.registrationId);
       if (data.status && data.data?.status === "success" && applicant?.status !== "Rejected" && data.data?.amount === expectedAmount && providerRegistrationId === input.registrationId) {
-        await db.update(registrations).set({ depositPaid: "Paid" }).where(eq6(registrations.id, input.registrationId));
+        await db.update(registrations).set({ depositPaid: "Paid" }).where(eq7(registrations.id, input.registrationId));
         return { success: true, status: "success" };
       }
       return { success: false, status: data.data?.status ?? "failed" };
     } catch (err) {
-      throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Verification request failed" });
+      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Verification request failed" });
     }
   })
 });
 
 // server/routers/scheduling.ts
-import { TRPCError as TRPCError5 } from "@trpc/server";
-import { and as and5, desc as desc2, eq as eq7, sql as sql4 } from "drizzle-orm";
-import { z as z4 } from "zod";
+import { TRPCError as TRPCError6 } from "@trpc/server";
+import { and as and6, desc as desc2, eq as eq8, sql as sql4 } from "drizzle-orm";
+import { z as z5 } from "zod";
 
 // server/calendar.ts
 init_env();
@@ -3437,7 +3774,7 @@ I trust this meets you well and in good health.`,
 
 // server/routers/scheduling.ts
 init_brand();
-var slotKindSchema = z4.enum(["Decide", "Learn", "Apply"]);
+var slotKindSchema = z5.enum(["Decide", "Learn", "Apply"]);
 function asSlotKind(value) {
   return value;
 }
@@ -3446,7 +3783,7 @@ var schedulingRouter = router({
     connected: isCalendarConfigured(),
     message: isCalendarConfigured() ? "Google Calendar is connected and will be checked before a booking is confirmed." : "Availability is managed by owner coordination. The site prevents double-booking locally."
   })),
-  availableSlots: participantProcedure.input(z4.object({ kind: slotKindSchema })).query(async ({ input, ctx }) => {
+  availableSlots: participantProcedure.input(z5.object({ kind: slotKindSchema })).query(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) return { eligible: false, reason: "Database not available", slots: [], calendarConnected: false };
     const kind = asSlotKind(input.kind);
@@ -3454,15 +3791,15 @@ var schedulingRouter = router({
     let reason;
     let requiredCount = kind === "Decide" || kind === "Apply" ? 3 : 5;
     let packageName;
-    const applicant = await db.select({ id: registrations.id, status: registrations.status, depositPaid: registrations.depositPaid, package: registrations.package }).from(registrations).where(eq7(registrations.id, ctx.participant.id)).limit(1);
+    const applicant = await db.select({ id: registrations.id, status: registrations.status, depositPaid: registrations.depositPaid, package: registrations.package }).from(registrations).where(eq8(registrations.id, ctx.participant.id)).limit(1);
     const row = applicant[0];
     if (!row) {
       eligible = false;
       reason = "Your participant session could not be confirmed. Kindly reopen your personal portal link.";
     } else {
-      const consentRows = await db.select({ id: participantEngagementConsents.id }).from(participantEngagementConsents).where(and5(
-        eq7(participantEngagementConsents.registrationId, row.id),
-        eq7(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
+      const consentRows = await db.select({ id: participantEngagementConsents.id }).from(participantEngagementConsents).where(and6(
+        eq8(participantEngagementConsents.registrationId, row.id),
+        eq8(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
       )).limit(1);
       if (!consentRows[0]) {
         eligible = false;
@@ -3480,7 +3817,7 @@ var schedulingRouter = router({
         }
       }
     }
-    const rows = await db.select().from(scheduleSlots).where(eq7(scheduleSlots.kind, kind)).orderBy(scheduleSlots.startAt);
+    const rows = await db.select().from(scheduleSlots).where(eq8(scheduleSlots.kind, kind)).orderBy(scheduleSlots.startAt);
     const window = getAvailabilityWindow(kind);
     let busyRanges = [];
     if (isCalendarConfigured()) {
@@ -3510,10 +3847,10 @@ var schedulingRouter = router({
       }))
     };
   }),
-  myBookings: participantProcedure.input(z4.object({}).optional()).query(async ({ ctx }) => {
+  myBookings: participantProcedure.input(z5.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
-    const applicant = await db.select({ id: registrations.id }).from(registrations).where(eq7(registrations.id, ctx.participant.id)).limit(1);
+    const applicant = await db.select({ id: registrations.id }).from(registrations).where(eq8(registrations.id, ctx.participant.id)).limit(1);
     if (!applicant[0]) return [];
     return db.select({
       id: scheduleBookings.id,
@@ -3524,54 +3861,54 @@ var schedulingRouter = router({
       endAt: scheduleSlots.endAt,
       timezone: scheduleSlots.timezone,
       sessionNumber: scheduleSlots.sessionNumber
-    }).from(scheduleBookings).innerJoin(scheduleSlots, eq7(scheduleBookings.slotId, scheduleSlots.id)).where(and5(eq7(scheduleBookings.registrationId, applicant[0].id), eq7(scheduleBookings.status, "Confirmed"))).orderBy(scheduleSlots.startAt);
+    }).from(scheduleBookings).innerJoin(scheduleSlots, eq8(scheduleBookings.slotId, scheduleSlots.id)).where(and6(eq8(scheduleBookings.registrationId, applicant[0].id), eq8(scheduleBookings.status, "Confirmed"))).orderBy(scheduleSlots.startAt);
   }),
-  book: participantProcedure.input(z4.object({ slotId: z4.number().int().positive() })).mutation(async ({ input, ctx }) => {
+  book: participantProcedure.input(z5.object({ slotId: z5.number().int().positive() })).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const booking = await db.transaction(async (tx) => {
-      const applicantRows = await tx.select().from(registrations).where(eq7(registrations.id, ctx.participant.id)).limit(1);
+      const applicantRows = await tx.select().from(registrations).where(eq8(registrations.id, ctx.participant.id)).limit(1);
       const applicant = applicantRows[0];
-      if (!applicant) throw new TRPCError5({ code: "NOT_FOUND", message: "Booking link not recognised." });
-      const consentRows = await tx.select({ id: participantEngagementConsents.id }).from(participantEngagementConsents).where(and5(
-        eq7(participantEngagementConsents.registrationId, applicant.id),
-        eq7(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
+      if (!applicant) throw new TRPCError6({ code: "NOT_FOUND", message: "Booking link not recognised." });
+      const consentRows = await tx.select({ id: participantEngagementConsents.id }).from(participantEngagementConsents).where(and6(
+        eq8(participantEngagementConsents.registrationId, applicant.id),
+        eq8(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
       )).limit(1);
       if (!consentRows[0]) {
-        throw new TRPCError5({ code: "FORBIDDEN", message: "Please read and acknowledge your personalised engagement brief in the participant portal before scheduling." });
+        throw new TRPCError6({ code: "FORBIDDEN", message: "Please read and acknowledge your personalised engagement brief in the participant portal before scheduling." });
       }
       if (applicant.status !== "Accepted" || applicant.depositPaid !== "Paid") {
-        throw new TRPCError5({ code: "FORBIDDEN", message: "Scheduling opens after acceptance and confirmation of the 40% commitment payment." });
+        throw new TRPCError6({ code: "FORBIDDEN", message: "Scheduling opens after acceptance and confirmation of the 40% commitment payment." });
       }
-      const slotRows = await tx.select().from(scheduleSlots).where(eq7(scheduleSlots.id, input.slotId)).limit(1);
+      const slotRows = await tx.select().from(scheduleSlots).where(eq8(scheduleSlots.id, input.slotId)).limit(1);
       const slot = slotRows[0];
       if (!slot || slot.status !== "Open" || slot.bookedCount >= slot.capacity) {
-        throw new TRPCError5({ code: "CONFLICT", message: "That slot has just been taken. Please choose another available time." });
+        throw new TRPCError6({ code: "CONFLICT", message: "That slot has just been taken. Please choose another available time." });
       }
       const required = requiredMeetingsForPackage(applicant.package);
       if (required.kind !== slot.kind) {
-        throw new TRPCError5({ code: "BAD_REQUEST", message: `This package books ${required.kind} sessions.` });
+        throw new TRPCError6({ code: "BAD_REQUEST", message: `This package books ${required.kind} sessions.` });
       }
-      const currentBookings = await tx.select({ count: sql4`count(*)` }).from(scheduleBookings).where(and5(
-        eq7(scheduleBookings.registrationId, applicant.id),
-        eq7(scheduleBookings.kind, slot.kind),
-        eq7(scheduleBookings.status, "Confirmed")
+      const currentBookings = await tx.select({ count: sql4`count(*)` }).from(scheduleBookings).where(and6(
+        eq8(scheduleBookings.registrationId, applicant.id),
+        eq8(scheduleBookings.kind, slot.kind),
+        eq8(scheduleBookings.status, "Confirmed")
       ));
       if (Number(currentBookings[0]?.count ?? 0) >= required.count) {
-        throw new TRPCError5({ code: "CONFLICT", message: `You already have the maximum ${required.count} ${slot.kind} bookings for this package.` });
+        throw new TRPCError6({ code: "CONFLICT", message: `You already have the maximum ${required.count} ${slot.kind} bookings for this package.` });
       }
-      const duplicate = await tx.select({ id: scheduleBookings.id }).from(scheduleBookings).where(and5(
-        eq7(scheduleBookings.registrationId, applicant.id),
-        eq7(scheduleBookings.slotId, slot.id),
-        eq7(scheduleBookings.status, "Confirmed")
+      const duplicate = await tx.select({ id: scheduleBookings.id }).from(scheduleBookings).where(and6(
+        eq8(scheduleBookings.registrationId, applicant.id),
+        eq8(scheduleBookings.slotId, slot.id),
+        eq8(scheduleBookings.status, "Confirmed")
       )).limit(1);
-      if (duplicate[0]) throw new TRPCError5({ code: "CONFLICT", message: "You have already booked this slot." });
+      if (duplicate[0]) throw new TRPCError6({ code: "CONFLICT", message: "You have already booked this slot." });
       const existingBookings = await tx.select({
         startAt: scheduleSlots.startAt,
         endAt: scheduleSlots.endAt
-      }).from(scheduleBookings).innerJoin(scheduleSlots, eq7(scheduleBookings.slotId, scheduleSlots.id)).where(and5(
-        eq7(scheduleBookings.registrationId, applicant.id),
-        eq7(scheduleBookings.status, "Confirmed")
+      }).from(scheduleBookings).innerJoin(scheduleSlots, eq8(scheduleBookings.slotId, scheduleSlots.id)).where(and6(
+        eq8(scheduleBookings.registrationId, applicant.id),
+        eq8(scheduleBookings.status, "Confirmed")
       ));
       for (const bookingRow of existingBookings) {
         const s1Start = new Date(bookingRow.startAt).getTime();
@@ -3579,16 +3916,16 @@ var schedulingRouter = router({
         const s2Start = new Date(slot.startAt).getTime();
         const s2End = new Date(slot.endAt).getTime();
         if (s1Start < s2End && s2Start < s1End) {
-          throw new TRPCError5({ code: "CONFLICT", message: "You already have a confirmed session booked that overlaps with this time." });
+          throw new TRPCError6({ code: "CONFLICT", message: "You already have a confirmed session booked that overlaps with this time." });
         }
       }
       const claimedSlots = await tx.update(scheduleSlots).set({
         bookedCount: sql4`${scheduleSlots.bookedCount} + 1`,
         // PostgreSQL does not coerce a text CASE result into an enum column, so the result is cast explicitly.
         status: sql4`(CASE WHEN ${scheduleSlots.bookedCount} + 1 >= ${scheduleSlots.capacity} THEN 'Booked' ELSE 'Open' END)::${sql4.identifier(scheduleSlotsStatusEnum.enumName)}`
-      }).where(and5(eq7(scheduleSlots.id, slot.id), eq7(scheduleSlots.status, "Open"), sql4`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`)).returning({ id: scheduleSlots.id });
+      }).where(and6(eq8(scheduleSlots.id, slot.id), eq8(scheduleSlots.status, "Open"), sql4`${scheduleSlots.bookedCount} < ${scheduleSlots.capacity}`)).returning({ id: scheduleSlots.id });
       if (claimedSlots.length !== 1) {
-        throw new TRPCError5({ code: "CONFLICT", message: "That slot has just been taken. Please choose another available time." });
+        throw new TRPCError6({ code: "CONFLICT", message: "That slot has just been taken. Please choose another available time." });
       }
       const [insertResult] = await tx.insert(scheduleBookings).values({
         registrationId: applicant.id,
@@ -3616,7 +3953,7 @@ var schedulingRouter = router({
       calendarStatus = "Failed";
       console.error("[Calendar] Event creation failed after local booking:", error);
     }
-    await db.update(scheduleBookings).set({ calendarStatus, googleCalendarEventId }).where(eq7(scheduleBookings.id, booking.bookingId));
+    await db.update(scheduleBookings).set({ calendarStatus, googleCalendarEventId }).where(eq8(scheduleBookings.id, booking.bookingId));
     return {
       success: true,
       bookingId: booking.bookingId,
@@ -3624,34 +3961,34 @@ var schedulingRouter = router({
       message: calendarStatus === "Created" ? "Your place is reserved and a Google Calendar invitation has been sent." : "Your place is reserved. Calendar synchronisation is pending, so the programme team will confirm the meeting separately."
     };
   }),
-  seed: adminProcedure.input(z4.object({ kind: slotKindSchema })).mutation(async ({ input }) => {
+  seed: adminProcedure.input(z5.object({ kind: slotKindSchema })).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const kind = asSlotKind(input.kind);
     const definitions = generateSlotDefinitions(kind);
-    const existing = await db.select({ startAt: scheduleSlots.startAt, kind: scheduleSlots.kind }).from(scheduleSlots).where(eq7(scheduleSlots.kind, kind));
+    const existing = await db.select({ startAt: scheduleSlots.startAt, kind: scheduleSlots.kind }).from(scheduleSlots).where(eq8(scheduleSlots.kind, kind));
     const keys = new Set(existing.map((slot) => `${slot.kind}:${new Date(slot.startAt).getTime()}`));
     const missing = definitions.filter((slot) => !keys.has(`${slot.kind}:${slot.startAt.getTime()}`));
     if (missing.length > 0) await db.insert(scheduleSlots).values(missing);
     return { inserted: missing.length, total: definitions.length };
   }),
-  adminList: adminProcedure.input(z4.object({ kind: slotKindSchema.optional() }).optional()).query(async ({ input }) => {
+  adminList: adminProcedure.input(z5.object({ kind: slotKindSchema.optional() }).optional()).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(scheduleSlots).where(input?.kind ? eq7(scheduleSlots.kind, input.kind) : void 0).orderBy(desc2(scheduleSlots.startAt));
+    return db.select().from(scheduleSlots).where(input?.kind ? eq8(scheduleSlots.kind, input.kind) : void 0).orderBy(desc2(scheduleSlots.startAt));
   }),
-  block: adminProcedure.input(z4.object({ slotId: z4.number().int().positive(), blocked: z4.boolean() })).mutation(async ({ input }) => {
+  block: adminProcedure.input(z5.object({ slotId: z5.number().int().positive(), blocked: z5.boolean() })).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    await db.update(scheduleSlots).set({ status: input.blocked ? "Blocked" : "Open" }).where(and5(eq7(scheduleSlots.id, input.slotId), eq7(scheduleSlots.bookedCount, 0)));
+    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    await db.update(scheduleSlots).set({ status: input.blocked ? "Blocked" : "Open" }).where(and6(eq8(scheduleSlots.id, input.slotId), eq8(scheduleSlots.bookedCount, 0)));
     return { success: true };
   })
 });
 
 // server/routers/participant.ts
-import { and as and6, desc as desc3, eq as eq8 } from "drizzle-orm";
-import { z as z6 } from "zod";
-import { TRPCError as TRPCError6 } from "@trpc/server";
+import { and as and7, desc as desc3, eq as eq9 } from "drizzle-orm";
+import { z as z7 } from "zod";
+import { TRPCError as TRPCError7 } from "@trpc/server";
 
 // server/paymentGuidance.ts
 init_brand();
@@ -3731,50 +4068,50 @@ function getPrivatePaymentGuidance(packageName, fullName) {
 }
 
 // shared/structuredDiagnostic.ts
-import { z as z5 } from "zod";
+import { z as z6 } from "zod";
 var STRUCTURED_DIAGNOSTIC_VERSION = 2;
 var DIAGNOSTIC_SECTION_IDS = ["confirm", "shape", "numbers", "founder", "future"];
 var PAYERS = ["Consumers", "Small businesses", "Large companies", "Government", "Other businesses\u2019 customers"];
 var SUCCESS_MEASURE_OPTIONS = ["Reliable revenue", "Profitability and cash discipline", "A stronger market position", "A more capable team", "Founder time and decision clarity", "Readiness to scale or raise capital", "I am not ready to define this yet"];
-var structuredDiagnosticDraftSchema = z5.object({
-  version: z5.literal(STRUCTURED_DIAGNOSTIC_VERSION),
-  activeSection: z5.enum(DIAGNOSTIC_SECTION_IDS),
-  completedSections: z5.array(z5.enum(DIAGNOSTIC_SECTION_IDS)).default([]),
-  section1: z5.object({
-    businessName: z5.string().max(255).optional(),
-    businessDescription: z5.string().max(1200).optional(),
-    businessAge: z5.string().max(100).optional(),
-    engine: z5.string().max(100).optional(),
-    primaryConstraint: z5.string().max(500).optional()
+var structuredDiagnosticDraftSchema = z6.object({
+  version: z6.literal(STRUCTURED_DIAGNOSTIC_VERSION),
+  activeSection: z6.enum(DIAGNOSTIC_SECTION_IDS),
+  completedSections: z6.array(z6.enum(DIAGNOSTIC_SECTION_IDS)).default([]),
+  section1: z6.object({
+    businessName: z6.string().max(255).optional(),
+    businessDescription: z6.string().max(1200).optional(),
+    businessAge: z6.string().max(100).optional(),
+    engine: z6.string().max(100).optional(),
+    primaryConstraint: z6.string().max(500).optional()
   }).default({}),
-  section2: z5.object({
-    payers: z5.array(z5.string().max(100)).max(PAYERS.length).optional(),
-    legalStructure: z5.string().max(100).optional(),
-    ownership: z5.string().max(100).optional(),
-    paymentApproval: z5.string().max(100).optional(),
-    fullTimeTeam: z5.string().max(100).optional(),
-    partTimeTeam: z5.string().max(100).optional(),
-    contractors: z5.string().max(100).optional()
+  section2: z6.object({
+    payers: z6.array(z6.string().max(100)).max(PAYERS.length).optional(),
+    legalStructure: z6.string().max(100).optional(),
+    ownership: z6.string().max(100).optional(),
+    paymentApproval: z6.string().max(100).optional(),
+    fullTimeTeam: z6.string().max(100).optional(),
+    partTimeTeam: z6.string().max(100).optional(),
+    contractors: z6.string().max(100).optional()
   }).default({}),
-  section3: z5.object({
-    revenueStage: z5.string().max(100).optional(),
-    annualRevenueBand: z5.string().max(100).optional(),
-    revenueConfidence: z5.string().max(100).optional(),
-    materialNumberSource: z5.string().max(150).optional(),
-    cashRunway: z5.string().max(100).optional(),
-    materialNumberNote: z5.string().max(500).optional()
+  section3: z6.object({
+    revenueStage: z6.string().max(100).optional(),
+    annualRevenueBand: z6.string().max(100).optional(),
+    revenueConfidence: z6.string().max(100).optional(),
+    materialNumberSource: z6.string().max(150).optional(),
+    cashRunway: z6.string().max(100).optional(),
+    materialNumberNote: z6.string().max(500).optional()
   }).default({}),
-  section4: z5.object({
-    founderCapacity: z5.string().max(150).optional(),
-    decisionStyle: z5.string().max(150).optional(),
-    founderEnergy: z5.string().max(150).optional(),
-    leadershipConstraint: z5.string().max(500).optional()
+  section4: z6.object({
+    founderCapacity: z6.string().max(150).optional(),
+    decisionStyle: z6.string().max(150).optional(),
+    founderEnergy: z6.string().max(150).optional(),
+    leadershipConstraint: z6.string().max(500).optional()
   }).default({}),
-  section5: z5.object({
-    futureHorizon: z5.string().max(150).optional(),
-    successMeasures: z5.array(z5.string().max(150)).max(SUCCESS_MEASURE_OPTIONS.length).optional(),
-    strategicPriority: z5.string().max(200).optional(),
-    successDescription: z5.string().max(500).optional()
+  section5: z6.object({
+    futureHorizon: z6.string().max(150).optional(),
+    successMeasures: z6.array(z6.string().max(150)).max(SUCCESS_MEASURE_OPTIONS.length).optional(),
+    strategicPriority: z6.string().max(200).optional(),
+    successDescription: z6.string().max(500).optional()
   }).default({})
 });
 function emptyStructuredDiagnosticDraft() {
@@ -3947,11 +4284,11 @@ function parseWorkingDiagnosticReport(raw) {
 }
 async function getCompletedStructuredDiagnostic(db, applicant) {
   await requireBriefAcknowledgement(db, applicant.id);
-  const stored = (await db.select({ structuredDiagnostic: currentStatusAssessments.structuredDiagnostic }).from(currentStatusAssessments).where(eq8(currentStatusAssessments.registrationId, applicant.id)).limit(1))[0];
+  const stored = (await db.select({ structuredDiagnostic: currentStatusAssessments.structuredDiagnostic }).from(currentStatusAssessments).where(eq9(currentStatusAssessments.registrationId, applicant.id)).limit(1))[0];
   const draft = mergeStructuredDiagnosticDraft(applicant, stored?.structuredDiagnostic ?? null);
   const progress = diagnosticSectionProgress(draft);
   if (progress.completed !== progress.total) {
-    throw new TRPCError6({
+    throw new TRPCError7({
       code: "PRECONDITION_FAILED",
       message: "Complete all five assessment sections before generating your working diagnostic report."
     });
@@ -3959,7 +4296,7 @@ async function getCompletedStructuredDiagnostic(db, applicant) {
   return draft;
 }
 async function getLatestWorkingDiagnosticReport(db, registrationId) {
-  const rows = await db.select({ summaryJson: consultingReports.summaryJson, updatedAt: consultingReports.updatedAt }).from(consultingReports).where(eq8(consultingReports.registrationId, registrationId)).orderBy(desc3(consultingReports.updatedAt));
+  const rows = await db.select({ summaryJson: consultingReports.summaryJson, updatedAt: consultingReports.updatedAt }).from(consultingReports).where(eq9(consultingReports.registrationId, registrationId)).orderBy(desc3(consultingReports.updatedAt));
   for (const row of rows) {
     const report = parseWorkingDiagnosticReport(row.summaryJson);
     if (report) return { report, updatedAt: row.updatedAt };
@@ -3968,30 +4305,30 @@ async function getLatestWorkingDiagnosticReport(db, registrationId) {
 }
 async function requireBriefAcknowledgement(db, registrationId) {
   const consent = (await db.select({ id: participantEngagementConsents.id }).from(participantEngagementConsents).where(
-    and6(
-      eq8(participantEngagementConsents.registrationId, registrationId),
-      eq8(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
+    and7(
+      eq9(participantEngagementConsents.registrationId, registrationId),
+      eq9(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
     )
   ).limit(1))[0];
   if (!consent) {
-    throw new TRPCError6({ code: "FORBIDDEN", message: "Acknowledge your Engagement Brief before opening the Current Status Assessment." });
+    throw new TRPCError7({ code: "FORBIDDEN", message: "Acknowledge your Engagement Brief before opening the Current Status Assessment." });
   }
 }
 var participantRouter = router({
-  signIn: publicProcedure.input(z6.object({ email: z6.string().email().max(320), password: z6.string().min(1).max(160) })).mutation(async ({ ctx, input }) => signInParticipantWithPassword(ctx, input.email, input.password)),
-  completePassword: publicProcedure.input(z6.object({ token: z6.string().min(30).max(200), password: z6.string().min(5).max(160), confirmPassword: z6.string().min(5).max(160) })).mutation(async ({ ctx, input }) => completeParticipantPassword(ctx, input)),
+  signIn: publicProcedure.input(z7.object({ email: z7.string().email().max(320), password: z7.string().min(1).max(160) })).mutation(async ({ ctx, input }) => signInParticipantWithPassword(ctx, input.email, input.password)),
+  completePassword: publicProcedure.input(z7.object({ token: z7.string().min(30).max(200), password: z7.string().min(5).max(160), confirmPassword: z7.string().min(5).max(160) })).mutation(async ({ ctx, input }) => completeParticipantPassword(ctx, input)),
   logout: participantProcedure.mutation(async ({ ctx }) => {
     clearParticipantSession(ctx);
     return { success: true };
   }),
   // Get participant dashboard details via secure token
-  dashboard: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  dashboard: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const applicant = ctx.participant;
-    let programmeRecord = (await db.select().from(participantProgrammeRecords).where(eq8(participantProgrammeRecords.registrationId, applicant.id)).limit(1))[0];
+    let programmeRecord = (await db.select().from(participantProgrammeRecords).where(eq9(participantProgrammeRecords.registrationId, applicant.id)).limit(1))[0];
     if (!programmeRecord) {
       const registrationSnapshot = JSON.stringify({
         id: applicant.id,
@@ -4021,10 +4358,10 @@ var participantRouter = router({
         });
       } catch {
       }
-      programmeRecord = (await db.select().from(participantProgrammeRecords).where(eq8(participantProgrammeRecords.registrationId, applicant.id)).limit(1))[0];
+      programmeRecord = (await db.select().from(participantProgrammeRecords).where(eq9(participantProgrammeRecords.registrationId, applicant.id)).limit(1))[0];
     }
     if (!programmeRecord) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Could not initialise participant programme record." });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Could not initialise participant programme record." });
     }
     const bookings = await db.select({
       id: scheduleBookings.id,
@@ -4035,17 +4372,17 @@ var participantRouter = router({
       timezone: scheduleSlots.timezone,
       sessionNumber: scheduleSlots.sessionNumber,
       googleCalendarEventId: scheduleSlots.googleCalendarEventId
-    }).from(scheduleBookings).innerJoin(scheduleSlots, eq8(scheduleBookings.slotId, scheduleSlots.id)).where(
-      and6(
-        eq8(scheduleBookings.registrationId, applicant.id),
-        eq8(scheduleBookings.status, "Confirmed")
+    }).from(scheduleBookings).innerJoin(scheduleSlots, eq9(scheduleBookings.slotId, scheduleSlots.id)).where(
+      and7(
+        eq9(scheduleBookings.registrationId, applicant.id),
+        eq9(scheduleBookings.status, "Confirmed")
       )
     ).orderBy(scheduleSlots.startAt);
-    const briefs = await db.select().from(participantBriefs).where(eq8(participantBriefs.registrationId, applicant.id)).orderBy(desc3(participantBriefs.createdAt));
+    const briefs = await db.select().from(participantBriefs).where(eq9(participantBriefs.registrationId, applicant.id)).orderBy(desc3(participantBriefs.createdAt));
     const consentRows = await db.select().from(participantEngagementConsents).where(
-      and6(
-        eq8(participantEngagementConsents.registrationId, applicant.id),
-        eq8(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
+      and7(
+        eq9(participantEngagementConsents.registrationId, applicant.id),
+        eq9(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
       )
     ).orderBy(desc3(participantEngagementConsents.acknowledgedAt)).limit(1);
     const currentConsent = consentRows[0] ?? null;
@@ -4084,25 +4421,25 @@ var participantRouter = router({
     };
   }),
   /** Payment details stay off public pages but are available to every authenticated eligible participant. */
-  paymentGuidance: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  paymentGuidance: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const applicant = ctx.participant;
     return getPrivatePaymentGuidance(applicant.package, applicant.fullName);
   }),
   // Record one acknowledgement per personalised brief version and issue a confirmation email.
-  acknowledgeEngagementBrief: participantProcedure.input(z6.object({ confirmed: z6.literal(true) })).mutation(async ({ ctx }) => {
+  acknowledgeEngagementBrief: participantProcedure.input(z7.object({ confirmed: z7.literal(true) })).mutation(async ({ ctx }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const applicant = ctx.participant;
     const existingRows = await db.select().from(participantEngagementConsents).where(
-      and6(
-        eq8(participantEngagementConsents.registrationId, applicant.id),
-        eq8(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
+      and7(
+        eq9(participantEngagementConsents.registrationId, applicant.id),
+        eq9(participantEngagementConsents.briefVersion, ENGAGEMENT_BRIEF_VERSION)
       )
     ).orderBy(desc3(participantEngagementConsents.acknowledgedAt)).limit(1);
     const existing = existingRows[0];
@@ -4134,7 +4471,7 @@ var participantRouter = router({
     await db.update(participantEngagementConsents).set({
       confirmationEmailStatus: delivery.status,
       confirmationEmailMessageId: messageId
-    }).where(eq8(participantEngagementConsents.id, consentId));
+    }).where(eq9(participantEngagementConsents.id, consentId));
     await db.insert(emailLogs).values({
       registrationId: applicant.id,
       recipientEmail: applicant.email,
@@ -4146,17 +4483,17 @@ var participantRouter = router({
   }),
   // Admin upload or create brief
   uploadBrief: adminPermissionProcedure("manage_documents").input(
-    z6.object({
-      registrationId: z6.number().int().positive(),
-      title: z6.string().min(2),
-      fileUrl: z6.string().url(),
-      fileKey: z6.string().min(2),
-      description: z6.string().optional()
+    z7.object({
+      registrationId: z7.number().int().positive(),
+      title: z7.string().min(2),
+      fileUrl: z7.string().url(),
+      fileKey: z7.string().min(2),
+      description: z7.string().optional()
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     await db.insert(participantBriefs).values({
       registrationId: input.registrationId,
@@ -4168,28 +4505,28 @@ var participantRouter = router({
     return { success: true };
   }),
   // Admin list briefs for a registration
-  listBriefs: adminPermissionProcedure("view_documents").input(z6.object({ registrationId: z6.number().int().positive() })).query(async ({ input }) => {
+  listBriefs: adminPermissionProcedure("view_documents").input(z7.object({ registrationId: z7.number().int().positive() })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(participantBriefs).where(eq8(participantBriefs.registrationId, input.registrationId)).orderBy(desc3(participantBriefs.createdAt));
+    return db.select().from(participantBriefs).where(eq9(participantBriefs.registrationId, input.registrationId)).orderBy(desc3(participantBriefs.createdAt));
   }),
   // Participant upload completed assignment
   uploadAssignment: participantProcedure.input(
-    z6.object({
-      fileName: z6.string().min(1),
-      fileUrl: z6.string().startsWith("/manus-storage/"),
-      fileKey: z6.string().min(1),
-      notes: z6.string().optional()
+    z7.object({
+      fileName: z7.string().min(1),
+      fileUrl: z7.string().startsWith("/manus-storage/"),
+      fileKey: z7.string().min(1),
+      notes: z7.string().optional()
     })
   ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const applicant = ctx.participant;
     const expectedPrefix = `participant-assignments/${applicant.id}/`;
     if (!input.fileKey.startsWith(expectedPrefix)) {
-      throw new TRPCError6({ code: "FORBIDDEN", message: "This uploaded file is not associated with your private participant session." });
+      throw new TRPCError7({ code: "FORBIDDEN", message: "This uploaded file is not associated with your private participant session." });
     }
     await db.insert(participantAssignments).values({
       registrationId: applicant.id,
@@ -4201,34 +4538,34 @@ var participantRouter = router({
     return { success: true };
   }),
   // List participant assignments (public via token or admin)
-  listAssignments: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  listAssignments: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     const applicant = ctx.participant;
-    return db.select().from(participantAssignments).where(eq8(participantAssignments.registrationId, applicant.id)).orderBy(desc3(participantAssignments.createdAt));
+    return db.select().from(participantAssignments).where(eq9(participantAssignments.registrationId, applicant.id)).orderBy(desc3(participantAssignments.createdAt));
   }),
   // Admin list assignments for any registration ID
-  adminListAssignments: adminPermissionProcedure("view_documents").input(z6.object({ registrationId: z6.number().int().positive() })).query(async ({ input }) => {
+  adminListAssignments: adminPermissionProcedure("view_documents").input(z7.object({ registrationId: z7.number().int().positive() })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(participantAssignments).where(eq8(participantAssignments.registrationId, input.registrationId)).orderBy(desc3(participantAssignments.createdAt));
+    return db.select().from(participantAssignments).where(eq9(participantAssignments.registrationId, input.registrationId)).orderBy(desc3(participantAssignments.createdAt));
   }),
   // Participant-submitted proof of transfer. A receipt can never mark a payment as paid by itself.
   submitPaymentReceipt: participantProcedure.input(
-    z6.object({
-      paymentMilestone: z6.enum(["deposit", "instalment_1", "instalment_2", "full_upfront"]),
-      fileName: z6.string().min(1).max(255),
-      fileUrl: z6.string().startsWith("/manus-storage/"),
-      fileKey: z6.string().min(1).max(255),
-      participantNote: z6.string().trim().max(1e3).optional()
+    z7.object({
+      paymentMilestone: z7.enum(["deposit", "instalment_1", "instalment_2", "full_upfront"]),
+      fileName: z7.string().min(1).max(255),
+      fileUrl: z7.string().startsWith("/manus-storage/"),
+      fileKey: z7.string().min(1).max(255),
+      participantNote: z7.string().trim().max(1e3).optional()
     })
   ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     const expectedPrefix = `payment-receipts/${applicant.id}/`;
     if (!input.fileKey.startsWith(expectedPrefix)) {
-      throw new TRPCError6({ code: "FORBIDDEN", message: "This receipt is not associated with your private participant session." });
+      throw new TRPCError7({ code: "FORBIDDEN", message: "This receipt is not associated with your private participant session." });
     }
     await db.insert(participantPaymentReceipts).values({
       registrationId: applicant.id,
@@ -4240,50 +4577,50 @@ var participantRouter = router({
     });
     return { success: true };
   }),
-  listPaymentReceipts: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  listPaymentReceipts: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(participantPaymentReceipts).where(eq8(participantPaymentReceipts.registrationId, ctx.participant.id)).orderBy(desc3(participantPaymentReceipts.createdAt));
+    return db.select().from(participantPaymentReceipts).where(eq9(participantPaymentReceipts.registrationId, ctx.participant.id)).orderBy(desc3(participantPaymentReceipts.createdAt));
   }),
-  adminListPaymentReceipts: adminPermissionProcedure("manage_payments").input(z6.object({ registrationId: z6.number().int().positive() })).query(async ({ input }) => {
+  adminListPaymentReceipts: adminPermissionProcedure("manage_payments").input(z7.object({ registrationId: z7.number().int().positive() })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(participantPaymentReceipts).where(eq8(participantPaymentReceipts.registrationId, input.registrationId)).orderBy(desc3(participantPaymentReceipts.createdAt));
+    return db.select().from(participantPaymentReceipts).where(eq9(participantPaymentReceipts.registrationId, input.registrationId)).orderBy(desc3(participantPaymentReceipts.createdAt));
   }),
   reviewPaymentReceipt: adminPermissionProcedure("manage_payments").input(
-    z6.object({
-      receiptId: z6.number().int().positive(),
-      status: z6.enum(["Confirmed", "Declined"]),
-      reviewNote: z6.string().trim().max(1e3).optional()
+    z7.object({
+      receiptId: z7.number().int().positive(),
+      status: z7.enum(["Confirmed", "Declined"]),
+      reviewNote: z7.string().trim().max(1e3).optional()
     })
   ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     await db.update(participantPaymentReceipts).set({
       status: input.status,
       reviewedByUserId: ctx.user.id,
       reviewedAt: /* @__PURE__ */ new Date(),
       reviewNote: input.reviewNote || null
-    }).where(eq8(participantPaymentReceipts.id, input.receiptId));
+    }).where(eq9(participantPaymentReceipts.id, input.receiptId));
     return { success: true };
   }),
   // Staged, registration-aware Current State Diagnostic. It is unlocked by brief consent, not payment.
-  getStructuredDiagnostic: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  getStructuredDiagnostic: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
-    const stored = (await db.select({ structuredDiagnostic: currentStatusAssessments.structuredDiagnostic }).from(currentStatusAssessments).where(eq8(currentStatusAssessments.registrationId, applicant.id)).limit(1))[0];
+    const stored = (await db.select({ structuredDiagnostic: currentStatusAssessments.structuredDiagnostic }).from(currentStatusAssessments).where(eq9(currentStatusAssessments.registrationId, applicant.id)).limit(1))[0];
     const draft = mergeStructuredDiagnosticDraft(applicant, stored?.structuredDiagnostic ?? null);
     return { draft, progress: diagnosticSectionProgress(draft) };
   }),
-  saveStructuredDiagnostic: participantProcedure.input(z6.object({ draft: structuredDiagnosticDraftSchema })).mutation(async ({ input, ctx }) => {
+  saveStructuredDiagnostic: participantProcedure.input(z7.object({ draft: structuredDiagnosticDraftSchema })).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
     const draft = input.draft;
-    const existing = (await db.select({ id: currentStatusAssessments.id }).from(currentStatusAssessments).where(eq8(currentStatusAssessments.registrationId, applicant.id)).limit(1))[0];
+    const existing = (await db.select({ id: currentStatusAssessments.id }).from(currentStatusAssessments).where(eq9(currentStatusAssessments.registrationId, applicant.id)).limit(1))[0];
     const values = {
       structuredDiagnostic: JSON.stringify(draft),
       diagnosticVersion: STRUCTURED_DIAGNOSTIC_VERSION,
@@ -4293,22 +4630,22 @@ var participantRouter = router({
       status: "Draft"
     };
     if (existing) {
-      await db.update(currentStatusAssessments).set(values).where(eq8(currentStatusAssessments.id, existing.id));
+      await db.update(currentStatusAssessments).set(values).where(eq9(currentStatusAssessments.id, existing.id));
     } else {
       await db.insert(currentStatusAssessments).values({ registrationId: applicant.id, ...values });
     }
     return { success: true, savedAt: /* @__PURE__ */ new Date(), progress: diagnosticSectionProgress(draft) };
   }),
-  getWorkingDiagnosticReport: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  getWorkingDiagnosticReport: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
     return getLatestWorkingDiagnosticReport(db, applicant.id);
   }),
-  generateWorkingDiagnosticReport: participantProcedure.input(z6.object({}).optional()).mutation(async ({ ctx }) => {
+  generateWorkingDiagnosticReport: participantProcedure.input(z7.object({}).optional()).mutation(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     const draft = await getCompletedStructuredDiagnostic(db, applicant);
     const report = buildWorkingDiagnosticReport(applicant, draft);
@@ -4319,14 +4656,14 @@ var participantRouter = router({
     });
     return { report, generated: true };
   }),
-  downloadWorkingDiagnosticReportPdf: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  downloadWorkingDiagnosticReportPdf: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
     const current = await getLatestWorkingDiagnosticReport(db, applicant.id);
     if (!current) {
-      throw new TRPCError6({ code: "NOT_FOUND", message: "Generate your working diagnostic report before downloading it." });
+      throw new TRPCError7({ code: "NOT_FOUND", message: "Generate your working diagnostic report before downloading it." });
     }
     const pdf = await renderWorkingDiagnosticReportPdf(current.report);
     const safeBusinessName = applicant.businessName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "report";
@@ -4335,14 +4672,14 @@ var participantRouter = router({
       dataUrl: `data:application/pdf;base64,${pdf.toString("base64")}`
     };
   }),
-  emailWorkingDiagnosticReport: participantProcedure.input(z6.object({ recipientEmail: z6.string().email().max(320).optional() })).mutation(async ({ input, ctx }) => {
+  emailWorkingDiagnosticReport: participantProcedure.input(z7.object({ recipientEmail: z7.string().email().max(320).optional() })).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
     const current = await getLatestWorkingDiagnosticReport(db, applicant.id);
     if (!current) {
-      throw new TRPCError6({ code: "NOT_FOUND", message: "Generate your working diagnostic report before emailing it." });
+      throw new TRPCError7({ code: "NOT_FOUND", message: "Generate your working diagnostic report before emailing it." });
     }
     const recipientEmail = input.recipientEmail || applicant.email;
     const pdf = await renderWorkingDiagnosticReportPdf(current.report);
@@ -4373,42 +4710,42 @@ ${BRAND.facilitatorName}`;
       status: result.status === "Sent" ? "Sent" : result.status === "Failed" ? "Failed" : "Simulated"
     });
     if (result.status === "Failed") {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Your report email could not be sent. Kindly try again shortly." });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Your report email could not be sent. Kindly try again shortly." });
     }
     return { status: result.status, recipientEmail };
   }),
   // Legacy endpoints are retained during the staged replacement so prior assessments remain accessible.
   // Get current status assessment for a participant
-  getAssessment: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  getAssessment: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
-    const assessmentRows = await db.select().from(currentStatusAssessments).where(eq8(currentStatusAssessments.registrationId, applicant.id)).limit(1);
+    const assessmentRows = await db.select().from(currentStatusAssessments).where(eq9(currentStatusAssessments.registrationId, applicant.id)).limit(1);
     return assessmentRows[0] || null;
   }),
   // Save or update current status assessment by participant token
   saveAssessment: participantProcedure.input(
-    z6.object({
-      businessModelSummary: z6.string().optional(),
-      currentRevenueStage: z6.string().optional(),
-      primaryBottleNeck: z6.string().optional(),
-      teamAndOperations: z6.string().optional(),
-      financialVisibility: z6.string().optional(),
-      desiredSixMonthOutcome: z6.string().optional(),
-      additionalNotes: z6.string().optional(),
-      status: z6.enum(["Draft", "Submitted"]).default("Draft")
+    z7.object({
+      businessModelSummary: z7.string().optional(),
+      currentRevenueStage: z7.string().optional(),
+      primaryBottleNeck: z7.string().optional(),
+      teamAndOperations: z7.string().optional(),
+      financialVisibility: z7.string().optional(),
+      desiredSixMonthOutcome: z7.string().optional(),
+      additionalNotes: z7.string().optional(),
+      status: z7.enum(["Draft", "Submitted"]).default("Draft")
     })
   ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
-    const existingRows = await db.select().from(currentStatusAssessments).where(eq8(currentStatusAssessments.registrationId, applicant.id)).limit(1);
+    const existingRows = await db.select().from(currentStatusAssessments).where(eq9(currentStatusAssessments.registrationId, applicant.id)).limit(1);
     if (existingRows.length > 0) {
       await db.update(currentStatusAssessments).set({
         businessModelSummary: input.businessModelSummary,
@@ -4419,7 +4756,7 @@ ${BRAND.facilitatorName}`;
         desiredSixMonthOutcome: input.desiredSixMonthOutcome,
         additionalNotes: input.additionalNotes,
         status: input.status
-      }).where(eq8(currentStatusAssessments.registrationId, applicant.id));
+      }).where(eq9(currentStatusAssessments.registrationId, applicant.id));
     } else {
       await db.insert(currentStatusAssessments).values({
         registrationId: applicant.id,
@@ -4436,12 +4773,12 @@ ${BRAND.facilitatorName}`;
     return { success: true };
   }),
   // Admin get assessment for any registration ID
-  adminGetAssessment: adminPermissionProcedure("view_assessments").input(z6.object({ registrationId: z6.number().int().positive() })).query(async ({ input }) => {
+  adminGetAssessment: adminPermissionProcedure("view_assessments").input(z7.object({ registrationId: z7.number().int().positive() })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return null;
-    const applicant = (await db.select().from(registrations).where(eq8(registrations.id, input.registrationId)).limit(1))[0];
-    if (!applicant) throw new TRPCError6({ code: "NOT_FOUND", message: "Participant registration not found." });
-    const assessment = (await db.select().from(currentStatusAssessments).where(eq8(currentStatusAssessments.registrationId, input.registrationId)).limit(1))[0];
+    const applicant = (await db.select().from(registrations).where(eq9(registrations.id, input.registrationId)).limit(1))[0];
+    if (!applicant) throw new TRPCError7({ code: "NOT_FOUND", message: "Participant registration not found." });
+    const assessment = (await db.select().from(currentStatusAssessments).where(eq9(currentStatusAssessments.registrationId, input.registrationId)).limit(1))[0];
     if (!assessment) return { assessment: null, draft: null, progress: null, workingReport: null };
     const draft = mergeStructuredDiagnosticDraft(applicant, assessment.structuredDiagnostic ?? null);
     return {
@@ -4452,17 +4789,17 @@ ${BRAND.facilitatorName}`;
     };
   }),
   // Download Current Status Assessment PDF for a participant token
-  downloadAssessmentPdf: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  downloadAssessmentPdf: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     }
     const applicant = ctx.participant;
     await requireBriefAcknowledgement(db, applicant.id);
-    const assessmentRows = await db.select().from(currentStatusAssessments).where(eq8(currentStatusAssessments.registrationId, applicant.id)).limit(1);
+    const assessmentRows = await db.select().from(currentStatusAssessments).where(eq9(currentStatusAssessments.registrationId, applicant.id)).limit(1);
     const assessment = assessmentRows[0];
     if (!assessment) {
-      throw new TRPCError6({ code: "NOT_FOUND", message: "Assessment not found. Please submit your assessment first." });
+      throw new TRPCError7({ code: "NOT_FOUND", message: "Assessment not found. Please submit your assessment first." });
     }
     const PDFDocument2 = (await import("pdfkit")).default;
     const doc = new PDFDocument2({ margin: 50, size: "A4" });
@@ -4514,11 +4851,11 @@ ${BRAND.facilitatorName}`;
     });
   }),
   // Get AI consulting chat conversation history and current question
-  getConsultingChat: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  getConsultingChat: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
-    const messages = await db.select().from(consultingChatMessages).where(eq8(consultingChatMessages.registrationId, applicant.id)).orderBy(consultingChatMessages.createdAt);
+    const messages = await db.select().from(consultingChatMessages).where(eq9(consultingChatMessages.registrationId, applicant.id)).orderBy(consultingChatMessages.createdAt);
     if (messages.length === 0) {
       const welcomeText = `Welcome, ${applicant.fullName}. I am your strategy & innovation AI consulting partner for ${BRAND.programmeName} (working alongside ${BRAND.facilitatorFormalName}).
 
@@ -4548,10 +4885,10 @@ When leading through high-uncertainty execution or pivoting under cash pressure,
         topicTag: "founder_swot",
         structuredData: initialOptions
       });
-      const freshMessages = await db.select().from(consultingChatMessages).where(eq8(consultingChatMessages.registrationId, applicant.id)).orderBy(consultingChatMessages.createdAt);
+      const freshMessages = await db.select().from(consultingChatMessages).where(eq9(consultingChatMessages.registrationId, applicant.id)).orderBy(consultingChatMessages.createdAt);
       return { messages: freshMessages, completed: false };
     }
-    const reportRows = await db.select().from(consultingReports).where(eq8(consultingReports.registrationId, applicant.id)).limit(1);
+    const reportRows = await db.select().from(consultingReports).where(eq9(consultingReports.registrationId, applicant.id)).limit(1);
     return {
       messages,
       completed: reportRows.length > 0,
@@ -4559,12 +4896,12 @@ When leading through high-uncertainty execution or pivoting under cash pressure,
     };
   }),
   // Send message or pass in consulting chat, advance to next question or generate report
-  sendConsultingMessage: participantProcedure.input(z6.object({
-    content: z6.string().max(8e3),
-    isPass: z6.boolean().default(false)
+  sendConsultingMessage: participantProcedure.input(z7.object({
+    content: z7.string().max(8e3),
+    isPass: z7.boolean().default(false)
   })).mutation(async ({ input, ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
     const participantMessage = input.isPass ? "[Participant passed on this question]" : input.content;
     await db.insert(consultingChatMessages).values({
@@ -4573,7 +4910,7 @@ When leading through high-uncertainty execution or pivoting under cash pressure,
       content: participantMessage,
       topicTag: "user_response"
     });
-    const messages = await db.select().from(consultingChatMessages).where(eq8(consultingChatMessages.registrationId, applicant.id)).orderBy(consultingChatMessages.createdAt);
+    const messages = await db.select().from(consultingChatMessages).where(eq9(consultingChatMessages.registrationId, applicant.id)).orderBy(consultingChatMessages.createdAt);
     const aiTurns = messages.filter((m) => m.sender === "ai").length;
     let nextAiContent = "";
     let nextOptions = null;
@@ -4659,11 +4996,11 @@ You can now review your inferred diagnostic findings, strategic hypotheses, and 
     return { success: true };
   }),
   // Download Consulting Assessment Inferred PDF Report
-  downloadConsultingReportPdf: participantProcedure.input(z6.object({}).optional()).query(async ({ ctx }) => {
+  downloadConsultingReportPdf: participantProcedure.input(z7.object({}).optional()).query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const applicant = ctx.participant;
-    const reportRows = await db.select().from(consultingReports).where(eq8(consultingReports.registrationId, applicant.id)).limit(1);
+    const reportRows = await db.select().from(consultingReports).where(eq9(consultingReports.registrationId, applicant.id)).limit(1);
     const report = reportRows[0];
     const summary = report ? JSON.parse(report.summaryJson) : {
       strategicHypotheses: ["Diagnostic interview pending completion."],
@@ -4720,12 +5057,12 @@ You can now review your inferred diagnostic findings, strategic hypotheses, and 
 });
 
 // server/routers/adminAccess.ts
-import { TRPCError as TRPCError7 } from "@trpc/server";
-import { and as and7, desc as desc4, eq as eq9, gt as gt3, isNull as isNull3 } from "drizzle-orm";
-import { randomBytes as randomBytes3 } from "crypto";
-import { z as z7 } from "zod";
+import { TRPCError as TRPCError8 } from "@trpc/server";
+import { and as and8, desc as desc4, eq as eq10, gt as gt4, isNull as isNull4 } from "drizzle-orm";
+import { randomBytes as randomBytes4 } from "crypto";
+import { z as z8 } from "zod";
 init_brand();
-var passwordSchema = z7.string().min(12).max(160);
+var passwordSchema = z8.string().min(12).max(160);
 var PASSWORD_RESET_TOKEN_MAX_AGE_MS = 20 * 60 * 1e3;
 function expirationStatus(expiresAt) {
   return expiresAt.getTime() <= Date.now() ? "Expired" : "Pending";
@@ -4733,10 +5070,10 @@ function expirationStatus(expiresAt) {
 var adminAccessRouter = router({
   status: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db || !ctx.user) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const credentials = await db.select({ id: adminCredentials.id }).from(adminCredentials).where(eq9(adminCredentials.userId, ctx.user.id)).limit(1);
+    if (!db || !ctx.user) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const credentials = await db.select({ id: adminCredentials.id }).from(adminCredentials).where(eq10(adminCredentials.userId, ctx.user.id)).limit(1);
     const passwordVerified = ctx.user.role === "admin" && await hasVerifiedAdminAccess(ctx.req, ctx.user.id);
-    const profile = (await db.select({ permissionsJson: adminPermissionProfiles.permissionsJson }).from(adminPermissionProfiles).where(eq9(adminPermissionProfiles.userId, ctx.user.id)).limit(1))[0];
+    const profile = (await db.select({ permissionsJson: adminPermissionProfiles.permissionsJson }).from(adminPermissionProfiles).where(eq10(adminPermissionProfiles.userId, ctx.user.id)).limit(1))[0];
     return {
       email: ctx.user.email,
       isAdmin: ctx.user.role === "admin",
@@ -4746,15 +5083,15 @@ var adminAccessRouter = router({
       permissions: isOwnerAdmin(ctx.user) ? ADMIN_PERMISSION_IDS : parseAdminPermissions(profile?.permissionsJson)
     };
   }),
-  enrollOwnerPassword: protectedProcedure.input(z7.object({ password: passwordSchema, confirmPassword: passwordSchema })).mutation(async ({ ctx, input }) => {
+  enrollOwnerPassword: protectedProcedure.input(z8.object({ password: passwordSchema, confirmPassword: passwordSchema })).mutation(async ({ ctx, input }) => {
     if (!ctx.user || !isOwnerAdmin(ctx.user) || ctx.user.role !== "admin") {
-      throw new TRPCError7({ code: "FORBIDDEN", message: `Only the recognised ${BRAND.programmeShortName} super administrator can create this password.` });
+      throw new TRPCError8({ code: "FORBIDDEN", message: `Only the recognised ${BRAND.programmeShortName} super administrator can create this password.` });
     }
     if (input.password !== input.confirmPassword) {
-      throw new TRPCError7({ code: "BAD_REQUEST", message: "The password confirmation does not match." });
+      throw new TRPCError8({ code: "BAD_REQUEST", message: "The password confirmation does not match." });
     }
     const policyError = validateAdminPassword(input.password);
-    if (policyError) throw new TRPCError7({ code: "BAD_REQUEST", message: policyError });
+    if (policyError) throw new TRPCError8({ code: "BAD_REQUEST", message: policyError });
     await setAdminPassword(ctx.user.id, input.password);
     await issueAdminAccessSession(ctx.req, ctx.res, ctx.user.id);
     const db = await getDb();
@@ -4765,29 +5102,29 @@ var adminAccessRouter = router({
     });
     return { success: true, message: `Your ${BRAND.programmeShortName} administrator password is now active.` };
   }),
-  verifyPassword: protectedProcedure.input(z7.object({ password: z7.string().min(1).max(160) })).mutation(async ({ ctx, input }) => {
+  verifyPassword: protectedProcedure.input(z8.object({ password: z8.string().min(1).max(160) })).mutation(async ({ ctx, input }) => {
     if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError7({ code: "FORBIDDEN", message: `This account is not an authorised ${BRAND.programmeShortName} administrator.` });
+      throw new TRPCError8({ code: "FORBIDDEN", message: `This account is not an authorised ${BRAND.programmeShortName} administrator.` });
     }
     const result = await verifyAndRecordAdminPassword(ctx.user.id, input.password);
-    if (!result.ok) throw new TRPCError7({ code: "UNAUTHORIZED", message: result.reason });
+    if (!result.ok) throw new TRPCError8({ code: "UNAUTHORIZED", message: result.reason });
     await issueAdminAccessSession(ctx.req, ctx.res, ctx.user.id);
     return { success: true, message: "Administrator access verified." };
   }),
   requestPasswordReset: protectedProcedure.mutation(async ({ ctx }) => {
     if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError7({ code: "FORBIDDEN", message: `This account is not an authorised ${BRAND.programmeShortName} administrator.` });
+      throw new TRPCError8({ code: "FORBIDDEN", message: `This account is not an authorised ${BRAND.programmeShortName} administrator.` });
     }
     const db = await getDb();
-    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const email = normalizeAdminEmail(ctx.user.email);
-    if (!email) throw new TRPCError7({ code: "BAD_REQUEST", message: "This administrator account does not have a verified email address." });
-    const token = randomBytes3(32).toString("base64url");
+    if (!email) throw new TRPCError8({ code: "BAD_REQUEST", message: "This administrator account does not have a verified email address." });
+    const token = randomBytes4(32).toString("base64url");
     const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_MAX_AGE_MS);
-    await db.update(adminPasswordResetTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and7(
-      eq9(adminPasswordResetTokens.userId, ctx.user.id),
-      isNull3(adminPasswordResetTokens.consumedAt),
-      isNull3(adminPasswordResetTokens.revokedAt)
+    await db.update(adminPasswordResetTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and8(
+      eq10(adminPasswordResetTokens.userId, ctx.user.id),
+      isNull4(adminPasswordResetTokens.consumedAt),
+      isNull4(adminPasswordResetTokens.revokedAt)
     ));
     const inserted = await db.insert(adminPasswordResetTokens).values({
       userId: ctx.user.id,
@@ -4812,10 +5149,10 @@ For your protection, this link can be used once. If you did not request this res
 ${BRAND.senderDisplayName}`
     });
     if (delivery.status !== "Sent") {
-      await db.update(adminPasswordResetTokens).set({ revokedAt: /* @__PURE__ */ new Date(), deliveryStatus: delivery.status, deliveryMessageId: null }).where(eq9(adminPasswordResetTokens.id, resetId));
-      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "The reset email could not be delivered. Kindly try again shortly." });
+      await db.update(adminPasswordResetTokens).set({ revokedAt: /* @__PURE__ */ new Date(), deliveryStatus: delivery.status, deliveryMessageId: null }).where(eq10(adminPasswordResetTokens.id, resetId));
+      throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "The reset email could not be delivered. Kindly try again shortly." });
     }
-    await db.update(adminPasswordResetTokens).set({ deliveryStatus: delivery.status, deliveryMessageId: delivery.providerMessageId || null }).where(eq9(adminPasswordResetTokens.id, resetId));
+    await db.update(adminPasswordResetTokens).set({ deliveryStatus: delivery.status, deliveryMessageId: delivery.providerMessageId || null }).where(eq10(adminPasswordResetTokens.id, resetId));
     await db.insert(adminAccessAuditEvents).values({
       actorUserId: ctx.user.id,
       action: "admin_password_reset_requested",
@@ -4824,30 +5161,30 @@ ${BRAND.senderDisplayName}`
     });
     return { success: true, expiresAt };
   }),
-  confirmPasswordReset: publicProcedure.input(z7.object({ token: z7.string().min(30).max(200), password: passwordSchema, confirmPassword: passwordSchema })).mutation(async ({ ctx, input }) => {
+  confirmPasswordReset: publicProcedure.input(z8.object({ token: z8.string().min(30).max(200), password: passwordSchema, confirmPassword: passwordSchema })).mutation(async ({ ctx, input }) => {
     if (input.password !== input.confirmPassword) {
-      throw new TRPCError7({ code: "BAD_REQUEST", message: "The password confirmation does not match." });
+      throw new TRPCError8({ code: "BAD_REQUEST", message: "The password confirmation does not match." });
     }
     const policyError = validateAdminPassword(input.password);
-    if (policyError) throw new TRPCError7({ code: "BAD_REQUEST", message: policyError });
+    if (policyError) throw new TRPCError8({ code: "BAD_REQUEST", message: policyError });
     const db = await getDb();
-    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const resetToken = (await db.select().from(adminPasswordResetTokens).where(and7(
-      eq9(adminPasswordResetTokens.tokenHash, sha256(input.token)),
-      isNull3(adminPasswordResetTokens.consumedAt),
-      isNull3(adminPasswordResetTokens.revokedAt),
-      gt3(adminPasswordResetTokens.expiresAt, /* @__PURE__ */ new Date())
+    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const resetToken = (await db.select().from(adminPasswordResetTokens).where(and8(
+      eq10(adminPasswordResetTokens.tokenHash, sha256(input.token)),
+      isNull4(adminPasswordResetTokens.consumedAt),
+      isNull4(adminPasswordResetTokens.revokedAt),
+      gt4(adminPasswordResetTokens.expiresAt, /* @__PURE__ */ new Date())
     )).limit(1))[0];
     if (!resetToken) {
-      throw new TRPCError7({ code: "NOT_FOUND", message: "This password reset link is unavailable or has expired. Kindly request a new link." });
+      throw new TRPCError8({ code: "NOT_FOUND", message: "This password reset link is unavailable or has expired. Kindly request a new link." });
     }
-    const administrator = (await db.select().from(users).where(and7(eq9(users.id, resetToken.userId), eq9(users.role, "admin"))).limit(1))[0];
+    const administrator = (await db.select().from(users).where(and8(eq10(users.id, resetToken.userId), eq10(users.role, "admin"))).limit(1))[0];
     if (!administrator) {
-      throw new TRPCError7({ code: "FORBIDDEN", message: "This password reset link is no longer valid." });
+      throw new TRPCError8({ code: "FORBIDDEN", message: "This password reset link is no longer valid." });
     }
     await revokeAdminSessionsForUser(administrator.id);
     await setAdminPassword(administrator.id, input.password);
-    await db.update(adminPasswordResetTokens).set({ consumedAt: /* @__PURE__ */ new Date() }).where(eq9(adminPasswordResetTokens.id, resetToken.id));
+    await db.update(adminPasswordResetTokens).set({ consumedAt: /* @__PURE__ */ new Date() }).where(eq10(adminPasswordResetTokens.id, resetToken.id));
     clearAdminAccessSession(ctx.req, ctx.res);
     await db.insert(adminAccessAuditEvents).values({
       actorUserId: administrator.id,
@@ -4862,22 +5199,22 @@ ${BRAND.senderDisplayName}`
     clearAdminAccessSession(ctx.req, ctx.res);
     return { success: true };
   }),
-  inviteAdmin: ownerAdminProcedure.input(z7.object({
-    email: z7.string().email(),
-    inviteeName: z7.string().trim().min(2).max(255).optional(),
-    permissions: z7.array(z7.string().refine(isAdminPermission)).min(1).max(ADMIN_PERMISSION_IDS.length)
+  inviteAdmin: ownerAdminProcedure.input(z8.object({
+    email: z8.string().email(),
+    inviteeName: z8.string().trim().min(2).max(255).optional(),
+    permissions: z8.array(z8.string().refine(isAdminPermission)).min(1).max(ADMIN_PERMISSION_IDS.length)
   })).mutation(async ({ ctx, input }) => {
-    if (!ctx.user) throw new TRPCError7({ code: "UNAUTHORIZED" });
+    if (!ctx.user) throw new TRPCError8({ code: "UNAUTHORIZED" });
     const db = await getDb();
-    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const email = normalizeAdminEmail(input.email);
-    if (email === OWNER_ADMIN_EMAIL) throw new TRPCError7({ code: "BAD_REQUEST", message: "The super administrator already has permanent access." });
-    const existingAdmin = await db.select({ id: users.id }).from(users).where(and7(emailEquals(users.email, email), eq9(users.role, "admin"))).limit(1);
-    if (existingAdmin.length) throw new TRPCError7({ code: "CONFLICT", message: `That email is already an active ${BRAND.programmeShortName} administrator.` });
-    const token = randomBytes3(32).toString("base64url");
+    if (email === OWNER_ADMIN_EMAIL) throw new TRPCError8({ code: "BAD_REQUEST", message: "The super administrator already has permanent access." });
+    const existingAdmin = await db.select({ id: users.id }).from(users).where(and8(emailEquals(users.email, email), eq10(users.role, "admin"))).limit(1);
+    if (existingAdmin.length) throw new TRPCError8({ code: "CONFLICT", message: `That email is already an active ${BRAND.programmeShortName} administrator.` });
+    const token = randomBytes4(32).toString("base64url");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3);
     const permissions = parseAdminPermissions(JSON.stringify(input.permissions));
-    await db.update(adminInvitations).set({ status: "Revoked" }).where(and7(eq9(adminInvitations.email, email), eq9(adminInvitations.status, "Pending")));
+    await db.update(adminInvitations).set({ status: "Revoked" }).where(and8(eq10(adminInvitations.email, email), eq10(adminInvitations.status, "Pending")));
     const inserted = await db.insert(adminInvitations).values({
       email,
       inviteeName: input.inviteeName || null,
@@ -4907,7 +5244,7 @@ ${BRAND.senderDisplayName}`
     await db.update(adminInvitations).set({
       deliveryStatus: delivery.status,
       deliveryMessageId: delivery.status === "Sent" ? delivery.providerMessageId || null : null
-    }).where(eq9(adminInvitations.id, invitationId));
+    }).where(eq10(adminInvitations.id, invitationId));
     await db.insert(adminAccessAuditEvents).values({
       actorUserId: ctx.user.id,
       action: "admin_invitation_created",
@@ -4919,7 +5256,7 @@ ${BRAND.senderDisplayName}`
   listTeam: ownerAdminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-    const team = await db.select().from(users).where(eq9(users.role, "admin")).orderBy(desc4(users.lastSignedIn));
+    const team = await db.select().from(users).where(eq10(users.role, "admin")).orderBy(desc4(users.lastSignedIn));
     const profiles = await db.select().from(adminPermissionProfiles);
     const permissionMap = new Map(profiles.map((profile) => [profile.userId, parseAdminPermissions(profile.permissionsJson)]));
     return team.map((member) => ({
@@ -4938,15 +5275,15 @@ ${BRAND.senderDisplayName}`
       proposedPermissions: parseAdminPermissions(invitation.proposedPermissionsJson)
     }));
   }),
-  revokeAdmin: ownerAdminProcedure.input(z7.object({ userId: z7.number().int().positive() })).mutation(async ({ ctx, input }) => {
-    if (!ctx.user) throw new TRPCError7({ code: "UNAUTHORIZED" });
+  revokeAdmin: ownerAdminProcedure.input(z8.object({ userId: z8.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    if (!ctx.user) throw new TRPCError8({ code: "UNAUTHORIZED" });
     const db = await getDb();
-    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const target = await db.select().from(users).where(eq9(users.id, input.userId)).limit(1);
-    if (!target[0] || target[0].role !== "admin") throw new TRPCError7({ code: "NOT_FOUND", message: "Active administrator not found." });
-    if (isOwnerAdmin(target[0])) throw new TRPCError7({ code: "FORBIDDEN", message: `The ${BRAND.programmeShortName} super administrator cannot be revoked here.` });
-    await db.update(users).set({ role: "user" }).where(eq9(users.id, target[0].id));
-    await db.delete(adminPermissionProfiles).where(eq9(adminPermissionProfiles.userId, target[0].id));
+    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const target = await db.select().from(users).where(eq10(users.id, input.userId)).limit(1);
+    if (!target[0] || target[0].role !== "admin") throw new TRPCError8({ code: "NOT_FOUND", message: "Active administrator not found." });
+    if (isOwnerAdmin(target[0])) throw new TRPCError8({ code: "FORBIDDEN", message: `The ${BRAND.programmeShortName} super administrator cannot be revoked here.` });
+    await db.update(users).set({ role: "user" }).where(eq10(users.id, target[0].id));
+    await db.delete(adminPermissionProfiles).where(eq10(adminPermissionProfiles.userId, target[0].id));
     await revokeAdminSessionsForUser(target[0].id);
     await db.insert(adminAccessAuditEvents).values({
       actorUserId: ctx.user.id,
@@ -4955,52 +5292,52 @@ ${BRAND.senderDisplayName}`
     });
     return { success: true };
   }),
-  updatePermissions: ownerAdminProcedure.input(z7.object({
-    userId: z7.number().int().positive(),
-    permissions: z7.array(z7.string().refine(isAdminPermission)).min(1).max(ADMIN_PERMISSION_IDS.length)
+  updatePermissions: ownerAdminProcedure.input(z8.object({
+    userId: z8.number().int().positive(),
+    permissions: z8.array(z8.string().refine(isAdminPermission)).min(1).max(ADMIN_PERMISSION_IDS.length)
   })).mutation(async ({ ctx, input }) => {
-    if (!ctx.user) throw new TRPCError7({ code: "UNAUTHORIZED" });
+    if (!ctx.user) throw new TRPCError8({ code: "UNAUTHORIZED" });
     const db = await getDb();
-    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const target = (await db.select().from(users).where(eq9(users.id, input.userId)).limit(1))[0];
-    if (!target || target.role !== "admin") throw new TRPCError7({ code: "NOT_FOUND", message: "Active administrator not found." });
-    if (isOwnerAdmin(target)) throw new TRPCError7({ code: "FORBIDDEN", message: "The Super Admin retains all permissions and cannot be restricted." });
+    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const target = (await db.select().from(users).where(eq10(users.id, input.userId)).limit(1))[0];
+    if (!target || target.role !== "admin") throw new TRPCError8({ code: "NOT_FOUND", message: "Active administrator not found." });
+    if (isOwnerAdmin(target)) throw new TRPCError8({ code: "FORBIDDEN", message: "The Super Admin retains all permissions and cannot be restricted." });
     const permissionsJson = serializeAdminPermissions(parseAdminPermissions(JSON.stringify(input.permissions)));
-    const profile = (await db.select({ id: adminPermissionProfiles.id }).from(adminPermissionProfiles).where(eq9(adminPermissionProfiles.userId, target.id)).limit(1))[0];
+    const profile = (await db.select({ id: adminPermissionProfiles.id }).from(adminPermissionProfiles).where(eq10(adminPermissionProfiles.userId, target.id)).limit(1))[0];
     if (profile) {
-      await db.update(adminPermissionProfiles).set({ permissionsJson, updatedByUserId: ctx.user.id }).where(eq9(adminPermissionProfiles.id, profile.id));
+      await db.update(adminPermissionProfiles).set({ permissionsJson, updatedByUserId: ctx.user.id }).where(eq10(adminPermissionProfiles.id, profile.id));
     } else {
       await db.insert(adminPermissionProfiles).values({ userId: target.id, permissionsJson, updatedByUserId: ctx.user.id });
     }
     await db.insert(adminAccessAuditEvents).values({ actorUserId: ctx.user.id, action: "admin_permissions_updated", targetEmail: normalizeAdminEmail(target.email), details: permissionsJson });
     return { success: true };
   }),
-  acceptInvitation: protectedProcedure.input(z7.object({ token: z7.string().min(30).max(200), password: passwordSchema, confirmPassword: passwordSchema })).mutation(async ({ ctx, input }) => {
-    if (!ctx.user) throw new TRPCError7({ code: "UNAUTHORIZED" });
-    if (input.password !== input.confirmPassword) throw new TRPCError7({ code: "BAD_REQUEST", message: "The password confirmation does not match." });
+  acceptInvitation: protectedProcedure.input(z8.object({ token: z8.string().min(30).max(200), password: passwordSchema, confirmPassword: passwordSchema })).mutation(async ({ ctx, input }) => {
+    if (!ctx.user) throw new TRPCError8({ code: "UNAUTHORIZED" });
+    if (input.password !== input.confirmPassword) throw new TRPCError8({ code: "BAD_REQUEST", message: "The password confirmation does not match." });
     const policyError = validateAdminPassword(input.password);
-    if (policyError) throw new TRPCError7({ code: "BAD_REQUEST", message: policyError });
+    if (policyError) throw new TRPCError8({ code: "BAD_REQUEST", message: policyError });
     const db = await getDb();
-    if (!db) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const candidates = await db.select().from(adminInvitations).where(and7(eq9(adminInvitations.tokenHash, sha256(input.token)), eq9(adminInvitations.status, "Pending"))).limit(1);
+    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const candidates = await db.select().from(adminInvitations).where(and8(eq10(adminInvitations.tokenHash, sha256(input.token)), eq10(adminInvitations.status, "Pending"))).limit(1);
     const invitation = candidates[0];
     if (!invitation || invitation.expiresAt.getTime() <= Date.now()) {
-      if (invitation) await db.update(adminInvitations).set({ status: "Expired" }).where(eq9(adminInvitations.id, invitation.id));
-      throw new TRPCError7({ code: "NOT_FOUND", message: "This invitation is unavailable or has expired." });
+      if (invitation) await db.update(adminInvitations).set({ status: "Expired" }).where(eq10(adminInvitations.id, invitation.id));
+      throw new TRPCError8({ code: "NOT_FOUND", message: "This invitation is unavailable or has expired." });
     }
     if (normalizeAdminEmail(ctx.user.email) !== invitation.email) {
-      throw new TRPCError7({ code: "FORBIDDEN", message: `Kindly sign in with ${invitation.email} to accept this invitation.` });
+      throw new TRPCError8({ code: "FORBIDDEN", message: `Kindly sign in with ${invitation.email} to accept this invitation.` });
     }
-    await db.update(users).set({ role: "admin" }).where(eq9(users.id, ctx.user.id));
+    await db.update(users).set({ role: "admin" }).where(eq10(users.id, ctx.user.id));
     await setAdminPassword(ctx.user.id, input.password);
     const permissionsJson = serializeAdminPermissions(parseAdminPermissions(invitation.proposedPermissionsJson));
-    const profile = (await db.select({ id: adminPermissionProfiles.id }).from(adminPermissionProfiles).where(eq9(adminPermissionProfiles.userId, ctx.user.id)).limit(1))[0];
+    const profile = (await db.select({ id: adminPermissionProfiles.id }).from(adminPermissionProfiles).where(eq10(adminPermissionProfiles.userId, ctx.user.id)).limit(1))[0];
     if (profile) {
-      await db.update(adminPermissionProfiles).set({ permissionsJson, updatedByUserId: invitation.createdByUserId }).where(eq9(adminPermissionProfiles.id, profile.id));
+      await db.update(adminPermissionProfiles).set({ permissionsJson, updatedByUserId: invitation.createdByUserId }).where(eq10(adminPermissionProfiles.id, profile.id));
     } else {
       await db.insert(adminPermissionProfiles).values({ userId: ctx.user.id, permissionsJson, updatedByUserId: invitation.createdByUserId });
     }
-    await db.update(adminInvitations).set({ status: "Accepted", acceptedByUserId: ctx.user.id, acceptedAt: /* @__PURE__ */ new Date() }).where(eq9(adminInvitations.id, invitation.id));
+    await db.update(adminInvitations).set({ status: "Accepted", acceptedByUserId: ctx.user.id, acceptedAt: /* @__PURE__ */ new Date() }).where(eq10(adminInvitations.id, invitation.id));
     await issueAdminAccessSession(ctx.req, ctx.res, ctx.user.id);
     await db.insert(adminAccessAuditEvents).values({
       actorUserId: ctx.user.id,
@@ -5010,18 +5347,18 @@ ${BRAND.senderDisplayName}`
     });
     return { success: true };
   }),
-  inviteStatus: publicProcedure.input(z7.object({ token: z7.string().min(30).max(200) })).query(async ({ input }) => {
+  inviteStatus: publicProcedure.input(z8.object({ token: z8.string().min(30).max(200) })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return { valid: false };
-    const result = await db.select({ inviteeName: adminInvitations.inviteeName, expiresAt: adminInvitations.expiresAt, status: adminInvitations.status }).from(adminInvitations).where(eq9(adminInvitations.tokenHash, sha256(input.token))).limit(1);
+    const result = await db.select({ inviteeName: adminInvitations.inviteeName, expiresAt: adminInvitations.expiresAt, status: adminInvitations.status }).from(adminInvitations).where(eq10(adminInvitations.tokenHash, sha256(input.token))).limit(1);
     const invitation = result[0];
     return { valid: Boolean(invitation && invitation.status === "Pending" && invitation.expiresAt.getTime() > Date.now()), inviteeName: invitation?.inviteeName || null };
   })
 });
 
 // server/routers/referrals.ts
-import { TRPCError as TRPCError8 } from "@trpc/server";
-import { and as and8, desc as desc5, eq as eq10, sql as sql5 } from "drizzle-orm";
+import { TRPCError as TRPCError9 } from "@trpc/server";
+import { and as and9, desc as desc5, eq as eq11, sql as sql5 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid as nanoid2 } from "nanoid";
 
@@ -5039,7 +5376,7 @@ function referralIsEligibleForQualification(status, depositPaid) {
 
 // server/routers/referrals.ts
 init_env();
-import { z as z8 } from "zod";
+import { z as z9 } from "zod";
 function shareOrigin(req) {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || "https";
@@ -5050,19 +5387,19 @@ function shareOrigin(req) {
 var referralsRouter = router({
   share: participantProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!db) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
     const registrationId = ctx.participant.id;
-    let profile = (await db.select().from(participantReferralProfiles).where(eq10(participantReferralProfiles.registrationId, registrationId)).limit(1))[0];
+    let profile = (await db.select().from(participantReferralProfiles).where(eq11(participantReferralProfiles.registrationId, registrationId)).limit(1))[0];
     if (!profile) {
       const referralCode = `j${nanoid2(20)}`;
       try {
         await db.insert(participantReferralProfiles).values({ registrationId, referralCode });
       } catch {
       }
-      profile = (await db.select().from(participantReferralProfiles).where(eq10(participantReferralProfiles.registrationId, registrationId)).limit(1))[0];
+      profile = (await db.select().from(participantReferralProfiles).where(eq11(participantReferralProfiles.registrationId, registrationId)).limit(1))[0];
     }
-    if (!profile) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Could not prepare your share link." });
-    const referrals = await db.select().from(participantReferrals).where(eq10(participantReferrals.referrerRegistrationId, registrationId)).orderBy(desc5(participantReferrals.createdAt));
+    if (!profile) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "Could not prepare your share link." });
+    const referrals = await db.select().from(participantReferrals).where(eq11(participantReferrals.referrerRegistrationId, registrationId)).orderBy(desc5(participantReferrals.createdAt));
     const approvedCount = referrals.filter((referral) => referral.status === "Approved").length;
     return {
       shareUrl: `${shareOrigin(ctx.req)}/?ref=${encodeURIComponent(profile.referralCode)}`,
@@ -5092,24 +5429,24 @@ var referralsRouter = router({
       referredPackage: referred.package,
       referredStatus: referred.status,
       referredDepositPaid: referred.depositPaid
-    }).from(participantReferrals).innerJoin(referrer, eq10(participantReferrals.referrerRegistrationId, referrer.id)).innerJoin(referred, eq10(participantReferrals.referredRegistrationId, referred.id)).orderBy(desc5(participantReferrals.createdAt));
+    }).from(participantReferrals).innerJoin(referrer, eq11(participantReferrals.referrerRegistrationId, referrer.id)).innerJoin(referred, eq11(participantReferrals.referredRegistrationId, referred.id)).orderBy(desc5(participantReferrals.createdAt));
   }),
-  review: ownerAdminProcedure.input(z8.object({ id: z8.number().int().positive(), decision: z8.enum(["Qualified", "Approved", "Declined"]), notes: z8.string().trim().max(2e3).optional() })).mutation(async ({ ctx, input }) => {
+  review: ownerAdminProcedure.input(z9.object({ id: z9.number().int().positive(), decision: z9.enum(["Qualified", "Approved", "Declined"]), notes: z9.string().trim().max(2e3).optional() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-    const referral = (await db.select().from(participantReferrals).where(eq10(participantReferrals.id, input.id)).limit(1))[0];
-    if (!referral) throw new TRPCError8({ code: "NOT_FOUND", message: "Referral record not found." });
-    const referredRegistration = (await db.select().from(registrations).where(eq10(registrations.id, referral.referredRegistrationId)).limit(1))[0];
-    if (!referredRegistration) throw new TRPCError8({ code: "NOT_FOUND", message: "Referred participant record not found." });
+    if (!db) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    const referral = (await db.select().from(participantReferrals).where(eq11(participantReferrals.id, input.id)).limit(1))[0];
+    if (!referral) throw new TRPCError9({ code: "NOT_FOUND", message: "Referral record not found." });
+    const referredRegistration = (await db.select().from(registrations).where(eq11(registrations.id, referral.referredRegistrationId)).limit(1))[0];
+    if (!referredRegistration) throw new TRPCError9({ code: "NOT_FOUND", message: "Referred participant record not found." });
     const isEligible = referralIsEligibleForQualification(referredRegistration.status, referredRegistration.depositPaid);
     if ((input.decision === "Qualified" || input.decision === "Approved") && !isEligible) {
-      throw new TRPCError8({ code: "PRECONDITION_FAILED", message: "A referral can qualify only after the referred business is Accepted and its first commitment payment is marked Paid." });
+      throw new TRPCError9({ code: "PRECONDITION_FAILED", message: "A referral can qualify only after the referred business is Accepted and its first commitment payment is marked Paid." });
     }
     if (input.decision === "Approved") {
-      if (referral.status !== "Qualified") throw new TRPCError8({ code: "PRECONDITION_FAILED", message: "Mark the referral Qualified before approving a credit." });
-      const countRow = (await db.select({ count: sql5`count(*)` }).from(participantReferrals).where(and8(eq10(participantReferrals.referrerRegistrationId, referral.referrerRegistrationId), eq10(participantReferrals.status, "Approved"))))[0];
+      if (referral.status !== "Qualified") throw new TRPCError9({ code: "PRECONDITION_FAILED", message: "Mark the referral Qualified before approving a credit." });
+      const countRow = (await db.select({ count: sql5`count(*)` }).from(participantReferrals).where(and9(eq11(participantReferrals.referrerRegistrationId, referral.referrerRegistrationId), eq11(participantReferrals.status, "Approved"))))[0];
       if (!referralCreditIsAvailable(Number(countRow?.count ?? 0))) {
-        throw new TRPCError8({ code: "PRECONDITION_FAILED", message: `The referrer has reached the maximum of ${REFERRAL_MAX_APPROVED_CREDITS} approved referral credits.` });
+        throw new TRPCError9({ code: "PRECONDITION_FAILED", message: `The referrer has reached the maximum of ${REFERRAL_MAX_APPROVED_CREDITS} approved referral credits.` });
       }
     }
     await db.update(participantReferrals).set({
@@ -5118,7 +5455,7 @@ var referralsRouter = router({
       reviewedByUserId: ctx.user.id,
       reviewedAt: /* @__PURE__ */ new Date(),
       notes: input.notes || null
-    }).where(eq10(participantReferrals.id, referral.id));
+    }).where(eq11(participantReferrals.id, referral.id));
     return { success: true, decision: input.decision, creditPercentage: input.decision === "Approved" ? REFERRAL_CREDIT_PERCENTAGE : 0 };
   })
 });
@@ -5207,8 +5544,8 @@ var informationSessionRouter = router({
 });
 
 // server/routers/paymentInstructions.ts
-import { eq as eq11 } from "drizzle-orm";
-import { z as z9 } from "zod";
+import { eq as eq12 } from "drizzle-orm";
+import { z as z10 } from "zod";
 
 // shared/paymentInstructionTemplates.ts
 init_brand();
@@ -5305,14 +5642,14 @@ function renderPaymentInstruction(templateId, fullName, appOrigin) {
 }
 
 // server/routers/paymentInstructions.ts
-var paymentInstructionInput = z9.object({
-  registrationId: z9.number().int().positive(),
-  templateId: z9.enum(PAYMENT_INSTRUCTION_TEMPLATE_IDS)
+var paymentInstructionInput = z10.object({
+  registrationId: z10.number().int().positive(),
+  templateId: z10.enum(PAYMENT_INSTRUCTION_TEMPLATE_IDS)
 });
 async function getEligibleRegistration(registrationId) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const registration = (await db.select().from(registrations).where(eq11(registrations.id, registrationId)).limit(1))[0];
+  const registration = (await db.select().from(registrations).where(eq12(registrations.id, registrationId)).limit(1))[0];
   if (!registration || registration.status === "Rejected" || registration.supersededByRegistrationId) {
     throw new Error("An eligible active participant record was not found.");
   }
@@ -5328,7 +5665,7 @@ var paymentInstructionsRouter = router({
       ...renderPaymentInstruction(input.templateId, registration.fullName, getTrustedApplicationOrigin())
     };
   }),
-  send: ownerAdminProcedure.input(paymentInstructionInput.extend({ ownerApproval: z9.literal(true) })).mutation(async ({ input }) => {
+  send: ownerAdminProcedure.input(paymentInstructionInput.extend({ ownerApproval: z10.literal(true) })).mutation(async ({ input }) => {
     const { db, registration } = await getEligibleRegistration(input.registrationId);
     const message = renderPaymentInstruction(input.templateId, registration.fullName, getTrustedApplicationOrigin());
     const delivery = await deliverEmail({
@@ -5350,8 +5687,8 @@ var paymentInstructionsRouter = router({
 });
 
 // server/routers/inboundReplies.ts
-import { desc as desc6, eq as eq12, inArray as inArray3 } from "drizzle-orm";
-import { z as z10 } from "zod";
+import { desc as desc6, eq as eq13, inArray as inArray3 } from "drizzle-orm";
+import { z as z11 } from "zod";
 
 // server/workspaceMailbox.ts
 init_env();
@@ -5443,7 +5780,7 @@ async function getJumpMailboxMessages(allowedSenderEmails) {
 }
 
 // server/routers/inboundReplies.ts
-var replyStatus = z10.enum(["New", "Reviewed", "Follow-up", "Closed"]);
+var replyStatus = z11.enum(["New", "Reviewed", "Follow-up", "Closed"]);
 var inboundRepliesRouter = router({
   list: adminPermissionProcedure("view_communications").query(async () => {
     const db = await getDb();
@@ -5460,7 +5797,7 @@ var inboundRepliesRouter = router({
       status: inboundEmailReplies.status,
       participantName: registrations.fullName,
       package: registrations.package
-    }).from(inboundEmailReplies).innerJoin(registrations, eq12(inboundEmailReplies.registrationId, registrations.id)).orderBy(desc6(inboundEmailReplies.receivedAt));
+    }).from(inboundEmailReplies).innerJoin(registrations, eq13(inboundEmailReplies.registrationId, registrations.id)).orderBy(desc6(inboundEmailReplies.receivedAt));
     return { replies, connected: isJumpMailboxSyncConfigured() };
   }),
   sync: ownerAdminProcedure.mutation(async () => {
@@ -5499,31 +5836,31 @@ var inboundRepliesRouter = router({
     }
     return { matchedMessages: stored, scannedMessages: messages.length };
   }),
-  updateStatus: adminPermissionProcedure("view_communications").input(z10.object({ id: z10.number().int().positive(), status: replyStatus })).mutation(async ({ input }) => {
+  updateStatus: adminPermissionProcedure("view_communications").input(z11.object({ id: z11.number().int().positive(), status: replyStatus })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available.");
-    await db.update(inboundEmailReplies).set({ status: input.status }).where(eq12(inboundEmailReplies.id, input.id));
+    await db.update(inboundEmailReplies).set({ status: input.status }).where(eq13(inboundEmailReplies.id, input.id));
     return { success: true };
   })
 });
 
 // server/routers/pricingRequests.ts
-import { z as z11 } from "zod";
+import { z as z12 } from "zod";
 init_brand();
-import { TRPCError as TRPCError9 } from "@trpc/server";
+import { TRPCError as TRPCError10 } from "@trpc/server";
 var PACKAGE_CHOICES = ["Foundation", "Engine Room", "Boardroom", "Not sure yet"];
 var PUBLIC_REQUEST_WINDOW_MS = 15 * 60 * 1e3;
 var PUBLIC_REQUEST_MAXIMUM = 5;
 var publicRequestCounts = /* @__PURE__ */ new Map();
-var publicPricingRequestInput = z11.object({
-  fullName: z11.string().trim().min(2).max(255),
-  email: z11.string().trim().email().max(320),
-  businessName: z11.string().trim().min(2).max(255),
-  preferredPackage: z11.enum(PACKAGE_CHOICES),
-  note: z11.string().trim().max(1e3).optional()
+var publicPricingRequestInput = z12.object({
+  fullName: z12.string().trim().min(2).max(255),
+  email: z12.string().trim().email().max(320),
+  businessName: z12.string().trim().min(2).max(255),
+  preferredPackage: z12.enum(PACKAGE_CHOICES),
+  note: z12.string().trim().max(1e3).optional()
 });
-var portalPricingRequestInput = z11.object({
-  note: z11.string().trim().max(1e3).optional()
+var portalPricingRequestInput = z12.object({
+  note: z12.string().trim().max(1e3).optional()
 });
 function consumePublicPricingRequestRateLimit(email, ip) {
   const key = `${ip.trim().toLowerCase()}:${email.trim().toLowerCase()}`;
@@ -5555,7 +5892,7 @@ function buildNotification(input) {
 }
 async function persistAndNotify(input) {
   const db = await getDb();
-  if (!db) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: `${BRAND.programmeShortName} is temporarily unable to record this pricing request.` });
+  if (!db) throw new TRPCError10({ code: "INTERNAL_SERVER_ERROR", message: `${BRAND.programmeShortName} is temporarily unable to record this pricing request.` });
   const message = buildNotification(input);
   const delivery = await deliverEmail({
     to: JUMP_ADMINISTRATION_MAILBOX,
@@ -5574,14 +5911,14 @@ async function persistAndNotify(input) {
     notificationStatus
   });
   if (delivery.status === "Failed") {
-    throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "We could not send your request to the programme office. Kindly try again shortly." });
+    throw new TRPCError10({ code: "INTERNAL_SERVER_ERROR", message: "We could not send your request to the programme office. Kindly try again shortly." });
   }
   return { success: true };
 }
 var pricingRequestsRouter = router({
   submitPublic: publicProcedure.input(publicPricingRequestInput).mutation(async ({ input, ctx }) => {
     if (!consumePublicPricingRequestRateLimit(input.email, ctx.req.ip || "unknown")) {
-      throw new TRPCError9({ code: "TOO_MANY_REQUESTS", message: "Kindly wait a few minutes before sending another pricing request." });
+      throw new TRPCError10({ code: "TOO_MANY_REQUESTS", message: "Kindly wait a few minutes before sending another pricing request." });
     }
     return persistAndNotify({ ...input, source: "Public" });
   }),
@@ -5600,10 +5937,10 @@ var pricingRequestsRouter = router({
 });
 
 // server/routers/businessCheck.ts
-import { TRPCError as TRPCError10 } from "@trpc/server";
-import { randomBytes as randomBytes4 } from "crypto";
-import { eq as eq13 } from "drizzle-orm";
-import { z as z13 } from "zod";
+import { TRPCError as TRPCError11 } from "@trpc/server";
+import { randomBytes as randomBytes5 } from "crypto";
+import { eq as eq14 } from "drizzle-orm";
+import { z as z14 } from "zod";
 init_brand();
 
 // shared/businessCheck/catalogue.ts
@@ -6509,7 +6846,7 @@ function matchedOfferings(answers, outline, limit = 3) {
     if (answers.p_trend === "declining") lead.push("business-transformation");
     lead.push("embedded-support");
   }
-  const order = new Map(OFFERINGS.map((offering, index) => [offering.id, index]));
+  const order = new Map(OFFERINGS.map((offering, index2) => [offering.id, index2]));
   const ranked = Array.from(weights.entries()).sort((a, b) => b[1] - a[1] || (order.get(a[0]) ?? 0) - (order.get(b[0]) ?? 0)).map(([id]) => id).filter((id) => !lead.includes(id));
   return [...lead, ...ranked].map((id) => offeringById(id)).filter((offering) => Boolean(offering)).slice(0, limit);
 }
@@ -6567,7 +6904,7 @@ function writeSummary(input) {
 
 // server/businessCheck.ts
 init_brand();
-import { z as z12 } from "zod";
+import { z as z13 } from "zod";
 
 // shared/businessSupport.ts
 var PRICES = {
@@ -6812,11 +7149,11 @@ async function invokeLLM(params) {
 // server/businessCheck.ts
 init_env();
 var AI_TIMEOUT_MS = 25e3;
-var aiOutput = z12.object({
-  found: z12.string().min(20).max(900),
-  think: z12.string().min(20).max(900),
-  next: z12.string().min(10).max(400),
-  offerings: z12.array(z12.object({ id: z12.string(), why: z12.string().min(5).max(300) })).max(3)
+var aiOutput = z13.object({
+  found: z13.string().min(20).max(900),
+  think: z13.string().min(20).max(900),
+  next: z13.string().min(10).max(400),
+  offerings: z13.array(z13.object({ id: z13.string(), why: z13.string().min(5).max(300) })).max(3)
 });
 var OUTPUT_SCHEMA = {
   name: "business_check_summary",
@@ -7013,24 +7350,24 @@ function rateLimiter(maximum) {
 var allowStart = rateLimiter(5);
 var allowStartFromIp = rateLimiter(20);
 var allowSave = rateLimiter(300);
-var answerValue = z13.union([z13.string().max(300), z13.array(z13.string().max(64)).max(10)]);
-var answersInput = z13.record(z13.string().max(32), answerValue.optional()).refine((value) => Object.keys(value).length <= 80);
-var tokenInput = z13.string().min(16).max(64);
-var businessCheckStartInput = z13.object({
-  fullName: z13.string().trim().min(2).max(255),
-  email: z13.string().trim().email().max(320),
-  whatsapp: z13.string().trim().max(32).optional(),
-  heardFrom: z13.string().trim().max(64).optional()
+var answerValue = z14.union([z14.string().max(300), z14.array(z14.string().max(64)).max(10)]);
+var answersInput = z14.record(z14.string().max(32), answerValue.optional()).refine((value) => Object.keys(value).length <= 80);
+var tokenInput = z14.string().min(16).max(64);
+var businessCheckStartInput = z14.object({
+  fullName: z14.string().trim().min(2).max(255),
+  email: z14.string().trim().email().max(320),
+  whatsapp: z14.string().trim().max(32).optional(),
+  heardFrom: z14.string().trim().max(64).optional()
 });
-var unavailable = (what) => new TRPCError10({ code: "INTERNAL_SERVER_ERROR", message: `We could not ${what} just now. Kindly try again shortly.` });
+var unavailable = (what) => new TRPCError11({ code: "INTERNAL_SERVER_ERROR", message: `We could not ${what} just now. Kindly try again shortly.` });
 async function database(what) {
   const db = await getDb();
   if (!db) throw unavailable(what);
   return db;
 }
 async function findCheck(db, token) {
-  const [check] = await db.select().from(businessChecks).where(eq13(businessChecks.publicToken, token)).limit(1);
-  if (!check) throw new TRPCError10({ code: "NOT_FOUND", message: "We could not find that business check. Kindly start again." });
+  const [check] = await db.select().from(businessChecks).where(eq14(businessChecks.publicToken, token)).limit(1);
+  if (!check) throw new TRPCError11({ code: "NOT_FOUND", message: "We could not find that business check. Kindly start again." });
   return check;
 }
 function answerColumns(answers) {
@@ -7046,10 +7383,10 @@ var businessCheckRouter = router({
   start: publicProcedure.input(businessCheckStartInput).mutation(async ({ input, ctx }) => {
     const ip = (ctx.req.ip || "unknown").toLowerCase();
     if (!allowStartFromIp(ip) || !allowStart(`${ip}:${input.email.toLowerCase()}`)) {
-      throw new TRPCError10({ code: "TOO_MANY_REQUESTS", message: "Kindly wait a few minutes before starting another business check." });
+      throw new TRPCError11({ code: "TOO_MANY_REQUESTS", message: "Kindly wait a few minutes before starting another business check." });
     }
     const db = await database("start your business check");
-    const token = randomBytes4(24).toString("base64url");
+    const token = randomBytes5(24).toString("base64url");
     await db.insert(businessChecks).values({
       publicToken: token,
       pipelineStage: "lead",
@@ -7063,16 +7400,16 @@ var businessCheckRouter = router({
     return { token };
   }),
   /** Saves answers as the owner goes, so an unfinished check still tells the team where they were. */
-  saveProgress: publicProcedure.input(z13.object({ token: tokenInput, answers: answersInput })).mutation(async ({ input }) => {
-    if (!allowSave(input.token)) throw new TRPCError10({ code: "TOO_MANY_REQUESTS", message: "Too many updates. Your answers are still kept on this device." });
+  saveProgress: publicProcedure.input(z14.object({ token: tokenInput, answers: answersInput })).mutation(async ({ input }) => {
+    if (!allowSave(input.token)) throw new TRPCError11({ code: "TOO_MANY_REQUESTS", message: "Too many updates. Your answers are still kept on this device." });
     const db = await database("save your progress");
     const check = await findCheck(db, input.token);
     if (check.completedAt) return { saved: false };
-    await db.update(businessChecks).set(answerColumns(cleanAnswers(input.answers))).where(eq13(businessChecks.id, check.id));
+    await db.update(businessChecks).set(answerColumns(cleanAnswers(input.answers))).where(eq14(businessChecks.id, check.id));
     return { saved: true };
   }),
   /** Finishes the check: works out the result on the server, writes the summary and emails both sides once. */
-  submit: publicProcedure.input(z13.object({ token: tokenInput, answers: answersInput })).mutation(async ({ input }) => {
+  submit: publicProcedure.input(z14.object({ token: tokenInput, answers: answersInput })).mutation(async ({ input }) => {
     const db = await database("record your business check");
     const check = await findCheck(db, input.token);
     if (check.completedAt && check.resultJson && check.summaryJson && check.summarySource) {
@@ -7080,7 +7417,7 @@ var businessCheckRouter = router({
     }
     const answers = cleanAnswers(input.answers);
     if (!isComplete(answers)) {
-      throw new TRPCError10({ code: "BAD_REQUEST", message: "Some questions are still unanswered. Kindly go back and complete them." });
+      throw new TRPCError11({ code: "BAD_REQUEST", message: "Some questions are still unanswered. Kindly go back and complete them." });
     }
     const result = evaluate(answers);
     const contact = contactOf(check, answers);
@@ -7102,17 +7439,17 @@ var businessCheckRouter = router({
       summarySource: source,
       notificationStatus: officeDelivery.status === "Failed" ? "Failed" : officeDelivery.status === "Simulated" ? "Simulated" : "Sent",
       completedAt: databaseNow()
-    }).where(eq13(businessChecks.id, check.id));
+    }).where(eq14(businessChecks.id, check.id));
     return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl };
   }),
   /** The owner asks for the free call or the full report from the result screen. */
-  requestNext: publicProcedure.input(z13.object({ token: tokenInput, choice: z13.enum(["call", "report"]), note: z13.string().trim().max(500).optional() })).mutation(async ({ input }) => {
+  requestNext: publicProcedure.input(z14.object({ token: tokenInput, choice: z14.enum(["call", "report"]), note: z14.string().trim().max(500).optional() })).mutation(async ({ input }) => {
     const db = await database("record your request");
     const check = await findCheck(db, input.token);
-    if (!check.completedAt) throw new TRPCError10({ code: "BAD_REQUEST", message: "Kindly finish the business check first." });
+    if (!check.completedAt) throw new TRPCError11({ code: "BAD_REQUEST", message: "Kindly finish the business check first." });
     const already = input.choice === "call" ? check.callRequestedAt : check.reportRequestedAt;
     if (!already) {
-      await db.update(businessChecks).set(input.choice === "call" ? { callRequestedAt: databaseNow(), pipelineStage: advancePipeline(check.pipelineStage, "call_booked") } : { reportRequestedAt: databaseNow() }).where(eq13(businessChecks.id, check.id));
+      await db.update(businessChecks).set(input.choice === "call" ? { callRequestedAt: databaseNow(), pipelineStage: advancePipeline(check.pipelineStage, "call_booked") } : { reportRequestedAt: databaseNow() }).where(eq14(businessChecks.id, check.id));
       const what = input.choice === "call" ? "a free discovery call" : "the full business check report";
       await deliverEmail({
         to: JUMP_ADMINISTRATION_MAILBOX,
@@ -7130,6 +7467,27 @@ var businessCheckRouter = router({
       });
     }
     return { success: true, choice: input.choice };
+  })
+});
+
+// server/routers/account.ts
+import { z as z15 } from "zod";
+var accountRouter = router({
+  // Validated inside signUpAccount so the client receives one readable message, not a JSON issue list.
+  signUp: publicProcedure.input(z15.unknown()).mutation(({ ctx, input }) => signUpAccount(ctx.req, ctx.res, input)),
+  signIn: publicProcedure.input(signInInputSchema).mutation(({ ctx, input }) => signInAccount(ctx.req, ctx.res, input)),
+  signOut: publicProcedure.mutation(({ ctx }) => signOutAccount(ctx.req, ctx.res)),
+  /** Who is signed in, or null. Public so the client can decide where to send a visitor. */
+  me: publicProcedure.query(async ({ ctx }) => {
+    const session = await resolveAccountSession(ctx.req);
+    return session ? toAccountView(session) : null;
+  }),
+  /** The signed-in user's workspace. Requires a session. */
+  workspace: accountProcedure.query(({ ctx }) => toAccountView(ctx.account)),
+  /** A business the caller belongs to. The id is checked against the caller's memberships, never trusted. */
+  business: accountProcedure.input(z15.object({ businessId: z15.number().int().positive() })).query(({ ctx, input }) => {
+    const membership = requireBusinessMembership(ctx.account, input.businessId);
+    return { businessId: membership.businessId, name: membership.businessName, role: membership.role, profileComplete: membership.profileComplete };
   })
 });
 
@@ -7156,7 +7514,8 @@ var appRouter = router({
   paymentInstructions: paymentInstructionsRouter,
   inboundReplies: inboundRepliesRouter,
   pricingRequests: pricingRequestsRouter,
-  businessCheck: businessCheckRouter
+  businessCheck: businessCheckRouter,
+  account: accountRouter
 });
 
 // server/_core/context.ts
@@ -7291,7 +7650,7 @@ function createApp() {
       return res.status(201).json(uploaded);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to upload the file.";
-      const status = error instanceof TRPCError11 && error.code === "UNAUTHORIZED" ? 401 : 500;
+      const status = error instanceof TRPCError12 && error.code === "UNAUTHORIZED" ? 401 : 500;
       console.warn("[Participant upload] Failed:", message);
       return res.status(status).json({ message: status === 401 ? "Kindly sign in to your participant portal again and try again." : "We could not store this file. Kindly try again shortly." });
     }
@@ -7311,7 +7670,7 @@ function createApp() {
       return res.status(201).json(uploaded);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to upload the payment receipt.";
-      const status = error instanceof TRPCError11 && error.code === "UNAUTHORIZED" ? 401 : 500;
+      const status = error instanceof TRPCError12 && error.code === "UNAUTHORIZED" ? 401 : 500;
       console.warn("[Payment receipt upload] Failed:", message);
       return res.status(status).json({ message: status === 401 ? "Kindly sign in to your participant portal again and try again." : "We could not store the receipt. Kindly try again shortly." });
     }

@@ -15,6 +15,13 @@
       "when": 1791369034554,
       "tag": "0001_business_check_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791373621377,
+      "tag": "0002_universal_accounts_and_businesses",
+      "breakpoints": true
     }
   ]
 }

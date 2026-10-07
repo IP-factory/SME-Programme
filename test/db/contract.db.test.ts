@@ -10,7 +10,7 @@ import { getTableConfig, isPgEnum, type PgEnumColumn, type PgTable } from "drizz
 import { TRPCError } from "@trpc/server";
 import * as schema from "../../drizzle/schema";
 import { registerSchedulingCapacityTests } from "./schedulingCapacity";
-import { allTables, createPgliteHarness, createRemoteHarness, fixtureRow, pgErrorCode, type DbHarness } from "./harness";
+import { allTables, createPgliteHarness, createRemoteHarness, fixtureRow, insertFixture, pgErrorCode, type DbHarness } from "./harness";
 
 const holder = vi.hoisted(() => {
   process.env.DATABASE_URL = "postgresql://contract:contract@localhost:5432/contract";
@@ -97,10 +97,11 @@ for (const target of targets) {
     });
 
     describe("schema", () => {
-      it("creates exactly the 30 expected tables", async () => {
+      it("creates exactly the 34 expected tables", async () => {
         const rows = await harness.query(sql`select table_name from information_schema.tables where table_schema = current_schema() and table_type = 'BASE TABLE'`);
         const created = rows.map(row => String(row.table_name)).sort();
-        expect(expectedTableNames).toHaveLength(30);
+        // 30 from the MySQL migration + user_credentials, user_sessions, businesses, business_memberships.
+        expect(expectedTableNames).toHaveLength(34);
         expect(expectedTableNames.filter(name => !created.includes(name))).toEqual([]);
         expect(created.filter(name => !expectedTableNames.includes(name))).toEqual([]);
       });
@@ -126,21 +127,55 @@ for (const target of targets) {
         }
       });
 
-      it("gives every table an identity primary key and every declared unique column a unique constraint", async () => {
-        const rows = await harness.query(sql`select tc.table_name, tc.constraint_type, kcu.column_name from information_schema.table_constraints tc join information_schema.key_column_usage kcu on kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema where tc.table_schema = current_schema() and tc.constraint_type in ('PRIMARY KEY', 'UNIQUE')`);
+      it("gives every table an identity primary key and exactly its declared unique constraints (single and composite)", async () => {
+        const rows = await harness.query(sql`select tc.table_name, tc.constraint_name, tc.constraint_type, kcu.column_name from information_schema.table_constraints tc join information_schema.key_column_usage kcu on kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema where tc.table_schema = current_schema() and tc.constraint_type in ('PRIMARY KEY', 'UNIQUE')`);
+        const grouped = (table: string, type: string) => {
+          const byConstraint = new Map<string, string[]>();
+          for (const row of rows.filter(entry => entry.table_name === table && entry.constraint_type === type)) {
+            byConstraint.set(String(row.constraint_name), [...(byConstraint.get(String(row.constraint_name)) ?? []), String(row.column_name)]);
+          }
+          return [...byConstraint.values()].map(columns => columns.sort().join("+")).sort();
+        };
         for (const table of allTables) {
           const config = getTableConfig(table);
-          const forTable = rows.filter(row => row.table_name === config.name);
-          expect(forTable.filter(row => row.constraint_type === "PRIMARY KEY").map(row => row.column_name), `${config.name} primary key`).toEqual(["id"]);
-          const uniques = forTable.filter(row => row.constraint_type === "UNIQUE").map(row => row.column_name).sort();
-          expect(uniques, `${config.name} unique columns`).toEqual(config.columns.filter(column => column.isUnique).map(column => column.name).sort());
+          expect(grouped(config.name, "PRIMARY KEY"), `${config.name} primary key`).toEqual(["id"]);
+          const declared = [
+            ...config.columns.filter(column => column.isUnique).map(column => column.name),
+            ...config.uniqueConstraints.map(constraint => constraint.columns.map(column => column.name).sort().join("+")),
+          ].sort();
+          expect(grouped(config.name, "UNIQUE"), `${config.name} unique constraints`).toEqual(declared);
         }
       });
 
-      it("creates all 43 enum types with their exact labels in order", async () => {
+      it("enforces case-insensitive email uniqueness on users with a unique index", async () => {
+        await db.insert(schema.users).values({ openId: "ci-1", email: "Mixed.Case@Example.test" });
+        const failure = await db.insert(schema.users).values({ openId: "ci-2", email: "mixed.case@example.test" }).then(() => null, (error: unknown) => error);
+        expect(pgErrorCode(failure)).toBe("23505");
+        await db.insert(schema.users).values({ openId: "ci-3", email: null });
+        await db.insert(schema.users).values({ openId: "ci-4", email: null });
+      });
+
+      it("declares a foreign key from every account table and cascades deletes of a user", async () => {
+        const [user] = await db.insert(schema.users).values({ openId: "fk-cascade" }).returning();
+        const [business] = await db.insert(schema.businesses).values({ name: "FK Co", slug: "fk-co-1", createdByUserId: user.id }).returning();
+        await db.insert(schema.userCredentials).values({ userId: user.id, passwordHash: "x" });
+        await db.insert(schema.userSessions).values({ userId: user.id, tokenHash: "f".repeat(64), expiresAt: new Date() });
+        await db.insert(schema.businessMemberships).values({ businessId: business.id, userId: user.id, role: "owner" });
+        // A business created by a user blocks deleting that user (no silent loss of a workspace)...
+        const blocked = await db.delete(schema.users).where(eq(schema.users.id, user.id)).then(() => null, (error: unknown) => error);
+        expect(pgErrorCode(blocked)).toBe("23503");
+        // ...but deleting the business first lets the user's credential, sessions and memberships cascade away.
+        await db.delete(schema.businesses).where(eq(schema.businesses.id, business.id));
+        await db.delete(schema.users).where(eq(schema.users.id, user.id));
+        expect(await db.select().from(schema.userCredentials).where(eq(schema.userCredentials.userId, user.id))).toHaveLength(0);
+        expect(await db.select().from(schema.userSessions).where(eq(schema.userSessions.userId, user.id))).toHaveLength(0);
+        expect(await db.select().from(schema.businessMemberships).where(eq(schema.businessMemberships.userId, user.id))).toHaveLength(0);
+      });
+
+      it("creates all 47 enum types with their exact labels in order", async () => {
         const rows = await harness.query(sql`select t.typname, array_agg(e.enumlabel::text order by e.enumsortorder) as labels from pg_type t join pg_enum e on e.enumtypid = t.oid join pg_namespace n on n.oid = t.typnamespace where n.nspname = current_schema() group by t.typname`);
         const actual = new Map(rows.map(row => [String(row.typname), row.labels as string[]]));
-        expect(enums).toHaveLength(43);
+        expect(enums).toHaveLength(47);
         for (const definition of enums) expect(actual.get(definition.enumName), definition.enumName).toEqual([...definition.enumValues]);
         expect(actual.size).toBe(enums.length);
       });
@@ -155,7 +190,7 @@ for (const target of targets) {
         const table = tableByName(name) as PgTable;
         const config = getTableConfig(table);
         const t = table as unknown as Record<string, never>;
-        const [inserted] = await db.insert(table).values(fixtureRow(table)).returning();
+        const inserted = await insertFixture(db, table) as { id: number };
         expect(inserted.id).toEqual(expect.any(Number));
         const selected = await db.select().from(table).where(eq(t.id, inserted.id));
         expect(selected).toHaveLength(1);

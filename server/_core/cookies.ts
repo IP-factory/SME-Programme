@@ -30,3 +30,19 @@ export function getAdminAccessCookieOptions(
     secure: isSecureRequest(req),
   };
 }
+
+/**
+ * Universal account session cookie: HttpOnly, SameSite=Lax, Secure on HTTPS and always in production.
+ * The token is random and only its hash is stored server-side; it is never exposed to client script.
+ */
+export function getAccountSessionCookieOptions(
+  req: Request,
+  nodeEnv = process.env.NODE_ENV
+): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure: isSecureRequest(req) || nodeEnv === "production",
+  };
+}
