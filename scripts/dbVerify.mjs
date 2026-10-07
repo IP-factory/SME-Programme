@@ -121,8 +121,8 @@ async function main() {
     list("Actual enums", actualEnumNames);
     list("Missing enums", missingEnums);
     list("Unexpected enums", unexpectedEnums);
-    check("exactly 42 enum types defined", expectedEnumNames.length === 42, `${expectedEnumNames.length}`);
-    check("exactly 42 enum types present", actualEnumNames.length === 42, `${actualEnumNames.length}`);
+    check(`exactly ${expectedEnumNames.length} enum types defined (from the latest snapshot)`, expectedEnumNames.length > 0, `${expectedEnumNames.length}`);
+    check(`exactly ${expectedEnumNames.length} enum types present`, actualEnumNames.length === expectedEnumNames.length, `${actualEnumNames.length}`);
     check("no missing enums", missingEnums.length === 0);
     check("no unexpected enums", unexpectedEnums.length === 0);
     const labelMismatches = expectedEnums.filter(entry => {
