@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useAccount } from "@/hooks/useAccount";
 import { trpc } from "@/lib/trpc";
 import React, { useEffect, useState, type FormEvent } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -59,7 +59,7 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-        <p className="text-center text-sm text-ink-muted">New here? <Link href="/signup" className="text-brand underline">Create your account</Link></p>
+        <p className="text-center text-sm text-ink-muted">Client access is created during onboarding.</p>
       </div>
     </main>
   );

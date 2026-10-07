@@ -10,7 +10,6 @@ import {
   ACCOUNT_SESSION_COOKIE,
   ACCOUNT_SESSION_MAX_AGE_MS,
   normaliseAccountEmail,
-  signUpInputSchema,
   type AccountMembership,
   type AccountSessionView,
 } from "../shared/auth";
@@ -26,9 +25,8 @@ const PG_UNIQUE_VIOLATION = "23505";
 const RATE_LIMIT_WINDOW_MS = ACCOUNT_LOCKOUT_MS;
 const rateLimits = new Map<string, { count: number; resetAt: number }>();
 
-type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
-function isUniqueViolation(error: unknown) {
+export function isUniqueViolation(error: unknown) {
   const candidate = error as { code?: string; cause?: { code?: string } } | undefined;
   return candidate?.code === PG_UNIQUE_VIOLATION || candidate?.cause?.code === PG_UNIQUE_VIOLATION;
 }
@@ -38,7 +36,7 @@ function requestIp(req: Request) {
 }
 
 /** Per-instance throttle keyed on address + email; the database lockout below is the cross-instance control. */
-function consumeRateLimit(action: "signup" | "signin", req: Request, email: string, maximum: number) {
+export function consumeRateLimit(action: "onboarding" | "signin", req: Request, email: string, maximum: number) {
   const key = `${action}:${requestIp(req)}:${email}`;
   const now = Date.now();
   const existing = rateLimits.get(key);
@@ -52,7 +50,7 @@ function consumeRateLimit(action: "signup" | "signin", req: Request, email: stri
 }
 
 /** Clears the per-instance throttle for an address + email after a successful sign-in. */
-function releaseRateLimit(action: "signup" | "signin", req: Request, email: string) {
+function releaseRateLimit(action: "onboarding" | "signin", req: Request, email: string) {
   rateLimits.delete(`${action}:${requestIp(req)}:${email}`);
 }
 
@@ -76,19 +74,19 @@ function burnPasswordCheck(password: string) {
   verifyAdminPasswordHash(password, dummyPasswordHash);
 }
 
-function slugify(name: string) {
+export function slugify(name: string) {
   const base = name.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
   return `${base || "business"}-${randomBytes(3).toString("hex")}`;
 }
 
-async function createSession(tx: Pick<Database, "insert">, userId: number) {
+export async function createSession(tx: Pick<Database, "insert">, userId: number) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + ACCOUNT_SESSION_MAX_AGE_MS);
   await tx.insert(userSessions).values({ userId, tokenHash: sha256(token), expiresAt });
   return { token, expiresAt };
 }
 
-function setSessionCookie(req: Request, res: Response, token: string) {
+export function setSessionCookie(req: Request, res: Response, token: string) {
   res.cookie(ACCOUNT_SESSION_COOKIE, token, { ...getAccountSessionCookieOptions(req), maxAge: ACCOUNT_SESSION_MAX_AGE_MS });
 }
 
@@ -112,6 +110,8 @@ function readSessionToken(req: Request) {
 }
 
 export type AccountSession = AccountSessionView & { sessionId: number };
+
+export type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
 async function loadMemberships(db: Pick<Database, "select">, userId: number): Promise<AccountMembership[]> {
   const rows = await db
@@ -140,7 +140,7 @@ function chooseActiveBusiness(memberships: AccountMembership[]) {
   return memberships.length === 1 ? memberships[0] : null;
 }
 
-function buildView(user: { id: number; name: string | null; email: string | null }, memberships: AccountMembership[]): AccountSessionView {
+export function buildView(user: { id: number; name: string | null; email: string | null }, memberships: AccountMembership[]): AccountSessionView {
   return {
     user: { id: user.id, fullName: user.name ?? "", email: user.email ?? "" },
     memberships,
@@ -180,64 +180,10 @@ export function requireBusinessMembership(session: AccountSession, businessId: n
   return membership;
 }
 
-async function emailIsReserved(db: Pick<Database, "select">, email: string) {
+export async function emailIsReserved(db: Pick<Database, "select">, email: string) {
   if (email === OWNER_ADMIN_EMAIL) return true;
   const invited = await db.select({ id: adminInvitations.id }).from(adminInvitations).where(and(emailEquals(adminInvitations.email, email), eq(adminInvitations.status, "Pending"))).limit(1);
   return invited.length > 0;
-}
-
-/**
- * Creates the person, their password credential, their business, their owner membership and their first
- * session in ONE transaction: if any step fails, nothing is kept.
- */
-export async function signUpAccount(req: Request, res: Response, rawInput: unknown) {
-  assertSameOrigin(req);
-  const parsed = signUpInputSchema.safeParse(rawInput);
-  if (!parsed.success) throw new TRPCError({ code: "BAD_REQUEST", message: parsed.error.issues[0]?.message ?? "Check the details and try again." });
-  const input = parsed.data;
-  if (!consumeRateLimit("signup", req, input.email, 5)) {
-    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: ACCOUNT_AUTH_ERRORS.tooManyRequests });
-  }
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-  const passwordHash = hashAdminPassword(input.password);
-
-  let created;
-  try {
-    created = await db.transaction(async tx => {
-      const existing = await tx.select({ id: users.id }).from(users).where(emailEquals(users.email, input.email)).limit(1);
-      if (existing.length > 0 || (await emailIsReserved(tx, input.email))) {
-        throw new TRPCError({ code: "CONFLICT", message: ACCOUNT_AUTH_ERRORS.emailTaken });
-      }
-      const [user] = await tx.insert(users).values({
-        openId: `local:${randomUUID()}`,
-        name: input.fullName,
-        email: input.email,
-        loginMethod: "password",
-        role: "user",
-        status: "active",
-      }).returning({ id: users.id });
-      await tx.insert(userCredentials).values({ userId: user.id, passwordHash });
-      const [business] = await tx.insert(businesses).values({
-        name: input.businessName,
-        slug: slugify(input.businessName),
-        createdByUserId: user.id,
-      }).returning({ id: businesses.id, name: businesses.name });
-      await tx.insert(businessMemberships).values({ businessId: business.id, userId: user.id, role: "owner", status: "active" });
-      const session = await createSession(tx, user.id);
-      return { userId: user.id, business, session };
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) throw new TRPCError({ code: "CONFLICT", message: ACCOUNT_AUTH_ERRORS.emailTaken });
-    throw error;
-  }
-
-  setSessionCookie(req, res, created.session.token);
-  const view = buildView(
-    { id: created.userId, name: input.fullName, email: input.email },
-    [{ businessId: created.business.id, businessName: created.business.name, role: "owner", profileComplete: false }],
-  );
-  return view;
 }
 
 /** Wrong email, wrong password, unknown account and suspended account all fail with the same message. */

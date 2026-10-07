@@ -1,16 +1,14 @@
 import { z } from "zod";
-import { signInInputSchema, signUpInputSchema } from "../../shared/auth";
-import { requireBusinessMembership, resolveAccountSession, signInAccount, signOutAccount, signUpAccount, toAccountView } from "../accountAuth";
+import { signInInputSchema } from "../../shared/auth";
+import { requireBusinessMembership, resolveAccountSession, signInAccount, signOutAccount, toAccountView } from "../accountAuth";
 import { accountProcedure, publicProcedure, router } from "../_core/trpc";
 
 /**
- * Universal account authentication. Separate from the legacy `auth`, `adminAccess` and `participant`
+ * Universal account sign-in. There is deliberately no sign-up here: accounts are created only by accepting an
+ * onboarding invitation (routers/clientOnboarding.ts). Separate from the legacy `auth`, `adminAccess` and `participant`
  * routers, which keep working unchanged.
  */
 export const accountRouter = router({
-  // Validated inside signUpAccount so the client receives one readable message, not a JSON issue list.
-  signUp: publicProcedure.input(z.unknown()).mutation(({ ctx, input }) => signUpAccount(ctx.req, ctx.res, input)),
-
   signIn: publicProcedure.input(signInInputSchema).mutation(({ ctx, input }) => signInAccount(ctx.req, ctx.res, input)),
 
   signOut: publicProcedure.mutation(({ ctx }) => signOutAccount(ctx.req, ctx.res)),

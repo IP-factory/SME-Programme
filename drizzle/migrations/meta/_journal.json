@@ -22,6 +22,13 @@
       "when": 1791373621377,
       "tag": "0002_universal_accounts_and_businesses",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791380797338,
+      "tag": "0003_client_onboarding_invitations",
+      "breakpoints": true
     }
   ]
 }

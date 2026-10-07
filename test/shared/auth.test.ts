@@ -6,12 +6,13 @@ import {
   PLATFORM_ROLES,
   normaliseAccountEmail,
   signInInputSchema,
-  signUpInputSchema,
+  onboardingAcceptInputSchema,
+  ONBOARDING_INVITATION_TTL_MS,
   validateAccountPassword,
 } from "@shared/auth";
 import { BUSINESS_MEMBERSHIP_ROLES, BUSINESS_MEMBERSHIP_STATUSES, isBusinessProfileComplete } from "@shared/businessMemberships";
 
-const valid = { fullName: "Ada Example", email: "Ada@Example.com", password: "correct horse 42", confirmPassword: "correct horse 42", businessName: "Example Traders" };
+const valid = { token: "t".repeat(43), fullName: "Ada Example", email: "Ada@Example.com", password: "correct horse 42", confirmPassword: "correct horse 42", businessName: "Example Traders" };
 
 describe("account email and password rules", () => {
   it("normalises emails by trimming and lower-casing", () => {
@@ -28,25 +29,27 @@ describe("account email and password rules", () => {
   });
 });
 
-describe("sign-up input", () => {
-  it("asks for exactly five fields and normalises the email", () => {
-    const parsed = signUpInputSchema.parse(valid);
-    expect(Object.keys(parsed).sort()).toEqual(["businessName", "confirmPassword", "email", "fullName", "password"]);
+describe("onboarding acceptance input", () => {
+  it("asks for the invitation token plus five account fields, and normalises the email", () => {
+    const parsed = onboardingAcceptInputSchema.parse(valid);
+    expect(Object.keys(parsed).sort()).toEqual(["businessName", "confirmPassword", "email", "fullName", "password", "token"]);
     expect(parsed.email).toBe("ada@example.com");
   });
 
   it("trims names and rejects bad input with a readable first message", () => {
-    expect(signUpInputSchema.parse({ ...valid, fullName: "  Ada Example ", businessName: "  Example Traders " })).toMatchObject({ fullName: "Ada Example", businessName: "Example Traders" });
-    const messages = (patch: object) => signUpInputSchema.safeParse({ ...valid, ...patch }).error?.issues.map(issue => issue.message);
+    expect(onboardingAcceptInputSchema.parse({ ...valid, fullName: "  Ada Example ", businessName: "  Example Traders " })).toMatchObject({ fullName: "Ada Example", businessName: "Example Traders" });
+    const messages = (patch: object) => onboardingAcceptInputSchema.safeParse({ ...valid, ...patch }).error?.issues.map((issue: { message: string }) => issue.message);
     expect(messages({ email: "nope" })).toContain("Enter a valid email address.");
     expect(messages({ confirmPassword: "different 12345" })).toContain("The password confirmation does not match.");
     expect(messages({ businessName: "" })).toContain("Enter your business name.");
+    expect(messages({ token: "short" })).toBeDefined();
+    expect(onboardingAcceptInputSchema.safeParse({ ...valid, token: undefined }).success).toBe(false);
     expect(messages({ businessName: "x".repeat(256) })).toBeDefined();
     expect(messages({ fullName: "x".repeat(256) })).toBeDefined();
   });
 
-  it("does not ask for profile fields at signup", () => {
-    const parsed = signUpInputSchema.parse({ ...valid, sector: "Retail", website: "https://x.test", phone: "123" } as never);
+  it("does not ask for profile fields during account creation", () => {
+    const parsed = onboardingAcceptInputSchema.parse({ ...valid, sector: "Retail", website: "https://x.test", phone: "123" } as never);
     expect(parsed).not.toHaveProperty("sector");
     expect(parsed).not.toHaveProperty("website");
     expect(parsed).not.toHaveProperty("phone");
@@ -80,5 +83,11 @@ describe("roles and vocabulary", () => {
     expect(isBusinessProfileComplete({})).toBe(false);
     expect(isBusinessProfileComplete({ description: "d", sector: "s", country: " " })).toBe(false);
     expect(isBusinessProfileComplete({ description: "d", sector: "s", country: "Nigeria" })).toBe(true);
+  });
+});
+
+describe("onboarding invitations", () => {
+  it("expire after seven days", () => {
+    expect(ONBOARDING_INVITATION_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000);
   });
 });

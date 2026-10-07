@@ -49,8 +49,13 @@ export function validateAccountPassword(password: string): string | null {
   return null;
 }
 
-export const signUpInputSchema = z
+/**
+ * Accepting an onboarding invitation. Accounts are never created without a valid invitation token: there is no
+ * public self-registration. `email` is read-only in the form and must equal the invitation's address.
+ */
+export const onboardingAcceptInputSchema = z
   .object({
+    token: z.string().min(20).max(200),
     fullName: z.string().trim().min(2, "Enter your full name.").max(ACCOUNT_FULL_NAME_MAX_LENGTH),
     email: z.string().trim().email("Enter a valid email address.").max(ACCOUNT_EMAIL_MAX_LENGTH).transform(normaliseAccountEmail),
     password: z.string().max(ACCOUNT_PASSWORD_MAX_LENGTH + 1),
@@ -64,7 +69,17 @@ export const signUpInputSchema = z
       context.addIssue({ code: "custom", path: ["confirmPassword"], message: "The password confirmation does not match." });
     }
   });
-export type SignUpInput = z.input<typeof signUpInputSchema>;
+export type OnboardingAcceptInput = z.input<typeof onboardingAcceptInputSchema>;
+
+export const ONBOARDING_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const ONBOARDING_ERRORS = {
+  unavailable: "This invitation is unavailable. It may have expired or already been used. Ask the IPF team for a new link.",
+  emailMismatch: "The email does not match this invitation.",
+  existingAccount: "An account already exists for this email address. The IPF team will help you sign in.",
+  existingAccountAdmin: "This email already belongs to an account. Linking an existing account to a new business is not available yet.",
+  noCheck: "That business check does not exist.",
+  invalidCheckEmail: "The business check does not have a valid email address to invite.",
+} as const;
 
 export const signInInputSchema = z.object({
   email: z.string().trim().max(ACCOUNT_EMAIL_MAX_LENGTH).transform(normaliseAccountEmail),

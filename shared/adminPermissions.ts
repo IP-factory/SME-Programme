@@ -46,6 +46,11 @@ export const ADMIN_PERMISSION_DEFINITIONS = [
     description: `Read the recorded email history for participant context. ${BRAND.facilitatorFirstName} retains approval and sending authority.`,
   },
   {
+    id: "manage_client_onboarding",
+    label: "Invite clients to onboard",
+    description: "Send a client the secure onboarding link that creates their account and business workspace, and revoke unused links. Only for clients who have reached onboarding.",
+  },
+  {
     id: "manage_portal_access",
     label: "Manage portal access",
     description: "Replace a participant’s private portal link when access needs to be reset.",

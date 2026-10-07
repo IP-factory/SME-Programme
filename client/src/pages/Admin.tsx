@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
+import ClientOnboardingPanel from "@/components/ClientOnboardingPanel";
 import { Ban, CalendarDays, Check, CheckCircle2, CircleDollarSign, ClipboardList, Copy, ExternalLink, FileText, Layers3, Mail, MessageSquare, RefreshCw, Search, Shield, ShieldAlert, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -79,7 +80,7 @@ function AdminConsole() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [scheduleKind, setScheduleKind] = useState<"Decide" | "Learn" | "Apply">("Decide");
-  const [activeTab, setActiveTab] = useState<"applicants" | "users" | "referrals">("applicants");
+  const [activeTab, setActiveTab] = useState<"applicants" | "users" | "referrals" | "onboarding">("applicants");
   const [emailSearch, setEmailSearch] = useState("");
   const [emailStatusFilter, setEmailStatusFilter] = useState("All");
   const [selectedEmailLog, setSelectedEmailLog] = useState<{ id: number; recipientEmail: string; subject: string; body: string; status: string; sentAt: Date | string } | null>(null);
@@ -286,6 +287,15 @@ function AdminConsole() {
             >
               Referrals & Credits
             </Button>
+            {can("manage_client_onboarding") && (
+              <Button
+                variant={activeTab === "onboarding" ? "default" : "outline"}
+                onClick={() => setActiveTab("onboarding")}
+                className={`rounded-none text-xs uppercase tracking-wider ${activeTab === "onboarding" ? "bg-brand text-paper" : "border-brand-line-strong text-brand"}`}
+              >
+                Client onboarding
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -332,6 +342,11 @@ function AdminConsole() {
               <CardContent className="p-0">
                 <AdminTeamManagement />
               </CardContent>
+            </Card>
+          ) : activeTab === "onboarding" ? (
+            <Card className="rounded-none border-line bg-paper shadow-sm">
+              <CardHeader className="border-b border-line px-6 py-4"><CardTitle className="font-serif text-xl">Client onboarding</CardTitle></CardHeader>
+              <CardContent className="p-0"><ClientOnboardingPanel /></CardContent>
             </Card>
           ) : activeTab === "referrals" ? (
             <Card className="rounded-none border-line bg-paper shadow-sm">

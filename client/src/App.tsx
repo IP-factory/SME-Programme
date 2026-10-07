@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { MotionConfig } from "framer-motion";
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Admin from "./pages/Admin";
@@ -10,7 +10,7 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminPasswordResetPage from "./pages/AdminPasswordResetPage";
 import AdminInvitationPage from "./pages/AdminInvitationPage";
 import BusinessCheck from "./pages/BusinessCheck";
-import SignUpPage from "./pages/SignUpPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import LoginPage from "./pages/LoginPage";
 import AccountDashboard from "./pages/AccountDashboard";
 import Home from "./pages/Home";
@@ -23,7 +23,9 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/check" component={BusinessCheck} />
-      <Route path="/signup" component={SignUpPage} />
+      {/* Accounts are created only from an onboarding invitation; the old public sign-up address goes to sign-in. */}
+      <Route path="/signup">{() => <Redirect to="/login" />}</Route>
+      <Route path="/onboarding/:token" component={OnboardingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/dashboard" component={AccountDashboard} />
       <Route path="/admin/login" component={AdminLoginPage} />

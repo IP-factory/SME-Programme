@@ -1,0 +1,89 @@
+import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
+import React, { useState } from "react";
+import { toast } from "sonner";
+
+const formatDate = (value: Date | string | null) => (value ? new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-");
+
+/**
+ * Invite a business check to become a client account. Shown only to administrators with the
+ * manage_client_onboarding responsibility (the server enforces it; this only hides the tab).
+ * The secure link is shown once, to the administrator, because email delivery may be unavailable.
+ */
+export default function ClientOnboardingPanel() {
+  const utils = trpc.useUtils();
+  const candidates = trpc.onboarding.candidates.useQuery(undefined, { retry: false });
+  const invitations = trpc.onboarding.invitations.useQuery(undefined, { retry: false });
+  const metrics = trpc.onboarding.metrics.useQuery(undefined, { retry: false });
+  const [issued, setIssued] = useState<{ url: string; email: string; delivery: string } | null>(null);
+
+  const refresh = () => {
+    void utils.onboarding.invitations.invalidate();
+    void utils.onboarding.metrics.invalidate();
+  };
+  const invite = trpc.onboarding.invite.useMutation({
+    onSuccess: (result, variables) => {
+      const lead = candidates.data?.find(item => item.id === variables.businessCheckId);
+      setIssued({ url: result.invitationUrl, email: lead?.email ?? "", delivery: result.deliveryStatus });
+      toast.success(result.deliveryStatus === "Sent" ? "Onboarding link emailed." : "Onboarding link created. Copy it to send it yourself.");
+      refresh();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const revoke = trpc.onboarding.revoke.useMutation({ onSuccess: () => { toast.success("Invitation revoked."); refresh(); }, onError: error => toast.error(error.message) });
+
+  const stats = metrics.data;
+  return (
+    <div className="space-y-6 p-6">
+      <p className="text-sm text-ink-muted">
+        Invite only a client who has had a discovery call, is a fit and has paid. The link creates their account and business workspace. It works once and expires in seven days.
+      </p>
+      {stats && (
+        <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
+          {[["Business checks", stats.businessChecks], ["Portal users", stats.portalUsers], ["Businesses", stats.businesses], ["Memberships", stats.memberships], ["Pending links", stats.pendingInvitations]].map(([label, value]) => (
+            <div key={label as string} className="border border-line bg-white p-3"><dt className="text-xs uppercase tracking-wider text-ink-muted">{label}</dt><dd className="font-serif text-2xl">{value}</dd></div>
+          ))}
+        </dl>
+      )}
+      {issued && (
+        <div role="status" className="space-y-2 border border-brand-line bg-brand-tint-softest p-4 text-sm">
+          <p className="font-semibold">Secure link for {issued.email} ({issued.delivery === "Sent" ? "emailed" : issued.delivery === "Failed" ? "email failed" : "email not sent"})</p>
+          <p className="text-ink-muted">Shown once. Do not post it publicly.</p>
+          <div className="flex gap-2">
+            <input readOnly value={issued.url} className="w-full border border-line bg-white px-2 py-1 text-xs" aria-label="Onboarding link" onFocus={event => event.currentTarget.select()} />
+            <Button type="button" variant="outline" className="rounded-none text-xs" onClick={() => { void navigator.clipboard?.writeText(issued.url); toast.success("Link copied."); }}>Copy</Button>
+            <Button type="button" variant="outline" className="rounded-none text-xs" onClick={() => setIssued(null)}>Hide</Button>
+          </div>
+        </div>
+      )}
+
+      <section>
+        <h3 className="mb-2 font-serif text-lg">Business checks</h3>
+        {candidates.isLoading ? <p className="text-sm text-ink-muted">Loading…</p> : (
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-line text-xs uppercase tracking-wider text-ink-muted"><th className="py-2 pr-3">Name</th><th className="pr-3">Business</th><th className="pr-3">Email</th><th className="pr-3">Stage</th><th /></tr></thead><tbody>
+            {candidates.data?.map(item => (
+              <tr key={item.id} className="border-b border-line-soft">
+                <td className="py-2 pr-3">{item.fullName}</td><td className="pr-3">{item.businessName ?? "-"}</td><td className="pr-3">{item.email}</td><td className="pr-3">{item.pipelineStage.replace(/_/g, " ")}</td>
+                <td className="text-right"><Button type="button" size="sm" disabled={invite.isPending} className="rounded-none bg-brand text-xs text-white" onClick={() => invite.mutate({ businessCheckId: item.id })}>Invite to onboard</Button></td>
+              </tr>
+            ))}
+            {candidates.data?.length === 0 && <tr><td colSpan={5} className="py-4 text-ink-muted">No business checks yet.</td></tr>}
+          </tbody></table></div>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-2 font-serif text-lg">Invitations</h3>
+        <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-line text-xs uppercase tracking-wider text-ink-muted"><th className="py-2 pr-3">Email</th><th className="pr-3">Business</th><th className="pr-3">Status</th><th className="pr-3">Expires</th><th /></tr></thead><tbody>
+          {invitations.data?.map(item => (
+            <tr key={item.id} className="border-b border-line-soft">
+              <td className="py-2 pr-3">{item.email}</td><td className="pr-3">{item.businessName || "-"}</td><td className="pr-3 capitalize">{item.status}</td><td className="pr-3">{formatDate(item.expiresAt)}</td>
+              <td className="text-right">{item.status === "pending" && <Button type="button" size="sm" variant="outline" disabled={revoke.isPending} className="rounded-none text-xs" onClick={() => revoke.mutate({ invitationId: item.id })}>Revoke</Button>}</td>
+            </tr>
+          ))}
+          {invitations.data?.length === 0 && <tr><td colSpan={5} className="py-4 text-ink-muted">No invitations yet.</td></tr>}
+        </tbody></table></div>
+      </section>
+    </div>
+  );
+}

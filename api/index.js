@@ -178,7 +178,7 @@ var init_ics = __esm({
 // server/_core/app.ts
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { TRPCError as TRPCError12 } from "@trpc/server";
+import { TRPCError as TRPCError13 } from "@trpc/server";
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
@@ -673,6 +673,32 @@ var businessChecks = pgTable("business_checks", {
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
+var clientOnboardingInvitationsStatusEnum = pgEnum("client_onboarding_invitations_status", ["pending", "accepted", "revoked", "expired"]);
+var clientOnboardingInvitationsDeliveryStatusEnum = pgEnum("client_onboarding_invitations_delivery_status", ["Sent", "Failed", "Simulated"]);
+var clientOnboardingInvitations = pgTable("client_onboarding_invitations", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  businessCheckId: integer("businessCheckId").notNull().references(() => businessChecks.id),
+  /** Normalised (lower-case) address the invitation is bound to. */
+  email: varchar("email", { length: 320 }).notNull(),
+  fullNameSnapshot: varchar("fullNameSnapshot", { length: 255 }).notNull(),
+  businessNameSnapshot: varchar("businessNameSnapshot", { length: 255 }).notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  status: clientOnboardingInvitationsStatusEnum("status").default("pending").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  createdByUserId: integer("createdByUserId").notNull().references(() => users.id),
+  acceptedByUserId: integer("acceptedByUserId").references(() => users.id),
+  /** The business created when the invitation was accepted. */
+  businessId: integer("businessId").references(() => businesses.id),
+  acceptedAt: timestamp("acceptedAt", { withTimezone: true }),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  deliveryStatus: clientOnboardingInvitationsDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
+  deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
+}, (table) => [
+  // At most one live invitation per business check: issuing a new one revokes the previous.
+  uniqueIndex("client_onboarding_invitations_one_pending_per_check").on(table.businessCheckId).where(sql`${table.status} = 'pending'`)
+]);
 
 // server/db.ts
 init_env();
@@ -2167,7 +2193,7 @@ import { initTRPC, TRPCError as TRPCError4 } from "@trpc/server";
 import superjson from "superjson";
 
 // server/accountAuth.ts
-import { randomBytes as randomBytes3, randomUUID } from "crypto";
+import { randomBytes as randomBytes3 } from "crypto";
 import { and as and4, eq as eq5, gt as gt3, isNull as isNull3 } from "drizzle-orm";
 import { TRPCError as TRPCError3 } from "@trpc/server";
 
@@ -2208,7 +2234,8 @@ function validateAccountPassword(password) {
   if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return "Use at least one letter and one number.";
   return null;
 }
-var signUpInputSchema = z.object({
+var onboardingAcceptInputSchema = z.object({
+  token: z.string().min(20).max(200),
   fullName: z.string().trim().min(2, "Enter your full name.").max(ACCOUNT_FULL_NAME_MAX_LENGTH),
   email: z.string().trim().email("Enter a valid email address.").max(ACCOUNT_EMAIL_MAX_LENGTH).transform(normaliseAccountEmail),
   password: z.string().max(ACCOUNT_PASSWORD_MAX_LENGTH + 1),
@@ -2221,6 +2248,15 @@ var signUpInputSchema = z.object({
     context.addIssue({ code: "custom", path: ["confirmPassword"], message: "The password confirmation does not match." });
   }
 });
+var ONBOARDING_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1e3;
+var ONBOARDING_ERRORS = {
+  unavailable: "This invitation is unavailable. It may have expired or already been used. Ask the IPF team for a new link.",
+  emailMismatch: "The email does not match this invitation.",
+  existingAccount: "An account already exists for this email address. The IPF team will help you sign in.",
+  existingAccountAdmin: "This email already belongs to an account. Linking an existing account to a new business is not available yet.",
+  noCheck: "That business check does not exist.",
+  invalidCheckEmail: "The business check does not have a valid email address to invite."
+};
 var signInInputSchema = z.object({
   email: z.string().trim().max(ACCOUNT_EMAIL_MAX_LENGTH).transform(normaliseAccountEmail),
   // No policy check on sign-in: a wrong or short password must fail like any other wrong password.
@@ -2345,53 +2381,6 @@ async function emailIsReserved(db, email) {
   const invited = await db.select({ id: adminInvitations.id }).from(adminInvitations).where(and4(emailEquals(adminInvitations.email, email), eq5(adminInvitations.status, "Pending"))).limit(1);
   return invited.length > 0;
 }
-async function signUpAccount(req, res, rawInput) {
-  assertSameOrigin(req);
-  const parsed = signUpInputSchema.safeParse(rawInput);
-  if (!parsed.success) throw new TRPCError3({ code: "BAD_REQUEST", message: parsed.error.issues[0]?.message ?? "Check the details and try again." });
-  const input = parsed.data;
-  if (!consumeRateLimit("signup", req, input.email, 5)) {
-    throw new TRPCError3({ code: "TOO_MANY_REQUESTS", message: ACCOUNT_AUTH_ERRORS.tooManyRequests });
-  }
-  const db = await getDb();
-  if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-  const passwordHash = hashAdminPassword(input.password);
-  let created;
-  try {
-    created = await db.transaction(async (tx) => {
-      const existing = await tx.select({ id: users.id }).from(users).where(emailEquals(users.email, input.email)).limit(1);
-      if (existing.length > 0 || await emailIsReserved(tx, input.email)) {
-        throw new TRPCError3({ code: "CONFLICT", message: ACCOUNT_AUTH_ERRORS.emailTaken });
-      }
-      const [user] = await tx.insert(users).values({
-        openId: `local:${randomUUID()}`,
-        name: input.fullName,
-        email: input.email,
-        loginMethod: "password",
-        role: "user",
-        status: "active"
-      }).returning({ id: users.id });
-      await tx.insert(userCredentials).values({ userId: user.id, passwordHash });
-      const [business] = await tx.insert(businesses).values({
-        name: input.businessName,
-        slug: slugify(input.businessName),
-        createdByUserId: user.id
-      }).returning({ id: businesses.id, name: businesses.name });
-      await tx.insert(businessMemberships).values({ businessId: business.id, userId: user.id, role: "owner", status: "active" });
-      const session = await createSession(tx, user.id);
-      return { userId: user.id, business, session };
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) throw new TRPCError3({ code: "CONFLICT", message: ACCOUNT_AUTH_ERRORS.emailTaken });
-    throw error;
-  }
-  setSessionCookie(req, res, created.session.token);
-  const view = buildView(
-    { id: created.userId, name: input.fullName, email: input.email },
-    [{ businessId: created.business.id, businessName: created.business.name, role: "owner", profileComplete: false }]
-  );
-  return view;
-}
 async function signInAccount(req, res, rawInput) {
   assertSameOrigin(req);
   const email = normaliseAccountEmail(rawInput.email);
@@ -2487,6 +2476,11 @@ var ADMIN_PERMISSION_DEFINITIONS = [
     id: "view_communications",
     label: "Review communication history",
     description: `Read the recorded email history for participant context. ${BRAND.facilitatorFirstName} retains approval and sending authority.`
+  },
+  {
+    id: "manage_client_onboarding",
+    label: "Invite clients to onboard",
+    description: "Send a client the secure onboarding link that creates their account and business workspace, and revoke unused links. Only for clients who have reached onboarding."
   },
   {
     id: "manage_portal_access",
@@ -2776,8 +2770,8 @@ var registrationInputSchema = z4.object({
   diagnostic: diagnosticInputSchema.optional(),
   referralCode: z4.string().trim().min(8).max(64).optional()
 });
-function registrationStatusForBoardroom(count) {
-  return count >= BOARDROOM_CAPACITY ? "Waitlisted" : "Pending";
+function registrationStatusForBoardroom(count2) {
+  return count2 >= BOARDROOM_CAPACITY ? "Waitlisted" : "Pending";
 }
 function buildRegistrationInsertFields(input, bookingToken) {
   const diagnostic = input.diagnostic ? deriveDiagnostic(input.diagnostic) : void 0;
@@ -2936,8 +2930,8 @@ var registrationRouter = router({
           eq7(registrations.status, "Accepted")
         )
       );
-      const count = Number(capacityCheck[0]?.count ?? 0);
-      if (registrationStatusForBoardroom(count) === "Waitlisted") {
+      const count2 = Number(capacityCheck[0]?.count ?? 0);
+      if (registrationStatusForBoardroom(count2) === "Waitlisted") {
         const [waitlistInsertResult] = await db.insert(registrations).values({
           ...registrationFields,
           status: "Waitlisted",
@@ -7478,8 +7472,6 @@ var businessCheckRouter = router({
 // server/routers/account.ts
 import { z as z15 } from "zod";
 var accountRouter = router({
-  // Validated inside signUpAccount so the client receives one readable message, not a JSON issue list.
-  signUp: publicProcedure.input(z15.unknown()).mutation(({ ctx, input }) => signUpAccount(ctx.req, ctx.res, input)),
   signIn: publicProcedure.input(signInInputSchema).mutation(({ ctx, input }) => signInAccount(ctx.req, ctx.res, input)),
   signOut: publicProcedure.mutation(({ ctx }) => signOutAccount(ctx.req, ctx.res)),
   /** Who is signed in, or null. Public so the client can decide where to send a visitor. */
@@ -7494,6 +7486,212 @@ var accountRouter = router({
     const membership = requireBusinessMembership(ctx.account, input.businessId);
     return { businessId: membership.businessId, name: membership.businessName, role: membership.role, profileComplete: membership.profileComplete };
   })
+});
+
+// server/routers/clientOnboarding.ts
+import { z as z17 } from "zod";
+
+// server/clientOnboarding.ts
+import { randomBytes as randomBytes6, randomUUID as randomUUID2 } from "crypto";
+import { and as and10, count, desc as desc7, eq as eq15, gt as gt5, isNull as isNull5 } from "drizzle-orm";
+import { TRPCError as TRPCError12 } from "@trpc/server";
+init_brand();
+import { z as z16 } from "zod";
+var emailSchema = z16.string().trim().email().max(320);
+function effectiveInvitationStatus(invitation, now = /* @__PURE__ */ new Date()) {
+  return invitation.status === "pending" && invitation.expiresAt.getTime() <= now.getTime() ? "expired" : invitation.status;
+}
+var unavailable2 = () => new TRPCError12({ code: "NOT_FOUND", message: ONBOARDING_ERRORS.unavailable });
+async function requireDatabase() {
+  const db = await getDb();
+  if (!db) throw new TRPCError12({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  return db;
+}
+async function identityConflict(db, email) {
+  const existing = await db.select({ id: users.id }).from(users).where(emailEquals(users.email, email)).limit(1);
+  return existing.length > 0 || await emailIsReserved(db, email);
+}
+function buildOnboardingEmail(input) {
+  const name = input.fullName.split(" ")[0] || "there";
+  return {
+    subject: `Set up your ${BRAND.programmeShortName} client account`,
+    body: [
+      `Hello ${name},`,
+      "",
+      `Welcome. Use the secure link below to create your account${input.businessName ? ` for ${input.businessName}` : ""}.`,
+      "It works once and expires in seven days.",
+      "",
+      input.url,
+      "",
+      "If you were not expecting this, you can ignore this email."
+    ].join("\n")
+  };
+}
+async function createOnboardingInvitation(input) {
+  const db = await requireDatabase();
+  const check = (await db.select().from(businessChecks).where(eq15(businessChecks.id, input.businessCheckId)).limit(1))[0];
+  if (!check) throw new TRPCError12({ code: "NOT_FOUND", message: ONBOARDING_ERRORS.noCheck });
+  const email = normaliseAccountEmail(check.email);
+  if (!emailSchema.safeParse(email).success) throw new TRPCError12({ code: "BAD_REQUEST", message: ONBOARDING_ERRORS.invalidCheckEmail });
+  if (await identityConflict(db, email)) throw new TRPCError12({ code: "CONFLICT", message: ONBOARDING_ERRORS.existingAccountAdmin });
+  const token = randomBytes6(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + ONBOARDING_INVITATION_TTL_MS);
+  const invitation = await db.transaction(async (tx) => {
+    await tx.update(clientOnboardingInvitations).set({ status: "revoked", revokedAt: databaseNow() }).where(and10(eq15(clientOnboardingInvitations.businessCheckId, check.id), eq15(clientOnboardingInvitations.status, "pending")));
+    const [row] = await tx.insert(clientOnboardingInvitations).values({
+      businessCheckId: check.id,
+      email,
+      fullNameSnapshot: check.fullName,
+      businessNameSnapshot: check.businessName ?? "",
+      tokenHash: sha256(token),
+      expiresAt,
+      createdByUserId: input.actorUserId
+    }).returning({ id: clientOnboardingInvitations.id });
+    return row;
+  });
+  const invitationUrl = `${getTrustedApplicationOrigin()}/onboarding/${encodeURIComponent(token)}`;
+  const message = buildOnboardingEmail({ fullName: check.fullName, businessName: check.businessName ?? "", url: invitationUrl });
+  const delivery = await deliverEmail({ to: email, subject: message.subject, body: message.body });
+  await db.update(clientOnboardingInvitations).set({
+    deliveryStatus: delivery.status,
+    deliveryMessageId: delivery.status === "Sent" ? delivery.providerMessageId || null : null
+  }).where(eq15(clientOnboardingInvitations.id, invitation.id));
+  await db.insert(adminAccessAuditEvents).values({
+    actorUserId: input.actorUserId,
+    action: "client_onboarding_invitation_created",
+    targetEmail: email,
+    details: JSON.stringify({ invitationId: invitation.id, businessCheckId: check.id, deliveryStatus: delivery.status })
+  });
+  return { invitationId: invitation.id, invitationUrl, expiresAt, deliveryStatus: delivery.status };
+}
+async function revokeOnboardingInvitation(input) {
+  const db = await requireDatabase();
+  const revoked = await db.update(clientOnboardingInvitations).set({ status: "revoked", revokedAt: databaseNow() }).where(and10(eq15(clientOnboardingInvitations.id, input.invitationId), eq15(clientOnboardingInvitations.status, "pending"))).returning({ id: clientOnboardingInvitations.id, email: clientOnboardingInvitations.email });
+  if (revoked.length !== 1) throw new TRPCError12({ code: "CONFLICT", message: "Only a pending invitation can be revoked." });
+  await db.insert(adminAccessAuditEvents).values({
+    actorUserId: input.actorUserId,
+    action: "client_onboarding_invitation_revoked",
+    targetEmail: revoked[0].email,
+    details: JSON.stringify({ invitationId: revoked[0].id })
+  });
+  return { success: true };
+}
+async function previewOnboardingInvitation(req, token) {
+  if (!consumeRateLimit("onboarding", req, "preview", 60)) throw new TRPCError12({ code: "TOO_MANY_REQUESTS", message: ACCOUNT_AUTH_ERRORS.tooManyRequests });
+  const db = await requireDatabase();
+  const invitation = (await db.select().from(clientOnboardingInvitations).where(eq15(clientOnboardingInvitations.tokenHash, sha256(token))).limit(1))[0];
+  if (!invitation || effectiveInvitationStatus(invitation) !== "pending") return { available: false };
+  return { available: true, email: invitation.email, fullName: invitation.fullNameSnapshot, businessName: invitation.businessNameSnapshot };
+}
+async function acceptOnboardingInvitation(req, res, rawInput) {
+  assertSameOrigin(req);
+  const parsed = onboardingAcceptInputSchema.safeParse(rawInput);
+  if (!parsed.success) throw new TRPCError12({ code: "BAD_REQUEST", message: parsed.error.issues[0]?.message ?? "Check the details and try again." });
+  const input = parsed.data;
+  if (!consumeRateLimit("onboarding", req, "accept", 10)) throw new TRPCError12({ code: "TOO_MANY_REQUESTS", message: ACCOUNT_AUTH_ERRORS.tooManyRequests });
+  const db = await requireDatabase();
+  const passwordHash = hashAdminPassword(input.password);
+  let created;
+  try {
+    created = await db.transaction(async (tx) => {
+      const invitation = (await tx.select().from(clientOnboardingInvitations).where(eq15(clientOnboardingInvitations.tokenHash, sha256(input.token))).limit(1))[0];
+      if (!invitation || effectiveInvitationStatus(invitation) !== "pending") throw unavailable2();
+      if (input.email !== invitation.email) throw new TRPCError12({ code: "BAD_REQUEST", message: ONBOARDING_ERRORS.emailMismatch });
+      if (await identityConflict(tx, invitation.email)) throw new TRPCError12({ code: "CONFLICT", message: ONBOARDING_ERRORS.existingAccount });
+      const [user] = await tx.insert(users).values({
+        openId: `local:${randomUUID2()}`,
+        name: input.fullName,
+        email: invitation.email,
+        loginMethod: "password",
+        role: "user",
+        status: "active"
+      }).returning({ id: users.id });
+      await tx.insert(userCredentials).values({ userId: user.id, passwordHash });
+      const [business] = await tx.insert(businesses).values({
+        name: input.businessName,
+        slug: slugify(input.businessName),
+        createdByUserId: user.id
+      }).returning({ id: businesses.id, name: businesses.name });
+      await tx.insert(businessMemberships).values({ businessId: business.id, userId: user.id, role: "owner", status: "active" });
+      const session = await createSession(tx, user.id);
+      const claimed = await tx.update(clientOnboardingInvitations).set({
+        status: "accepted",
+        acceptedAt: databaseNow(),
+        acceptedByUserId: user.id,
+        businessId: business.id
+      }).where(and10(
+        eq15(clientOnboardingInvitations.id, invitation.id),
+        eq15(clientOnboardingInvitations.status, "pending"),
+        gt5(clientOnboardingInvitations.expiresAt, /* @__PURE__ */ new Date()),
+        isNull5(clientOnboardingInvitations.acceptedAt)
+      )).returning({ id: clientOnboardingInvitations.id });
+      if (claimed.length !== 1) throw unavailable2();
+      return { userId: user.id, email: invitation.email, business, session };
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new TRPCError12({ code: "CONFLICT", message: ONBOARDING_ERRORS.existingAccount });
+    throw error;
+  }
+  setSessionCookie(req, res, created.session.token);
+  return buildView(
+    { id: created.userId, name: input.fullName, email: created.email },
+    [{ businessId: created.business.id, businessName: created.business.name, role: "owner", profileComplete: false }]
+  );
+}
+async function listOnboardingCandidates() {
+  const db = await requireDatabase();
+  return db.select({
+    id: businessChecks.id,
+    fullName: businessChecks.fullName,
+    email: businessChecks.email,
+    businessName: businessChecks.businessName,
+    pipelineStage: businessChecks.pipelineStage,
+    callRequestedAt: businessChecks.callRequestedAt,
+    completedAt: businessChecks.completedAt,
+    createdAt: businessChecks.createdAt
+  }).from(businessChecks).orderBy(desc7(businessChecks.createdAt)).limit(200);
+}
+async function listOnboardingInvitations() {
+  const db = await requireDatabase();
+  const rows = await db.select({
+    id: clientOnboardingInvitations.id,
+    businessCheckId: clientOnboardingInvitations.businessCheckId,
+    email: clientOnboardingInvitations.email,
+    businessName: clientOnboardingInvitations.businessNameSnapshot,
+    status: clientOnboardingInvitations.status,
+    expiresAt: clientOnboardingInvitations.expiresAt,
+    acceptedAt: clientOnboardingInvitations.acceptedAt,
+    deliveryStatus: clientOnboardingInvitations.deliveryStatus,
+    createdAt: clientOnboardingInvitations.createdAt
+  }).from(clientOnboardingInvitations).orderBy(desc7(clientOnboardingInvitations.createdAt)).limit(200);
+  return rows.map((row) => ({ ...row, status: effectiveInvitationStatus(row) }));
+}
+async function onboardingMetrics() {
+  const db = await requireDatabase();
+  const one = async (query) => Number((await query)[0]?.n ?? 0);
+  return {
+    businessChecks: await one(db.select({ n: count() }).from(businessChecks)),
+    portalUsers: await one(db.select({ n: count() }).from(userCredentials)),
+    businesses: await one(db.select({ n: count() }).from(businesses)),
+    memberships: await one(db.select({ n: count() }).from(businessMemberships)),
+    pendingInvitations: await one(db.select({ n: count() }).from(clientOnboardingInvitations).where(and10(eq15(clientOnboardingInvitations.status, "pending"), gt5(clientOnboardingInvitations.expiresAt, /* @__PURE__ */ new Date())))),
+    activeSessions: await one(db.select({ n: count() }).from(userSessions).where(and10(isNull5(userSessions.revokedAt), gt5(userSessions.expiresAt, /* @__PURE__ */ new Date()))))
+  };
+}
+
+// server/routers/clientOnboarding.ts
+var manage = adminPermissionProcedure("manage_client_onboarding");
+var clientOnboardingRouter = router({
+  // ---- the invited client (public, token-gated) ----
+  preview: publicProcedure.input(z17.object({ token: z17.string().min(1).max(200) })).query(({ ctx, input }) => previewOnboardingInvitation(ctx.req, input.token)),
+  // Validated inside acceptOnboardingInvitation so the client receives one readable message, not a JSON issue list.
+  accept: publicProcedure.input(z17.unknown()).mutation(({ ctx, input }) => acceptOnboardingInvitation(ctx.req, ctx.res, input)),
+  // ---- authorised administrators ----
+  candidates: manage.query(() => listOnboardingCandidates()),
+  invitations: manage.query(() => listOnboardingInvitations()),
+  metrics: manage.query(() => onboardingMetrics()),
+  invite: manage.input(z17.object({ businessCheckId: z17.number().int().positive() })).mutation(({ ctx, input }) => createOnboardingInvitation({ businessCheckId: input.businessCheckId, actorUserId: ctx.user.id })),
+  revoke: manage.input(z17.object({ invitationId: z17.number().int().positive() })).mutation(({ ctx, input }) => revokeOnboardingInvitation({ invitationId: input.invitationId, actorUserId: ctx.user.id }))
 });
 
 // server/routers.ts
@@ -7520,7 +7718,8 @@ var appRouter = router({
   inboundReplies: inboundRepliesRouter,
   pricingRequests: pricingRequestsRouter,
   businessCheck: businessCheckRouter,
-  account: accountRouter
+  account: accountRouter,
+  onboarding: clientOnboardingRouter
 });
 
 // server/_core/context.ts
@@ -7655,7 +7854,7 @@ function createApp() {
       return res.status(201).json(uploaded);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to upload the file.";
-      const status = error instanceof TRPCError12 && error.code === "UNAUTHORIZED" ? 401 : 500;
+      const status = error instanceof TRPCError13 && error.code === "UNAUTHORIZED" ? 401 : 500;
       console.warn("[Participant upload] Failed:", message);
       return res.status(status).json({ message: status === 401 ? "Kindly sign in to your participant portal again and try again." : "We could not store this file. Kindly try again shortly." });
     }
@@ -7675,7 +7874,7 @@ function createApp() {
       return res.status(201).json(uploaded);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to upload the payment receipt.";
-      const status = error instanceof TRPCError12 && error.code === "UNAUTHORIZED" ? 401 : 500;
+      const status = error instanceof TRPCError13 && error.code === "UNAUTHORIZED" ? 401 : 500;
       console.warn("[Payment receipt upload] Failed:", message);
       return res.status(status).json({ message: status === 401 ? "Kindly sign in to your participant portal again and try again." : "We could not store the receipt. Kindly try again shortly." });
     }

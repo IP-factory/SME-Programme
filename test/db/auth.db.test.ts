@@ -26,6 +26,7 @@ vi.mock("drizzle-orm/node-postgres", () => ({
 import { appRouter } from "@server/routers";
 import { ACCOUNT_AUTH_ERRORS, ACCOUNT_LOCKOUT_MS, ACCOUNT_SESSION_COOKIE } from "@shared/auth";
 import { OWNER_ADMIN_EMAIL } from "@server/adminSecurity";
+import { createOnboardingInvitation } from "@server/clientOnboarding";
 import { UNAUTHED_ERR_MSG } from "@shared/const";
 import type { TrpcContext } from "@server/_core/context";
 
@@ -78,11 +79,35 @@ for (const target of targets) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let db: any;
 
+    let actorUserId = 0;
+
     beforeAll(async () => {
       harness = await target.make();
       db = harness.db;
       holder.current = harness.db as unknown as Record<string, unknown>;
+      // The administrator who issues the invitations used to set accounts up.
+      const [actor] = await db.insert(schema.users).values({ openId: `seed-admin-${Math.random()}`, role: "admin", email: uniqueEmail("seed-admin") }).returning();
+      actorUserId = actor.id;
     }, 60_000);
+
+    /**
+     * Accounts exist only through the real onboarding path: a business check is invited, then the invitation is
+     * accepted. `input.email` may be malformed or taken; the invitation then uses a placeholder (or is refused).
+     */
+    async function onboard(client: ReturnType<typeof browser>, input: ReturnType<typeof signUpInput>) {
+      const wellFormed = /^\S+@\S+\.\S+$/.test(input.email.trim());
+      const [check] = await db.insert(schema.businessChecks).values({
+        publicToken: `check-${(counter += 1)}-${Math.random().toString(36).slice(2, 10)}`,
+        fullName: input.fullName || "Prospect",
+        email: wellFormed ? input.email : uniqueEmail("placeholder"),
+        businessName: input.businessName.trim() || null,
+        stage: "unknown",
+        answersJson: "{}",
+      }).returning();
+      const invitation = await createOnboardingInvitation({ businessCheckId: check.id, actorUserId });
+      const token = decodeURIComponent(invitation.invitationUrl.split("/onboarding/")[1]);
+      return client.call().onboarding.accept({ token, fullName: input.fullName, email: input.email, password: input.password, confirmPassword: input.confirmPassword, businessName: input.businessName });
+    }
     afterAll(async () => {
       await harness?.close();
     });
@@ -99,11 +124,11 @@ for (const target of targets) {
       };
     };
 
-    describe("signup", () => {
+    describe("account activation through an onboarding invitation", () => {
       it("creates one user, credential, business, owner membership and session, and signs the browser in", async () => {
         const email = uniqueEmail("signup");
         const b = browser();
-        const view = await b.call().account.signUp(signUpInput(email));
+        const view = await onboard(b, signUpInput(email));
 
         const rows = await rowsFor(email);
         expect(rows.user).toMatchObject({ email, name: "Ada Example", status: "active", role: "user", loginMethod: "password" });
@@ -128,7 +153,7 @@ for (const target of targets) {
       it("stores only a hash of the session token and sets a hardened cookie", async () => {
         const b = browser({ protocol: "https" });
         const email = uniqueEmail("cookie");
-        await b.call().account.signUp(signUpInput(email));
+        await onboard(b, signUpInput(email));
         const token = b.token()!;
         const { sessions } = await rowsFor(email);
         expect(token.length).toBeGreaterThanOrEqual(43);
@@ -141,7 +166,7 @@ for (const target of targets) {
 
       it("hashes the password with scrypt and never stores it", async () => {
         const email = uniqueEmail("hash");
-        await browser().call().account.signUp(signUpInput(email));
+        await onboard(browser(), signUpInput(email));
         const { credentials } = await rowsFor(email);
         expect(credentials[0].passwordHash).toMatch(/^scrypt\$/);
         expect(credentials[0].passwordHash).not.toContain(PASSWORD);
@@ -154,7 +179,7 @@ for (const target of targets) {
         await db.execute(sql.raw(`create or replace function ipf_force_failure() returns trigger language plpgsql as $$ begin raise exception 'forced failure'; end $$`));
         await db.execute(sql.raw(`create trigger ipf_force_failure before insert on ${table} for each row execute function ipf_force_failure()`));
         try {
-          await expect(browser().call().account.signUp(signUpInput(email, { businessName: `Rollback ${step}` }))).rejects.toBeTruthy();
+          await expect(onboard(browser(), signUpInput(email, { businessName: `Rollback ${step}` }))).rejects.toBeTruthy();
         } finally {
           await db.execute(sql.raw(`drop trigger ipf_force_failure on ${table}`));
         }
@@ -166,40 +191,40 @@ for (const target of targets) {
         expect(orphans[0]).toEqual({ c: expect.anything(), m: expect.anything(), s: expect.anything() });
         expect([Number(orphans[0].c), Number(orphans[0].m), Number(orphans[0].s)]).toEqual([0, 0, 0]);
         // The email is still free: a clean retry works.
-        await browser().call().account.signUp(signUpInput(email, { businessName: `Rollback ${step}` }));
+        await onboard(browser(), signUpInput(email, { businessName: `Rollback ${step}` }));
         expect((await rowsFor(email)).businesses).toHaveLength(1);
       });
 
       it("rejects a duplicate email case-insensitively, even against a legacy mixed-case user", async () => {
         const email = uniqueEmail("dup");
-        await browser().call().account.signUp(signUpInput(email));
-        await expect(browser().call().account.signUp(signUpInput(email.toUpperCase()))).rejects.toMatchObject({ code: "CONFLICT", message: ACCOUNT_AUTH_ERRORS.emailTaken });
-        await expect(browser().call().account.signUp(signUpInput(`  ${email}  `))).rejects.toMatchObject({ code: "CONFLICT" });
+        await onboard(browser(), signUpInput(email));
+        await expect(onboard(browser(), signUpInput(email.toUpperCase()))).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(onboard(browser(), signUpInput(`  ${email}  `))).rejects.toMatchObject({ code: "CONFLICT" });
         expect(await db.select().from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`)).toHaveLength(1);
 
         const legacy = uniqueEmail("Legacy").replace("legacy", "LeGaCy");
         await db.insert(schema.users).values({ openId: `oauth-${legacy}`, email: legacy, name: "Legacy" });
-        await expect(browser().call().account.signUp(signUpInput(legacy.toLowerCase()))).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(onboard(browser(), signUpInput(legacy.toLowerCase()))).rejects.toMatchObject({ code: "CONFLICT" });
       });
 
       it("refuses the owner administrator's email and pending administrator invitations", async () => {
-        await expect(browser().call().account.signUp(signUpInput(OWNER_ADMIN_EMAIL))).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(onboard(browser(), signUpInput(OWNER_ADMIN_EMAIL))).rejects.toMatchObject({ code: "CONFLICT" });
         const invited = uniqueEmail("invited");
         const [owner] = await db.insert(schema.users).values({ openId: `owner-${invited}`, role: "admin" }).returning();
         await db.insert(schema.adminInvitations).values({ email: invited, tokenHash: `h-${invited}`.slice(0, 64), createdByUserId: owner.id, expiresAt: new Date(Date.now() + 86_400_000), proposedPermissionsJson: "[]" });
-        await expect(browser().call().account.signUp(signUpInput(invited))).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(onboard(browser(), signUpInput(invited))).rejects.toMatchObject({ code: "CONFLICT" });
       });
 
       it("answers each kind of email problem with its own code: invalid is BAD_REQUEST, taken or reserved is CONFLICT", async () => {
         const taken = uniqueEmail("outcome-taken");
-        await browser().call().account.signUp(signUpInput(taken));
+        await onboard(browser(), signUpInput(taken));
         const invited = uniqueEmail("outcome-invited");
         const [admin] = await db.insert(schema.users).values({ openId: `outcome-${invited}`, role: "admin" }).returning();
         await db.insert(schema.adminInvitations).values({ email: invited, tokenHash: `h-${invited}`.slice(0, 64), createdByUserId: admin.id, expiresAt: new Date(Date.now() + 86_400_000), proposedPermissionsJson: "[]" });
 
         // The owner address must itself be well formed, whatever the environment says (it falls back to a default when blank).
         expect(OWNER_ADMIN_EMAIL).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
-        const outcomes = async (email: string) => browser().call().account.signUp(signUpInput(email)).then(() => "created", (error: { code: string }) => error.code);
+        const outcomes = async (email: string) => onboard(browser(), signUpInput(email)).then(() => "created", (error: { code: string }) => error.code);
         expect(await outcomes("not-an-email")).toBe("BAD_REQUEST");
         expect(await outcomes("")).toBe("BAD_REQUEST");
         expect(await outcomes(taken)).toBe("CONFLICT");
@@ -207,7 +232,8 @@ for (const target of targets) {
         expect(await outcomes(OWNER_ADMIN_EMAIL.toUpperCase())).toBe("CONFLICT");
         expect(await outcomes(invited)).toBe("CONFLICT");
         expect(await outcomes(uniqueEmail("outcome-free"))).toBe("created");
-      });
+        // Seven full invite-and-accept round trips: about 150 network round trips on a real database.
+      }, 90_000);
 
       it.each([
         ["a short password", { password: "a1", confirmPassword: "a1" }, /at least 10/],
@@ -218,7 +244,7 @@ for (const target of targets) {
         ["a one-letter name", { fullName: "A" }, /full name/i],
       ])("rejects %s without writing anything", async (_label, patch, message) => {
         const before = (await db.select().from(schema.users)).length;
-        await expect(browser().call().account.signUp({ ...signUpInput(uniqueEmail("invalid")), ...patch })).rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringMatching(message) });
+        await expect(onboard(browser(), { ...signUpInput(uniqueEmail("invalid")), ...patch })).rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringMatching(message) });
         expect((await db.select().from(schema.users)).length).toBe(before);
       });
     });
@@ -226,7 +252,7 @@ for (const target of targets) {
     describe("sign-in", () => {
       it("signs in with the right password, issues a new session and updates lastSignedIn", async () => {
         const email = uniqueEmail("login");
-        await browser().call().account.signUp(signUpInput(email));
+        await onboard(browser(), signUpInput(email));
         await db.update(schema.users).set({ lastSignedIn: new Date("2001-01-01T00:00:00Z") }).where(sql`lower(${schema.users.email}) = ${email}`);
 
         const b = browser();
@@ -241,7 +267,7 @@ for (const target of targets) {
 
       it("fails wrong password, unknown email and a suspended account with the same message", async () => {
         const email = uniqueEmail("generic");
-        await browser().call().account.signUp(signUpInput(email));
+        await onboard(browser(), signUpInput(email));
         const wrongPassword = await browser().call().account.signIn({ email, password: "wrong password 1" }).catch((e: unknown) => e);
         const unknownEmail = await browser().call().account.signIn({ email: uniqueEmail("ghost"), password: "wrong password 1" }).catch((e: unknown) => e);
         await db.update(schema.users).set({ status: "suspended" }).where(sql`lower(${schema.users.email}) = ${email}`);
@@ -253,7 +279,7 @@ for (const target of targets) {
 
       it("locks the credential after five failures, even for the right password, until the lock expires", async () => {
         const email = uniqueEmail("lock");
-        await browser().call().account.signUp(signUpInput(email));
+        await onboard(browser(), signUpInput(email));
         for (let attempt = 0; attempt < 5; attempt += 1) {
           await expect(browser({ ip: `203.0.113.${attempt + 1}` }).call().account.signIn({ email, password: "wrong password 1" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
         }
@@ -280,7 +306,7 @@ for (const target of targets) {
       it("keeps the user signed in across separate requests (a page refresh)", async () => {
         const b = browser();
         const email = uniqueEmail("refresh");
-        await b.call().account.signUp(signUpInput(email));
+        await onboard(b, signUpInput(email));
         const first = await b.call().account.me();
         const second = await b.call().account.me();
         expect(first?.user.email).toBe(email);
@@ -291,7 +317,7 @@ for (const target of targets) {
       it("signs out: revokes the session server-side, clears the cookie and rejects the old token", async () => {
         const b = browser();
         const email = uniqueEmail("logout");
-        await b.call().account.signUp(signUpInput(email));
+        await onboard(b, signUpInput(email));
         const stolen = { cookie: `${ACCOUNT_SESSION_COOKIE}=${encodeURIComponent(b.token()!)}` };
         expect(await b.call().account.signOut()).toEqual({ success: true });
         expect(b.token()).toBeUndefined();
@@ -308,7 +334,7 @@ for (const target of targets) {
       it("rejects an expired session, a revoked session and a suspended user", async () => {
         const email = uniqueEmail("expiry");
         const b = browser();
-        await b.call().account.signUp(signUpInput(email));
+        await onboard(b, signUpInput(email));
         expect(await b.call().account.me()).not.toBeNull();
 
         await db.update(schema.userSessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(sql`"userId" = (select id from users where lower(email) = ${email})`);
@@ -336,11 +362,11 @@ for (const target of targets) {
 
       it("refuses a sign-up, sign-in or sign-out whose Origin is another site", async () => {
         const hostile = browser({ origin: "https://evil.example", host: "app.example.test" });
-        await expect(hostile.call().account.signUp(signUpInput(uniqueEmail("csrf")))).rejects.toMatchObject({ code: "FORBIDDEN", message: ACCOUNT_AUTH_ERRORS.crossSite });
+        await expect(onboard(hostile, signUpInput(uniqueEmail("csrf")))).rejects.toMatchObject({ code: "FORBIDDEN", message: ACCOUNT_AUTH_ERRORS.crossSite });
         await expect(hostile.call().account.signIn({ email: "a@example.test", password: "x" })).rejects.toMatchObject({ code: "FORBIDDEN" });
         await expect(hostile.call().account.signOut()).rejects.toMatchObject({ code: "FORBIDDEN" });
         const same = browser({ origin: "https://app.example.test", host: "app.example.test" });
-        await same.call().account.signUp(signUpInput(uniqueEmail("sameorigin")));
+        await onboard(same, signUpInput(uniqueEmail("sameorigin")));
       });
     });
 
@@ -348,8 +374,8 @@ for (const target of targets) {
       it("never lets a user read another business by supplying its id", async () => {
         const a = browser();
         const bUser = browser();
-        const viewA = await a.call().account.signUp(signUpInput(uniqueEmail("tenant-a"), { businessName: "Tenant A" }));
-        const viewB = await bUser.call().account.signUp(signUpInput(uniqueEmail("tenant-b"), { businessName: "Tenant B" }));
+        const viewA = await onboard(a, signUpInput(uniqueEmail("tenant-a"), { businessName: "Tenant A" }));
+        const viewB = await onboard(bUser, signUpInput(uniqueEmail("tenant-b"), { businessName: "Tenant B" }));
         const idA = viewA.activeBusiness!.businessId;
         const idB = viewB.activeBusiness!.businessId;
         expect(idA).not.toBe(idB);
@@ -363,7 +389,7 @@ for (const target of targets) {
 
       it("ignores suspended or removed memberships and suspended businesses", async () => {
         const b = browser();
-        const view = await b.call().account.signUp(signUpInput(uniqueEmail("inactive"), { businessName: "Inactive Co" }));
+        const view = await onboard(b, signUpInput(uniqueEmail("inactive"), { businessName: "Inactive Co" }));
         const id = view.activeBusiness!.businessId;
         await db.update(schema.businessMemberships).set({ status: "removed" }).where(eq(schema.businessMemberships.businessId, id));
         expect((await b.call().account.me())!.memberships).toEqual([]);
@@ -376,7 +402,7 @@ for (const target of targets) {
       it("supports several memberships per user and several users per business at database level", async () => {
         const owner = browser();
         const email = uniqueEmail("multi");
-        const view = await owner.call().account.signUp(signUpInput(email, { businessName: "First Co" }));
+        const view = await onboard(owner, signUpInput(email, { businessName: "First Co" }));
         const { user } = await rowsFor(email);
         const [second] = await db.insert(schema.businesses).values({ name: "Second Co", slug: `second-${email}`.slice(0, 80), createdByUserId: user.id }).returning();
         await db.insert(schema.businessMemberships).values({ businessId: second.id, userId: user.id, role: "business_admin" });
@@ -389,7 +415,7 @@ for (const target of targets) {
 
         const teammate = browser();
         const teammateEmail = uniqueEmail("teammate");
-        await teammate.call().account.signUp(signUpInput(teammateEmail, { businessName: "Teammate Co" }));
+        await onboard(teammate, signUpInput(teammateEmail, { businessName: "Teammate Co" }));
         const { user: teammateUser } = await rowsFor(teammateEmail);
         await db.insert(schema.businessMemberships).values({ businessId: view.activeBusiness!.businessId, userId: teammateUser.id, role: "member" });
         const members = await db.select().from(schema.businessMemberships).where(eq(schema.businessMemberships.businessId, view.activeBusiness!.businessId));
@@ -398,7 +424,7 @@ for (const target of targets) {
 
       it("rejects a duplicate membership for the same business and user", async () => {
         const email = uniqueEmail("dupmember");
-        const view = await browser().call().account.signUp(signUpInput(email));
+        const view = await onboard(browser(), signUpInput(email));
         const { user } = await rowsFor(email);
         const failure = await db.insert(schema.businessMemberships).values({ businessId: view.activeBusiness!.businessId, userId: user.id, role: "member" }).then(() => null, (e: unknown) => e);
         expect(pgErrorCode(failure)).toBe("23505");
@@ -418,13 +444,13 @@ for (const target of targets) {
 
       it("does not turn an account session into administrator access", async () => {
         const b = browser();
-        await b.call().account.signUp(signUpInput(uniqueEmail("notadmin")));
+        await onboard(b, signUpInput(uniqueEmail("notadmin")));
         await expect(b.call().scheduling.adminList({})).rejects.toMatchObject({ code: "FORBIDDEN" });
       });
 
       it("leaves the legacy users.role gate as user for new accounts", async () => {
         const email = uniqueEmail("role");
-        await browser().call().account.signUp(signUpInput(email));
+        await onboard(browser(), signUpInput(email));
         expect((await rowsFor(email)).user.role).toBe("user");
         expect(await db.select().from(schema.users).where(and(eq(schema.users.role, "admin"), sql`lower(${schema.users.email}) = ${email}`))).toHaveLength(0);
       });

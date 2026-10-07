@@ -641,5 +641,42 @@ export const businessChecks = pgTable("business_checks", {
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
+export const clientOnboardingInvitationsStatusEnum = pgEnum("client_onboarding_invitations_status", ["pending", "accepted", "revoked", "expired"]);
+export const clientOnboardingInvitationsDeliveryStatusEnum = pgEnum("client_onboarding_invitations_delivery_status", ["Sent", "Failed", "Simulated"]);
+
+/**
+ * How a client account is created: an authorised IPF user invites a prospect who already exists as a business check
+ * (the front door). Accepting the invitation creates the user, credential, business, owner membership and session
+ * in one transaction. Public self-registration does not exist. Only the SHA-256 of the token is stored; an
+ * invitation is single-use, expiring, revocable and bound to `email`.
+ * A prospect is not a user and not a business until the invitation is accepted.
+ */
+export const clientOnboardingInvitations = pgTable("client_onboarding_invitations", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  businessCheckId: integer("businessCheckId").notNull().references(() => businessChecks.id),
+  /** Normalised (lower-case) address the invitation is bound to. */
+  email: varchar("email", { length: 320 }).notNull(),
+  fullNameSnapshot: varchar("fullNameSnapshot", { length: 255 }).notNull(),
+  businessNameSnapshot: varchar("businessNameSnapshot", { length: 255 }).notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  status: clientOnboardingInvitationsStatusEnum("status").default("pending").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  createdByUserId: integer("createdByUserId").notNull().references(() => users.id),
+  acceptedByUserId: integer("acceptedByUserId").references(() => users.id),
+  /** The business created when the invitation was accepted. */
+  businessId: integer("businessId").references(() => businesses.id),
+  acceptedAt: timestamp("acceptedAt", { withTimezone: true }),
+  revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  deliveryStatus: clientOnboardingInvitationsDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
+  deliveryMessageId: varchar("deliveryMessageId", { length: 255 }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
+}, table => [
+  // At most one live invitation per business check: issuing a new one revokes the previous.
+  uniqueIndex("client_onboarding_invitations_one_pending_per_check").on(table.businessCheckId).where(sql`${table.status} = 'pending'`),
+]);
+
+export type ClientOnboardingInvitation = typeof clientOnboardingInvitations.$inferSelect;
+
 export type BusinessCheck = typeof businessChecks.$inferSelect;
 export type InsertBusinessCheck = typeof businessChecks.$inferInsert;

@@ -97,11 +97,11 @@ for (const target of targets) {
     });
 
     describe("schema", () => {
-      it("creates exactly the 34 expected tables", async () => {
+      it("creates exactly the 35 expected tables", async () => {
         const rows = await harness.query(sql`select table_name from information_schema.tables where table_schema = current_schema() and table_type = 'BASE TABLE'`);
         const created = rows.map(row => String(row.table_name)).sort();
-        // 30 from the MySQL migration + user_credentials, user_sessions, businesses, business_memberships.
-        expect(expectedTableNames).toHaveLength(34);
+        // 30 from the MySQL migration + user_credentials, user_sessions, businesses, business_memberships, client_onboarding_invitations.
+        expect(expectedTableNames).toHaveLength(35);
         expect(expectedTableNames.filter(name => !created.includes(name))).toEqual([]);
         expect(created.filter(name => !expectedTableNames.includes(name))).toEqual([]);
       });
@@ -172,10 +172,10 @@ for (const target of targets) {
         expect(await db.select().from(schema.businessMemberships).where(eq(schema.businessMemberships.userId, user.id))).toHaveLength(0);
       });
 
-      it("creates all 47 enum types with their exact labels in order", async () => {
+      it("creates all 49 enum types with their exact labels in order", async () => {
         const rows = await harness.query(sql`select t.typname, array_agg(e.enumlabel::text order by e.enumsortorder) as labels from pg_type t join pg_enum e on e.enumtypid = t.oid join pg_namespace n on n.oid = t.typnamespace where n.nspname = current_schema() group by t.typname`);
         const actual = new Map(rows.map(row => [String(row.typname), row.labels as string[]]));
-        expect(enums).toHaveLength(47);
+        expect(enums).toHaveLength(49);
         for (const definition of enums) expect(actual.get(definition.enumName), definition.enumName).toEqual([...definition.enumValues]);
         expect(actual.size).toBe(enums.length);
       });

@@ -12,10 +12,44 @@ Three questions, kept separate everywhere in the code:
 User  ->  business_memberships (owner | business_admin | member)  ->  Business  ->  Engagement (later)
 ```
 
-## Phase 1 (this repository)
+## How a client account is created (invitation only)
 
-- **Signup** (`account.signUp`): full name, email, password, confirm password, business name. One database transaction creates the
-  user, the credential, the business, the `owner` membership and the first session; any failure rolls all of it back.
+Client accounts follow the client journey in the concept note (v0.8.1), not public registration:
+
+```
+Free Business Check (public, creates no account) -> discovery call -> fit -> payment -> onboarding invitation
+   -> client opens /onboarding/<token> -> user + credential + business + owner membership + session -> /dashboard
+```
+
+- **There is no public sign-up.** The `account` router has no sign-up procedure, `/signup` redirects to `/login`, and the
+  only mutation that creates a user is `onboarding.accept`, which requires a valid invitation token (server-enforced).
+- **Invitation** (`client_onboarding_invitations`, `server/clientOnboarding.ts`): created by an authorised IPF administrator
+  (`onboarding.invite`, permission `manage_client_onboarding`; the Super Admin always has it) from an existing
+  `business_checks` row, which supplies the email, name and business name. 256-bit random token, only its SHA-256 stored,
+  single use, expires after 7 days, revocable, bound to the business check's email. Issuing a new link revokes the previous
+  one (the database allows one pending link per business check). Who issued it is recorded in the admin audit log.
+- **Delivery** never blocks: the link is emailed (not BCC'd anywhere) and also returned once to the administrator, who can copy
+  it when email is unavailable. The token is never stored, logged or put in the audit log.
+- **Acceptance** is one transaction: validate the invitation, bind the email, refuse existing/reserved identities, create user,
+  credential, business, owner membership and session, then claim the invitation with a conditional update (so two simultaneous
+  acceptances cannot both win). Any failure rolls everything back and leaves the invitation usable.
+- **Businesses are created only at acceptance.** A business check is a prospect: it is not a user and not a business.
+  `onboarding.metrics` reports business checks, portal users, businesses and memberships as separate numbers.
+- Sign-in, sessions, sign-out and business isolation are unchanged from Phase 1 (below).
+
+### Deferred (deliberately not built)
+
+- **Fit and payment enforcement.** There is no canonical persisted "discovery call = fit" or "payment confirmed" field yet,
+  and none was invented. Until they exist the control is that only an authorised administrator can invite, and the admin
+  screen says to invite only a client who has had the call, is a fit and has paid. When those fields exist, `createOnboardingInvitation`
+  must refuse a business check that has not reached onboarding.
+- **Existing-account linking.** If the invited email already belongs to a user (a legacy OAuth user, an earlier client, an
+  administrator) the invitation is refused at creation, and acceptance returns a controlled conflict. Identities are never
+  merged, credentials never overwritten and a new business is never attached to an existing account automatically. Safe
+  linking (proving control of the account) is a later phase together with team invitations.
+
+## Account sign-in (Phase 1, unchanged)
+
 - **Sign-in / sign-out** (`account.signIn`, `account.signOut`), **session** (`account.me`, `account.workspace`).
 - **Sessions**: random 256-bit token in an `ipf_session` cookie (HttpOnly, SameSite=Lax, Secure over HTTPS and always in
   production, 14 days). Only the SHA-256 of the token is stored. Sign-out revokes the row. Nothing is kept in localStorage.
@@ -24,15 +58,15 @@ User  ->  business_memberships (owner | business_admin | member)  ->  Business  
   same message, and an unknown email costs the same time as a wrong password.
 - **Isolation**: a business id from the client is never trusted. `requireBusinessMembership` checks it against the caller's
   active memberships; a business that does not exist and one the caller cannot access give the same answer.
-- **Email verification is deferred.** There is no verified flag and no email is sent. Signup and sign-in work without it.
-- Screens: `/signup`, `/login`, `/dashboard` (server-checked; anonymous visitors are sent to `/login`).
+- **Email verification is deferred.** There is no verified flag and no email is sent for sign-in.
+- Screens: `/login`, `/onboarding/:token` (invitation only), `/dashboard` (server-checked; anonymous visitors go to `/login`).
 
 ## Identity table notes
 
 - `users` is the one human identity. Its `openId` is the external-identity key: password accounts get `local:<uuid>`.
   `name` is the full name and `lastSignedIn` the last sign-in time (kept, not renamed, so legacy code is unaffected).
 - Email is unique case-insensitively (`users_email_lower_unique`). New accounts store it lower-cased.
-- Signup refuses the owner administrator's email and any email with a pending administrator invitation, so an account cannot
+- Onboarding refuses the owner administrator's email and any email with a pending administrator invitation, so an account cannot
   be registered ahead of a legitimate administrator.
 - `users.role` (`user` | `admin`) is the **legacy** gate for the existing admin area. It is not a business role and not the
   future platform-role system. New accounts are always `user`, and an account session never grants admin access
