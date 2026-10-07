@@ -211,6 +211,16 @@ import pg from "pg";
 // drizzle/schema.ts
 import { sql } from "drizzle-orm";
 import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+
+// shared/businessCheck/pipeline.ts
+var PIPELINE_STAGES = ["lead", "qualified_lead", "call_booked", "opportunity", "won", "lost", "nurture", "referred"];
+var AUTOMATIC = ["lead", "qualified_lead", "call_booked"];
+function advancePipeline(current, event) {
+  if (!AUTOMATIC.includes(current) || !AUTOMATIC.includes(event)) return current;
+  return AUTOMATIC.indexOf(event) > AUTOMATIC.indexOf(current) ? event : current;
+}
+
+// drizzle/schema.ts
 var usersRoleEnum = pgEnum("users_role", ["user", "admin"]);
 var users = pgTable("users", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -583,26 +593,34 @@ var businessChecksRouteEnum = pgEnum("business_checks_route", ["advisory", "prog
 var businessChecksReadinessEnum = pgEnum("business_checks_readiness", ["advanced", "intermediate", "nascent"]);
 var businessChecksSummarySourceEnum = pgEnum("business_checks_summary_source", ["AI", "Rules"]);
 var businessChecksNotificationStatusEnum = pgEnum("business_checks_notification_status", ["Sent", "Failed", "Simulated"]);
+var businessChecksPipelineStageEnum = pgEnum("business_checks_pipeline_stage", PIPELINE_STAGES);
 var businessChecks = pgTable("business_checks", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   publicToken: varchar("publicToken", { length: 64 }).notNull().unique(),
+  /** Commercial stage: lead (details given) → qualified_lead (check finished) → call_booked → … */
+  pipelineStage: businessChecksPipelineStageEnum("pipelineStage").default("lead").notNull(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }),
+  heardFrom: varchar("heardFrom", { length: 64 }),
   businessName: varchar("businessName", { length: 255 }),
   description: varchar("description", { length: 500 }),
+  /** idea, side or operating; "unknown" until the owner answers the stage question. */
   stage: varchar("stage", { length: 16 }).notNull(),
-  route: businessChecksRouteEnum("route").notNull(),
-  readiness: businessChecksReadinessEnum("readiness").notNull(),
+  route: businessChecksRouteEnum("route"),
+  readiness: businessChecksReadinessEnum("readiness"),
   primaryArea: integer("primaryArea"),
+  /** Saved as the owner answers, so an unfinished check is still a lead with context. */
   answersJson: text("answersJson").notNull(),
-  resultJson: text("resultJson").notNull(),
-  summaryJson: text("summaryJson").notNull(),
-  summarySource: businessChecksSummarySourceEnum("summarySource").notNull(),
+  resultJson: text("resultJson"),
+  summaryJson: text("summaryJson"),
+  summarySource: businessChecksSummarySourceEnum("summarySource"),
   notificationStatus: businessChecksNotificationStatusEnum("notificationStatus").default("Simulated").notNull(),
   callRequestedAt: timestamp("callRequestedAt", { withTimezone: true }),
   reportRequestedAt: timestamp("reportRequestedAt", { withTimezone: true }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+  completedAt: timestamp("completedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull()
 });
 
 // server/db.ts
@@ -5646,6 +5664,18 @@ var SECTIONS = {
         ]
       },
       {
+        id: "p_name",
+        kind: "text",
+        prompt: "What is the business called?",
+        ideaPrompt: "Does the idea have a name yet?",
+        help: "Optional. We use it to put your outline together.",
+        optional: true,
+        placeholder: "e.g. Ada Foods",
+        ideaPlaceholder: "e.g. Zobo Express",
+        maxLength: 120,
+        options: []
+      },
+      {
         id: "p_age",
         kind: "single",
         prompt: "How long has the business been trading?",
@@ -5675,6 +5705,18 @@ var SECTIONS = {
         kind: "select",
         prompt: "Which sector is it in?",
         options: ["Fashion", "Food and drink", "Retail", "Services", "Technology", "Real estate", "Health", "Education", "Manufacturing", "Agriculture", "Logistics", "Other"].map((label) => ({ value: label.toLowerCase(), label }))
+      },
+      {
+        id: "p_description",
+        kind: "text",
+        prompt: "In one line, what does the business do?",
+        ideaPrompt: "In one line, what is the idea?",
+        help: "Optional. It helps us read your answers in context.",
+        optional: true,
+        placeholder: "e.g. We make and supply school uniforms in Abuja",
+        ideaPlaceholder: "e.g. Healthy lunch deliveries for offices in Lekki",
+        maxLength: 300,
+        options: []
       },
       {
         id: "p_staff",
@@ -6312,13 +6354,15 @@ function questionPath(answers) {
 }
 function isAnswered(question, answers) {
   const value = answers[question.id];
+  if (question.kind === "text") return typeof value === "string";
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
 }
-function nextStep(answers) {
-  return questionPath(answers).find((step) => !isAnswered(step.question, answers)) ?? null;
-}
 function isComplete(answers) {
-  return nextStep(answers) === null;
+  return questionPath(answers).every(({ question }) => question.optional || isAnswered(question, answers));
+}
+function businessDetails(answers) {
+  const text2 = (id) => typeof answers[id] === "string" ? answers[id].trim() : "";
+  return { businessName: text2("p_name"), description: text2("p_description") };
 }
 function optionsFor(question, answers) {
   const stage = stageOf(answers);
@@ -6326,6 +6370,9 @@ function optionsFor(question, answers) {
   return options.filter((option) => !option.stages || stage !== void 0 && option.stages.includes(stage));
 }
 function validValue(question, value, answers) {
+  if (question.kind === "text") {
+    return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, question.maxLength ?? 300) : void 0;
+  }
   const options = optionsFor(question, answers);
   const allowed = new Set(options.map((option) => option.value));
   if (question.kind === "multi") {
@@ -6932,6 +6979,7 @@ function officeEmail(input) {
     `WhatsApp: ${contact.whatsapp || "Not given"}`,
     `Business: ${contact.businessName || "Not given"}`,
     `In their words: ${contact.description || "Not given"}`,
+    `Heard about us: ${contact.heardFrom || "Not given"}`,
     "",
     describeResult(result),
     "",
@@ -6948,79 +6996,123 @@ function officeEmail(input) {
 
 // server/routers/businessCheck.ts
 var WINDOW_MS = 15 * 60 * 1e3;
-var MAXIMUM_PER_WINDOW = 5;
-var recentSubmissions = /* @__PURE__ */ new Map();
-function consumeRateLimit(email, ip) {
-  const key = `${ip.trim().toLowerCase()}:${email.trim().toLowerCase()}`;
-  const now = Date.now();
-  const existing = recentSubmissions.get(key);
-  if (!existing || existing.resetAt <= now) {
-    recentSubmissions.set(key, { count: 1, resetAt: now + WINDOW_MS });
+function rateLimiter(maximum) {
+  const counts = /* @__PURE__ */ new Map();
+  return (key) => {
+    const now = Date.now();
+    const existing = counts.get(key);
+    if (!existing || existing.resetAt <= now) {
+      counts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+      return true;
+    }
+    if (existing.count >= maximum) return false;
+    existing.count += 1;
     return true;
-  }
-  if (existing.count >= MAXIMUM_PER_WINDOW) return false;
-  existing.count += 1;
-  return true;
+  };
 }
-var answerValue = z13.union([z13.string().max(64), z13.array(z13.string().max(64)).max(10)]);
-var businessCheckInput = z13.object({
-  contact: z13.object({
-    fullName: z13.string().trim().min(2).max(255),
-    email: z13.string().trim().email().max(320),
-    whatsapp: z13.string().trim().max(32).optional(),
-    businessName: z13.string().trim().max(255).optional(),
-    description: z13.string().trim().max(500).optional()
-  }),
-  answers: z13.record(z13.string().max(32), answerValue.optional()).refine((value) => Object.keys(value).length <= 80)
+var allowStart = rateLimiter(5);
+var allowStartFromIp = rateLimiter(20);
+var allowSave = rateLimiter(300);
+var answerValue = z13.union([z13.string().max(300), z13.array(z13.string().max(64)).max(10)]);
+var answersInput = z13.record(z13.string().max(32), answerValue.optional()).refine((value) => Object.keys(value).length <= 80);
+var tokenInput = z13.string().min(16).max(64);
+var businessCheckStartInput = z13.object({
+  fullName: z13.string().trim().min(2).max(255),
+  email: z13.string().trim().email().max(320),
+  whatsapp: z13.string().trim().max(32).optional(),
+  heardFrom: z13.string().trim().max(64).optional()
 });
+var unavailable = (what) => new TRPCError10({ code: "INTERNAL_SERVER_ERROR", message: `We could not ${what} just now. Kindly try again shortly.` });
+async function database(what) {
+  const db = await getDb();
+  if (!db) throw unavailable(what);
+  return db;
+}
+async function findCheck(db, token) {
+  const [check] = await db.select().from(businessChecks).where(eq13(businessChecks.publicToken, token)).limit(1);
+  if (!check) throw new TRPCError10({ code: "NOT_FOUND", message: "We could not find that business check. Kindly start again." });
+  return check;
+}
+function answerColumns(answers) {
+  const { businessName, description } = businessDetails(answers);
+  return { answersJson: JSON.stringify(answers), stage: stageOf(answers) ?? "unknown", businessName: businessName || null, description: description || null };
+}
+function contactOf(check, answers) {
+  const { businessName, description } = businessDetails(answers);
+  return { fullName: check.fullName, email: check.email, whatsapp: check.whatsapp || void 0, heardFrom: check.heardFrom || void 0, businessName: businessName || void 0, description: description || void 0 };
+}
 var businessCheckRouter = router({
-  submit: publicProcedure.input(businessCheckInput).mutation(async ({ input, ctx }) => {
-    if (!consumeRateLimit(input.contact.email, ctx.req.ip || "unknown")) {
-      throw new TRPCError10({ code: "TOO_MANY_REQUESTS", message: "Kindly wait a few minutes before sending another business check." });
+  /** The details screen: records the owner as a lead before the first question. */
+  start: publicProcedure.input(businessCheckStartInput).mutation(async ({ input, ctx }) => {
+    const ip = (ctx.req.ip || "unknown").toLowerCase();
+    if (!allowStartFromIp(ip) || !allowStart(`${ip}:${input.email.toLowerCase()}`)) {
+      throw new TRPCError10({ code: "TOO_MANY_REQUESTS", message: "Kindly wait a few minutes before starting another business check." });
+    }
+    const db = await database("start your business check");
+    const token = randomBytes4(24).toString("base64url");
+    await db.insert(businessChecks).values({
+      publicToken: token,
+      pipelineStage: "lead",
+      fullName: input.fullName,
+      email: input.email,
+      whatsapp: input.whatsapp || null,
+      heardFrom: input.heardFrom || null,
+      stage: "unknown",
+      answersJson: "{}"
+    });
+    return { token };
+  }),
+  /** Saves answers as the owner goes, so an unfinished check still tells the team where they were. */
+  saveProgress: publicProcedure.input(z13.object({ token: tokenInput, answers: answersInput })).mutation(async ({ input }) => {
+    if (!allowSave(input.token)) throw new TRPCError10({ code: "TOO_MANY_REQUESTS", message: "Too many updates. Your answers are still kept on this device." });
+    const db = await database("save your progress");
+    const check = await findCheck(db, input.token);
+    if (check.completedAt) return { saved: false };
+    await db.update(businessChecks).set(answerColumns(cleanAnswers(input.answers))).where(eq13(businessChecks.id, check.id));
+    return { saved: true };
+  }),
+  /** Finishes the check: works out the result on the server, writes the summary and emails both sides once. */
+  submit: publicProcedure.input(z13.object({ token: tokenInput, answers: answersInput })).mutation(async ({ input }) => {
+    const db = await database("record your business check");
+    const check = await findCheck(db, input.token);
+    if (check.completedAt && check.resultJson && check.summaryJson && check.summarySource) {
+      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: BRAND.discoveryCallUrl };
     }
     const answers = cleanAnswers(input.answers);
     if (!isComplete(answers)) {
       throw new TRPCError10({ code: "BAD_REQUEST", message: "Some questions are still unanswered. Kindly go back and complete them." });
     }
-    const db = await getDb();
-    if (!db) throw new TRPCError10({ code: "INTERNAL_SERVER_ERROR", message: "We could not record your business check just now. Kindly try again shortly." });
     const result = evaluate(answers);
-    const { summary, source } = await summariseCheck({ answers, result, contact: input.contact });
-    const office = officeEmail({ contact: input.contact, answers, summary, source, result });
-    const owner = ownerEmail({ contact: input.contact, summary, result });
+    const contact = contactOf(check, answers);
+    const { summary, source } = await summariseCheck({ answers, result, contact });
+    const office = officeEmail({ contact, answers, summary, source, result });
+    const owner = ownerEmail({ contact, summary, result });
     const [officeDelivery] = await Promise.all([
       deliverEmail({ to: JUMP_ADMINISTRATION_MAILBOX, subject: office.subject, body: office.body }),
-      deliverEmail({ to: input.contact.email, subject: owner.subject, body: owner.body })
+      deliverEmail({ to: check.email, subject: owner.subject, body: owner.body })
     ]);
-    const token = randomBytes4(24).toString("base64url");
-    await db.insert(businessChecks).values({
-      publicToken: token,
-      fullName: input.contact.fullName,
-      email: input.contact.email,
-      whatsapp: input.contact.whatsapp || null,
-      businessName: input.contact.businessName || null,
-      description: input.contact.description || null,
-      stage: stageOf(answers) ?? "unknown",
+    await db.update(businessChecks).set({
+      ...answerColumns(answers),
+      pipelineStage: advancePipeline(check.pipelineStage, "qualified_lead"),
       route: result.route,
       readiness: result.founder.level,
       primaryArea: result.primaryArea?.area ?? null,
-      answersJson: JSON.stringify(answers),
       resultJson: JSON.stringify(result),
       summaryJson: JSON.stringify(summary),
       summarySource: source,
-      notificationStatus: officeDelivery.status === "Failed" ? "Failed" : officeDelivery.status === "Simulated" ? "Simulated" : "Sent"
-    });
-    return { token, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl };
+      notificationStatus: officeDelivery.status === "Failed" ? "Failed" : officeDelivery.status === "Simulated" ? "Simulated" : "Sent",
+      completedAt: databaseNow()
+    }).where(eq13(businessChecks.id, check.id));
+    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl };
   }),
-  /** The owner asks for the free call or the paid full report from the result screen. */
-  requestNext: publicProcedure.input(z13.object({ token: z13.string().min(16).max(64), choice: z13.enum(["call", "report"]), note: z13.string().trim().max(500).optional() })).mutation(async ({ input }) => {
-    const db = await getDb();
-    if (!db) throw new TRPCError10({ code: "INTERNAL_SERVER_ERROR", message: "We could not record your request just now. Kindly try again shortly." });
-    const [check] = await db.select().from(businessChecks).where(eq13(businessChecks.publicToken, input.token)).limit(1);
-    if (!check) throw new TRPCError10({ code: "NOT_FOUND", message: "We could not find that business check." });
+  /** The owner asks for the free call or the full report from the result screen. */
+  requestNext: publicProcedure.input(z13.object({ token: tokenInput, choice: z13.enum(["call", "report"]), note: z13.string().trim().max(500).optional() })).mutation(async ({ input }) => {
+    const db = await database("record your request");
+    const check = await findCheck(db, input.token);
+    if (!check.completedAt) throw new TRPCError10({ code: "BAD_REQUEST", message: "Kindly finish the business check first." });
     const already = input.choice === "call" ? check.callRequestedAt : check.reportRequestedAt;
     if (!already) {
-      await db.update(businessChecks).set(input.choice === "call" ? { callRequestedAt: /* @__PURE__ */ new Date() } : { reportRequestedAt: /* @__PURE__ */ new Date() }).where(eq13(businessChecks.id, check.id));
+      await db.update(businessChecks).set(input.choice === "call" ? { callRequestedAt: databaseNow(), pipelineStage: advancePipeline(check.pipelineStage, "call_booked") } : { reportRequestedAt: databaseNow() }).where(eq13(businessChecks.id, check.id));
       const what = input.choice === "call" ? "a free discovery call" : "the full business check report";
       await deliverEmail({
         to: JUMP_ADMINISTRATION_MAILBOX,
@@ -7033,7 +7125,7 @@ var businessCheckRouter = router({
           `Business: ${check.businessName || "Not given"}`,
           `Note: ${input.note || "None"}`,
           "",
-          `Business check #${check.id}, completed ${check.createdAt.toISOString()}.`
+          `Business check #${check.id}, completed ${check.completedAt.toISOString()}.`
         ].join("\n")
       });
     }

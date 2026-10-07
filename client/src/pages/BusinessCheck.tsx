@@ -10,6 +10,7 @@ import { trpc } from "@/lib/trpc";
 import { BRAND } from "@shared/brand";
 import { CAPABILITIES, offeringById } from "@shared/businessCheck/catalogue";
 import {
+  businessDetails,
   businessOutline,
   cleanAnswers,
   DISC_STYLES,
@@ -18,6 +19,7 @@ import {
   isAnswered,
   nextStep,
   optionsFor,
+  placeholderFor,
   promptFor,
   questionPath,
   READINESS_LABELS,
@@ -27,7 +29,7 @@ import {
 import { AREA_NAMES, GAP_LABELS, SECTIONS, stageOf, type Answers, type Health, type Question, type SectionId } from "@shared/businessCheck/questions";
 import { formatNaira, PRICES, PROMISE } from "@shared/businessSupport";
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, CheckCircle2, Clock3, Lightbulb, LockKeyhole, Mail, PencilLine, PhoneCall, RotateCcw, type LucideIcon } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EASE } from "@/components/motion";
 import { AnimatePresence, animate, motion, useMotionValue, useTransform, type Variants } from "framer-motion";
 import { Link } from "wouter";
@@ -35,10 +37,13 @@ import type { BusinessCheckResponse } from "../../../server/routers/businessChec
 
 const STORAGE_KEY = "ipf-business-check-v1";
 
-type Contact = { fullName: string; email: string; whatsapp: string; businessName: string; description: string; heardFrom: string };
-type Saved = { started: boolean; answers: Answers; seen: SectionId[]; history: string[]; contact: Contact; response?: BusinessCheckResponse };
+/** The owner, asked first. Everything about the business is asked inside the check. */
+type Contact = { fullName: string; email: string; whatsapp: string; heardFrom: string };
+/** token: the saved check on the server, created when the details are given. */
+type Saved = { started: boolean; token?: string; answers: Answers; seen: SectionId[]; history: string[]; contact: Contact; response?: BusinessCheckResponse };
 
-const EMPTY_CONTACT: Contact = { fullName: "", email: "", whatsapp: "", businessName: "", description: "", heardFrom: "" };
+const EMPTY_CONTACT: Contact = { fullName: "", email: "", whatsapp: "", heardFrom: "" };
+const SAVE_DELAY_MS = 800;
 const FRESH: Saved = { started: false, answers: {}, seen: [], history: [], contact: EMPTY_CONTACT };
 
 const HEARD_FROM = ["A friend or business owner", "A past JUMP participant", "LinkedIn", "Instagram or Facebook", "WhatsApp", "An event", "Somewhere else"];
@@ -46,7 +51,9 @@ const HEARD_FROM = ["A friend or business owner", "A past JUMP participant", "Li
 function load(): Saved {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...FRESH, ...JSON.parse(raw) } : FRESH;
+    if (!raw) return FRESH;
+    const saved = { ...FRESH, ...JSON.parse(raw) } as Saved;
+    return { ...saved, contact: { ...EMPTY_CONTACT, ...saved.contact } };
   } catch {
     return FRESH;
   }
@@ -96,16 +103,56 @@ export default function BusinessCheck() {
   const path = useMemo(() => questionPath(answers), [answers]);
   const step: Step | null = editing ? path.find((item) => item.question.id === editing) ?? null : nextStep(answers);
 
+  const start = trpc.businessCheck.start.useMutation({
+    onSuccess: ({ token }) => {
+      setError("");
+      setDirection(1);
+      update({ token });
+    },
+    onError: (err) => setError(err.message || "We could not start your business check. Kindly try again."),
+  });
+  const saveProgress = trpc.businessCheck.saveProgress.useMutation();
   const submit = trpc.businessCheck.submit.useMutation({
     onSuccess: (response) => update({ response }),
     onError: (err) => setError(err.message || "We could not send your answers. Kindly try again."),
   });
 
+  // Answers are saved to the server shortly after each change, so an unfinished check is still a lead.
+  const savedAnswers = useRef("");
+  useEffect(() => {
+    const serialised = JSON.stringify(answers);
+    if (!state.token || state.response || serialised === savedAnswers.current) return undefined;
+    const timer = window.setTimeout(() => {
+      savedAnswers.current = serialised;
+      saveProgress.mutate({ token: state.token!, answers });
+    }, SAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [answers, state.token, state.response]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // After the last question the check is sent once; a retry is offered if it fails.
+  const finished = Boolean(state.started && state.token && !state.response && !step);
+  const submittedFor = useRef("");
+  useEffect(() => {
+    const key = `${state.token}:${JSON.stringify(answers)}`;
+    if (!finished || submittedFor.current === key) return;
+    submittedFor.current = key;
+    setError("");
+    submit.mutate({ token: state.token!, answers });
+  }, [finished, answers, state.token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const retrySubmit = () => {
+    setError("");
+    submit.mutate({ token: state.token!, answers });
+  };
+
   const restart = () => {
     setEditing(null);
     setError("");
     submit.reset();
-    setState({ ...FRESH, started: true });
+    savedAnswers.current = "";
+    submittedFor.current = "";
+    // The owner's details are kept for convenience; a new check gets a new record.
+    setState({ ...FRESH, started: true, contact: state.contact });
   };
 
   const answer = (question: Question, value: string | string[], advance = true) => {
@@ -133,44 +180,40 @@ export default function BusinessCheck() {
   let screenKey: string;
   if (state.response) {
     screenKey = "result";
-    screen = <Result response={state.response} contact={state.contact} onRestart={restart} />;
+    screen = <Result response={state.response} contact={state.contact} businessName={businessDetails(answers).businessName} onRestart={restart} />;
   } else if (!state.started) {
     screenKey = "intro";
     screen = <Intro hasProgress={state.history.length > 0} onStart={() => update({ started: true })} onRestart={restart} />;
+  } else if (!state.token) {
+    screenKey = "details";
+    screen = (
+      <DetailsScreen
+        contact={state.contact}
+        pending={start.isPending}
+        error={error}
+        onChange={(contact) => update({ contact })}
+        onBack={() => { setDirection(-1); update({ started: false }); }}
+        onSubmit={() => {
+          setError("");
+          const { fullName, email, whatsapp, heardFrom } = state.contact;
+          start.mutate({ fullName: fullName.trim(), email: email.trim(), whatsapp: whatsapp.trim() || undefined, heardFrom: heardFrom || undefined });
+        }}
+      />
+    );
   } else if (step && !state.seen.includes(step.section.id)) {
     screenKey = `section-${step.section.id}`;
     screen = <SectionIntro step={step} answers={answers} onContinue={() => { setDirection(1); update({ seen: [...state.seen, step.section.id] }); }} onBack={back} />;
   } else if (step) {
     screenKey = `question-${step.question.id}`;
-    screen = <QuestionScreen key={step.question.id} step={step} answers={answers} onAnswer={answer} onBack={back} />;
+    screen = step.question.kind === "text"
+      ? <TextQuestionScreen key={step.question.id} step={step} answers={answers} onAnswer={answer} onBack={back} />
+      : <QuestionScreen key={step.question.id} step={step} answers={answers} onAnswer={answer} onBack={back} />;
   } else {
-    screenKey = "contact";
-    screen = (
-      <ContactScreen
-        contact={state.contact}
-        idea={stageOf(answers) === "idea"}
-        pending={submit.isPending}
-        error={error}
-        onChange={(contact) => update({ contact })}
-        onBack={back}
-        onSubmit={() => {
-          setError("");
-          const { heardFrom, ...contact } = state.contact;
-          submit.mutate({
-            contact: {
-              ...contact,
-              description: [contact.description, heardFrom && `Heard about us: ${heardFrom}`].filter(Boolean).join(" · ") || undefined,
-              whatsapp: contact.whatsapp || undefined,
-              businessName: contact.businessName || undefined,
-            },
-            answers,
-          });
-        }}
-      />
-    );
+    screenKey = "finishing";
+    screen = submit.isError ? <SubmitFailed error={error} onRetry={retrySubmit} onBack={back} /> : <Reading />;
   }
 
-  const showOutline = state.started && !state.response && stageOf(answers);
+  const showOutline = state.started && state.token && !state.response && stageOf(answers);
 
   return (
     <div className="min-h-screen bg-paper text-ink font-sans flex flex-col">
@@ -369,6 +412,42 @@ function useKeys(handler: (key: string) => void) {
   }, []);
 }
 
+/** A short typed answer, such as the business's name. Optional ones can be skipped. */
+function TextQuestionScreen({ step, answers, onAnswer, onBack }: { step: Step; answers: Answers; onAnswer: (question: Question, value: string) => void; onBack: () => void }) {
+  const { question, section } = step;
+  const [value, setValue] = useState(typeof answers[question.id] === "string" ? (answers[question.id] as string) : "");
+  const trimmed = value.trim();
+  return (
+    <motion.form className="space-y-7" variants={listMotion} initial="hidden" animate="show" onSubmit={(event) => { event.preventDefault(); if (trimmed || question.optional) onAnswer(question, trimmed); }}>
+      <motion.div variants={itemMotion}>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">{section.title}</p>
+        <h2 className="font-serif text-2xl font-bold leading-snug sm:text-3xl">{promptFor(question, answers)}</h2>
+        {question.help && <p className="mt-3 text-sm leading-relaxed text-ink-muted">{question.help}</p>}
+      </motion.div>
+      <motion.div variants={itemMotion}>
+        <Input
+          autoFocus
+          aria-label={promptFor(question, answers)}
+          value={value}
+          maxLength={question.maxLength}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder={placeholderFor(question, answers)}
+          className="h-14 rounded-none text-base transition-shadow focus-visible:shadow-[0_0_0_4px_rgba(28,78,126,0.12)]"
+        />
+      </motion.div>
+      <motion.div variants={itemMotion} className="flex items-center justify-between gap-4">
+        <BackButton onClick={onBack} />
+        <span className="flex items-center gap-5">
+          {question.optional && (
+            <button type="button" onClick={() => onAnswer(question, "")} className="text-sm font-semibold text-ink-muted underline underline-offset-4 hover:text-brand">Skip</button>
+          )}
+          <PrimaryButton type="submit" disabled={!trimmed}>Continue</PrimaryButton>
+        </span>
+      </motion.div>
+    </motion.form>
+  );
+}
+
 function QuestionScreen({ step, answers, onAnswer, onBack }: { step: Step; answers: Answers; onAnswer: (question: Question, value: string | string[], advance?: boolean) => void; onBack: () => void }) {
   const { question, section } = step;
   const options = optionsFor(question, answers);
@@ -511,42 +590,54 @@ function Reading() {
   );
 }
 
-function ContactScreen({ contact, idea, pending, error, onChange, onBack, onSubmit }: { contact: Contact; idea: boolean; pending: boolean; error: string; onChange: (contact: Contact) => void; onBack: () => void; onSubmit: () => void }) {
+function DetailsScreen({ contact, pending, error, onChange, onBack, onSubmit }: { contact: Contact; pending: boolean; error: string; onChange: (contact: Contact) => void; onBack: () => void; onSubmit: () => void }) {
   const set = (key: keyof Contact) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange({ ...contact, [key]: event.target.value });
   const valid = contact.fullName.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(contact.email.trim());
 
-  if (pending) return <Reading />;
-
   return (
-    <motion.form className="space-y-7" variants={listMotion} initial="hidden" animate="show" onSubmit={(event) => { event.preventDefault(); if (valid) onSubmit(); }}>
+    <motion.form className="space-y-7" variants={listMotion} initial="hidden" animate="show" onSubmit={(event) => { event.preventDefault(); if (valid && !pending) onSubmit(); }}>
       <motion.div variants={itemMotion}>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">Last step</p>
-        <h2 className="font-serif text-3xl font-black leading-tight">Where should we send your summary?</h2>
-        <p className="mt-3 leading-relaxed text-ink-muted">You will see it on the next screen, and we will email you a copy.</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">Before we start</p>
+        <h2 className="font-serif text-3xl font-black leading-tight">First, who are we talking to?</h2>
+        <p className="mt-3 leading-relaxed text-ink-muted">So we can save your progress and send you your summary at the end.</p>
       </motion.div>
       <motion.div variants={itemMotion} className="grid gap-5 sm:grid-cols-2">
         <Field label="Full name" required><Input value={contact.fullName} onChange={set("fullName")} autoComplete="name" className="h-12 rounded-none transition-shadow focus-visible:shadow-[0_0_0_4px_rgba(28,78,126,0.12)]" /></Field>
         <Field label="Email" required><Input type="email" value={contact.email} onChange={set("email")} autoComplete="email" className="h-12 rounded-none transition-shadow focus-visible:shadow-[0_0_0_4px_rgba(28,78,126,0.12)]" /></Field>
-        <Field label="WhatsApp number"><Input type="tel" value={contact.whatsapp} onChange={set("whatsapp")} autoComplete="tel" placeholder="+234" className="h-12 rounded-none" /></Field>
-        <Field label={idea ? "Name of the idea or business (if any)" : "Business name"}><Input value={contact.businessName} onChange={set("businessName")} autoComplete="organization" className="h-12 rounded-none" /></Field>
-        <Field label={idea ? "Your idea in one line" : "What the business does, in one line"} wide>
-          <Input value={contact.description} onChange={set("description")} maxLength={300} placeholder={idea ? "e.g. Healthy lunch deliveries for offices in Lekki" : "e.g. We make and supply school uniforms in Abuja"} className="h-12 rounded-none" />
-        </Field>
-        <Field label="How did you hear about us?" wide>
+        <Field label="WhatsApp number (optional, for a quicker reply)"><Input type="tel" value={contact.whatsapp} onChange={set("whatsapp")} autoComplete="tel" placeholder="+234" className="h-12 rounded-none" /></Field>
+        <Field label="How did you hear about us? (optional)">
           <select value={contact.heardFrom} onChange={set("heardFrom")} className="h-12 w-full border border-input bg-paper-raised px-3 text-sm">
-            <option value="">Choose one (optional)</option>
+            <option value="">Choose one</option>
             {HEARD_FROM.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </Field>
       </motion.div>
+      <motion.p variants={itemMotion} className="flex items-start gap-3 border border-brand-line bg-brand-tint p-4 text-xs leading-relaxed text-brand">
+        <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>We save your answers as you go, so you can pick up where you left off, and so our team can follow up if you don't finish. Your details stay with {BRAND.organisationName}; we never sell or share them.</span>
+      </motion.p>
       <AnimatePresence>
         {error && <motion.p initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: [0, -6, 6, -3, 0] }} exit={{ opacity: 0 }} className="border border-danger-line bg-danger-tint p-3 text-sm text-danger-strong">{error}</motion.p>}
       </AnimatePresence>
       <motion.div variants={itemMotion} className="flex items-center justify-between gap-4">
         <BackButton onClick={onBack} />
-        <PrimaryButton type="submit" disabled={!valid}>See my result</PrimaryButton>
+        <PrimaryButton type="submit" disabled={!valid || pending}>{pending ? "Starting…" : "Start the check"}</PrimaryButton>
       </motion.div>
     </motion.form>
+  );
+}
+
+function SubmitFailed({ error, onRetry, onBack }: { error: string; onRetry: () => void; onBack: () => void }) {
+  return (
+    <div className="space-y-6 py-10">
+      <h2 className="font-serif text-2xl font-bold">We could not send your answers.</h2>
+      <p className="border border-danger-line bg-danger-tint p-3 text-sm text-danger-strong">{error || "Kindly try again."}</p>
+      <p className="text-sm text-ink-muted">Your answers are safe on this device.</p>
+      <div className="flex items-center justify-between gap-4">
+        <BackButton onClick={onBack} />
+        <PrimaryButton onClick={onRetry}>Try again</PrimaryButton>
+      </div>
+    </div>
   );
 }
 
@@ -557,7 +648,7 @@ function OutlinePanel({ answers }: { answers: Answers }) {
   if (!areas.length) return null;
   return (
     <motion.aside initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, ease: EASE }} className="h-fit border border-line bg-paper-raised p-5 lg:sticky lg:top-40">
-      <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Your business outline</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">{businessDetails(answers).businessName ? `Outline for ${businessDetails(answers).businessName}` : "Your business outline"}</p>
       <p className="mt-1 text-xs leading-relaxed text-ink-faint">It fills in as you answer.</p>
       <ul className="mt-4 space-y-2">
         <AnimatePresence initial={false}>
@@ -598,7 +689,7 @@ function CountUp({ value }: { value: number }) {
   return <motion.span>{rounded}</motion.span>;
 }
 
-function Result({ response, contact, onRestart }: { response: BusinessCheckResponse; contact: Contact; onRestart: () => void }) {
+function Result({ response, contact, businessName, onRestart }: { response: BusinessCheckResponse; contact: Contact; businessName: string; onRestart: () => void }) {
   const { result, summary } = response;
   const founder = result.founder;
   const style = founder.instinct ? DISC_STYLES[founder.instinct] : undefined;
@@ -616,7 +707,7 @@ function Result({ response, contact, onRestart }: { response: BusinessCheckRespo
   return (
     <motion.div className="space-y-10" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12 } } }} initial="hidden" animate="show">
       <motion.div variants={itemMotion}>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">Your business check{contact.businessName ? ` · ${contact.businessName}` : ""}</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">Your business check{businessName ? ` · ${businessName}` : ""}</p>
         <h1 className="font-serif text-4xl font-black leading-tight sm:text-5xl">Here is what we see.</h1>
         <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted"><Mail className="h-4 w-4" />A copy is on its way to {contact.email}.</p>
       </motion.div>

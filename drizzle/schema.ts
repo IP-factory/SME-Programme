@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { PIPELINE_STAGES } from "../shared/businessCheck/pipeline";
 
 /**
  * Users provisioned through Manus OAuth. The live database is authoritative;
@@ -539,27 +540,35 @@ export const businessChecksRouteEnum = pgEnum("business_checks_route", ["advisor
 export const businessChecksReadinessEnum = pgEnum("business_checks_readiness", ["advanced", "intermediate", "nascent"]);
 export const businessChecksSummarySourceEnum = pgEnum("business_checks_summary_source", ["AI", "Rules"]);
 export const businessChecksNotificationStatusEnum = pgEnum("business_checks_notification_status", ["Sent", "Failed", "Simulated"]);
+export const businessChecksPipelineStageEnum = pgEnum("business_checks_pipeline_stage", PIPELINE_STAGES);
 
 export const businessChecks = pgTable("business_checks", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   publicToken: varchar("publicToken", { length: 64 }).notNull().unique(),
+  /** Commercial stage: lead (details given) → qualified_lead (check finished) → call_booked → … */
+  pipelineStage: businessChecksPipelineStageEnum("pipelineStage").default("lead").notNull(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }),
+  heardFrom: varchar("heardFrom", { length: 64 }),
   businessName: varchar("businessName", { length: 255 }),
   description: varchar("description", { length: 500 }),
+  /** idea, side or operating; "unknown" until the owner answers the stage question. */
   stage: varchar("stage", { length: 16 }).notNull(),
-  route: businessChecksRouteEnum("route").notNull(),
-  readiness: businessChecksReadinessEnum("readiness").notNull(),
+  route: businessChecksRouteEnum("route"),
+  readiness: businessChecksReadinessEnum("readiness"),
   primaryArea: integer("primaryArea"),
+  /** Saved as the owner answers, so an unfinished check is still a lead with context. */
   answersJson: text("answersJson").notNull(),
-  resultJson: text("resultJson").notNull(),
-  summaryJson: text("summaryJson").notNull(),
-  summarySource: businessChecksSummarySourceEnum("summarySource").notNull(),
+  resultJson: text("resultJson"),
+  summaryJson: text("summaryJson"),
+  summarySource: businessChecksSummarySourceEnum("summarySource"),
   notificationStatus: businessChecksNotificationStatusEnum("notificationStatus").default("Simulated").notNull(),
   callRequestedAt: timestamp("callRequestedAt", { withTimezone: true }),
   reportRequestedAt: timestamp("reportRequestedAt", { withTimezone: true }),
+  completedAt: timestamp("completedAt", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
 });
 
 export type BusinessCheck = typeof businessChecks.$inferSelect;

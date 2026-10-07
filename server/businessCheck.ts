@@ -25,6 +25,7 @@ export type CheckContact = {
   fullName: string;
   email: string;
   whatsapp?: string;
+  heardFrom?: string;
   businessName?: string;
   description?: string;
 };
@@ -213,6 +214,7 @@ export function officeEmail(input: { contact: CheckContact; answers: Answers; su
     `WhatsApp: ${contact.whatsapp || "Not given"}`,
     `Business: ${contact.businessName || "Not given"}`,
     `In their words: ${contact.description || "Not given"}`,
+    `Heard about us: ${contact.heardFrom || "Not given"}`,
     "",
     describeResult(result),
     "",

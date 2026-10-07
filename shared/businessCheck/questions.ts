@@ -35,7 +35,8 @@ export type Option = {
 
 export type Question = {
   id: string;
-  kind: "single" | "multi" | "select";
+  /** "text": a short typed answer. */
+  kind: "single" | "multi" | "select" | "text";
   prompt: string;
   /** Prompt used for idea-stage founders, where the wording differs. */
   ideaPrompt?: string;
@@ -43,6 +44,12 @@ export type Question = {
   sidePrompt?: string;
   /** "cards": large choices with a description each, for the questions that set the path. */
   display?: "cards";
+  /** May be skipped. A skipped answer is stored as "" so the question is not asked again. */
+  optional?: boolean;
+  /** Example shown in an empty text box. */
+  placeholder?: string;
+  ideaPlaceholder?: string;
+  maxLength?: number;
   help?: string;
   options: readonly Option[];
   ideaOptions?: readonly Option[];
@@ -103,6 +110,18 @@ export const SECTIONS: Record<SectionId, Section> = {
         ],
       },
       {
+        id: "p_name",
+        kind: "text",
+        prompt: "What is the business called?",
+        ideaPrompt: "Does the idea have a name yet?",
+        help: "Optional. We use it to put your outline together.",
+        optional: true,
+        placeholder: "e.g. Ada Foods",
+        ideaPlaceholder: "e.g. Zobo Express",
+        maxLength: 120,
+        options: [],
+      },
+      {
         id: "p_age",
         kind: "single",
         prompt: "How long has the business been trading?",
@@ -132,6 +151,18 @@ export const SECTIONS: Record<SectionId, Section> = {
         kind: "select",
         prompt: "Which sector is it in?",
         options: ["Fashion", "Food and drink", "Retail", "Services", "Technology", "Real estate", "Health", "Education", "Manufacturing", "Agriculture", "Logistics", "Other"].map((label) => ({ value: label.toLowerCase(), label })),
+      },
+      {
+        id: "p_description",
+        kind: "text",
+        prompt: "In one line, what does the business do?",
+        ideaPrompt: "In one line, what is the idea?",
+        help: "Optional. It helps us read your answers in context.",
+        optional: true,
+        placeholder: "e.g. We make and supply school uniforms in Abuja",
+        ideaPlaceholder: "e.g. Healthy lunch deliveries for offices in Lekki",
+        maxLength: 300,
+        options: [],
       },
       {
         id: "p_staff",

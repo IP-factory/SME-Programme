@@ -110,12 +110,13 @@ describe("PostgreSQL schema and migration history", () => {
     expect(pgTables).toEqual(mysqlTables);
   });
 
+  // Columns added after the migration (in later migrations) are allowed; none from MySQL may be lost.
   it("keeps every column name from the MySQL schema", () => {
     for (const table of allTables) {
       const { name, columns } = getTableConfig(table);
       const block = archive.split(`mysqlTable("${name}"`)[1]!.split("export type")[0]!;
       const mysqlColumns = [...block.matchAll(/^\s+\w+: \w+\("(\w+)"/gm)].map(match => match[1]).sort();
-      expect(columns.map(column => column.name).sort(), name).toEqual(mysqlColumns);
+      expect(columns.map(column => column.name), name).toEqual(expect.arrayContaining(mysqlColumns));
     }
   });
 
@@ -125,10 +126,15 @@ describe("PostgreSQL schema and migration history", () => {
   });
 
   it("contains no MySQL-specific SQL in the active migration directory", () => {
-    const files = readdirSync(resolve(root, "drizzle/migrations")).filter(file => file.endsWith(".sql"));
-    expect(files).toEqual(["0000_postgres_baseline.sql"]);
-    for (const pattern of [/`/, /AUTO_INCREMENT/i, /\bENGINE\s*=/i, /CHARSET/i, /ON UPDATE CURRENT_TIMESTAMP/i, /\bmysql/i, /\bdatetime\b/i, /\btinyint\b/i]) {
-      expect(baseline).not.toMatch(pattern);
+    const files = readdirSync(resolve(root, "drizzle/migrations")).filter(file => file.endsWith(".sql")).sort();
+    const journal = JSON.parse(readFileSync(resolve(root, "drizzle/migrations/meta/_journal.json"), "utf8")) as { entries: { tag: string }[] };
+    expect(files[0]).toBe("0000_postgres_baseline.sql");
+    expect(files).toEqual(journal.entries.map(entry => `${entry.tag}.sql`));
+    for (const file of files) {
+      const migration = readFileSync(resolve(root, "drizzle/migrations", file), "utf8");
+      for (const pattern of [/`/, /AUTO_INCREMENT/i, /\bENGINE\s*=/i, /CHARSET/i, /ON UPDATE CURRENT_TIMESTAMP/i, /\bmysql/i, /\bdatetime\b/i, /\btinyint\b/i]) {
+        expect(migration, file).not.toMatch(pattern);
+      }
     }
   });
 
@@ -156,8 +162,8 @@ describe("updatedAt uses one authoritative clock (the database)", () => {
   const dialect = new PgDialect();
   const updatedAtColumns = allTables.flatMap(table => getTableConfig(table).columns.filter(column => column.name === "updatedAt").map(column => ({ table: getTableConfig(table).name, column })));
 
-  it("defaults to now() on insert and rewrites to now() on every update for all 15 tables", () => {
-    expect(updatedAtColumns).toHaveLength(15);
+  it("defaults to now() on insert and rewrites to now() on every update for all 16 tables", () => {
+    expect(updatedAtColumns).toHaveLength(16);
     for (const { table, column } of updatedAtColumns) {
       expect(column.hasDefault, `${table} default`).toBe(true);
       const onUpdate = (column as unknown as { onUpdateFn?: () => unknown }).onUpdateFn?.();

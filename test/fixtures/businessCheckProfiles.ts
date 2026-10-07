@@ -7,6 +7,11 @@ export function completeWith(answers: Answers, pickIndex = 0): Answers {
   for (let guard = 0; guard < 100; guard++) {
     const step = nextStep(filled);
     if (!step) return filled;
+    // Typed answers (the business's name and description) are optional: skip them.
+    if (step.question.kind === "text") {
+      filled[step.question.id] = "";
+      continue;
+    }
     const options = step.question.options;
     const option = options[Math.min(pickIndex, options.length - 1)];
     filled[step.question.id] = step.question.kind === "multi" ? [option.value] : option.value;

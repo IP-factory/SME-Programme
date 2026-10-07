@@ -3,28 +3,43 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(process.cwd(), "server/routers/businessCheck.ts"), "utf8");
+const procedure = (name: string) => source.slice(source.indexOf(`  ${name}: publicProcedure`), source.indexOf("\n  }),", source.indexOf(`  ${name}: publicProcedure`)));
 
 describe("business check routes", () => {
-  it("rate-limits public submissions and refuses incomplete checks", () => {
-    expect(source).toContain("consumeRateLimit");
+  it("rate-limits starting a check and saving progress, and refuses incomplete checks", () => {
+    expect(procedure("start")).toContain("allowStart(");
+    expect(procedure("start")).toContain("allowStartFromIp(ip)");
+    expect(procedure("saveProgress")).toContain("allowSave(input.token)");
     expect(source).toContain('code: "TOO_MANY_REQUESTS"');
-    expect(source).toContain("if (!isComplete(answers))");
+    expect(procedure("submit")).toContain("if (!isComplete(answers))");
   });
 
   it("recomputes the result on the server from cleaned answers, never from browser input", () => {
-    expect(source).toContain("const answers = cleanAnswers(input.answers)");
-    expect(source).toContain("const result = evaluate(answers)");
+    expect(procedure("submit")).toContain("const answers = cleanAnswers(input.answers)");
+    expect(procedure("submit")).toContain("const result = evaluate(answers)");
     expect(source).not.toContain("input.result");
   });
 
-  it("records each check and finds follow-up requests by an unguessable token", () => {
-    expect(source).toContain("await db.insert(businessChecks).values");
-    expect(source).toContain("randomBytes(24)");
-    expect(source).toContain("eq(businessChecks.publicToken, input.token)");
+  it("takes the owner's contact details from the saved lead, not from the finishing request", () => {
+    expect(procedure("submit")).toContain("contactOf(check, answers)");
+    expect(procedure("submit")).not.toContain("input.contact");
+  });
+
+  it("records each check when it starts and finds it again by an unguessable token", () => {
+    expect(procedure("start")).toContain("await db.insert(businessChecks).values");
+    expect(procedure("start")).toContain("randomBytes(24)");
+    expect(source).toContain("eq(businessChecks.publicToken, token)");
+  });
+
+  it("moves the pipeline only through advancePipeline", () => {
+    expect(procedure("start")).toContain('pipelineStage: "lead"');
+    expect(procedure("submit")).toContain('advancePipeline(check.pipelineStage, "qualified_lead")');
+    expect(procedure("requestNext")).toContain('advancePipeline(check.pipelineStage, "call_booked")');
+    expect(source.match(/pipelineStage:/g)).toHaveLength(3);
   });
 
   it("notifies only the administration mailbox and the owner who took the check", () => {
     const recipients = Array.from(source.matchAll(/to: ([\w.]+)/g)).map((match) => match[1]);
-    expect(new Set(recipients)).toEqual(new Set(["JUMP_ADMINISTRATION_MAILBOX", "input.contact.email"]));
+    expect(new Set(recipients)).toEqual(new Set(["JUMP_ADMINISTRATION_MAILBOX", "check.email"]));
   });
 });

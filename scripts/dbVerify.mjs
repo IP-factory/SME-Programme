@@ -22,7 +22,7 @@ const list = (label, items) => line(`${label} (${items.length}): ${items.length 
 const CRITICAL = {
   users: ["openId", "role", "email"],
   registrations: ["email", "status", "package", "depositPaid", "bookingToken"],
-  business_checks: ["publicToken", "answersJson", "resultJson", "summaryJson", "callRequestedAt", "reportRequestedAt"],
+  business_checks: ["publicToken", "pipelineStage", "answersJson", "resultJson", "summaryJson", "callRequestedAt", "reportRequestedAt", "completedAt"],
   schedule_slots: ["bookedCount", "capacity", "status"],
   schedule_bookings: ["registrationId", "slotId", "status"],
   scheduled_reminder_deliveries: ["deliveryKey"],

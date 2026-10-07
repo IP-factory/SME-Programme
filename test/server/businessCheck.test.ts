@@ -18,6 +18,10 @@ const { summariseCheck, describeAnswers, ownerEmail } = await import("@server/bu
 function complete(answers: Answers) {
   const filled = { ...answers };
   for (let step = nextStep(filled); step; step = nextStep(filled)) {
+    if (step.question.kind === "text") {
+      filled[step.question.id] = "";
+      continue;
+    }
     const option = step.question.options[1] ?? step.question.options[0];
     filled[step.question.id] = step.question.kind === "multi" ? [option.value] : option.value;
   }

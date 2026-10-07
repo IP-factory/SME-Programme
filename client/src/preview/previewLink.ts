@@ -29,6 +29,8 @@ const responders: Record<string, Responder> = {
     };
   },
   "registration.requestPortalLink": () => ({ success: true }),
+  "businessCheck.start": () => ({ token: "preview-token-0000000000" }),
+  "businessCheck.saveProgress": () => ({ saved: true }),
   // The live site has the AI write the summary; the preview shows the rules-based version.
   "businessCheck.submit": (input) => {
     const result = evaluate((input as { answers: Answers }).answers);

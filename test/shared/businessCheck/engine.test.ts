@@ -5,6 +5,7 @@ import {
   evaluate,
   exampleFor,
   exampleHeading,
+  businessDetails,
   founderRead,
   isComplete,
   optionsFor,
@@ -44,6 +45,11 @@ function completeWith(answers: Answers, pickIndex = 0): Answers {
   for (let guard = 0; guard < 100; guard++) {
     const step = nextStep(filled);
     if (!step) return filled;
+    // Typed answers (the business's name and description) are optional: skip them.
+    if (step.question.kind === "text") {
+      filled[step.question.id] = "";
+      continue;
+    }
     const options = step.question.options;
     const option = options[Math.min(pickIndex, options.length - 1)];
     filled[step.question.id] = step.question.kind === "multi" ? [option.value] : option.value;
@@ -142,9 +148,11 @@ describe("stage first", () => {
     const stage = nextStep({})!.question;
     expect(stage.id).toBe("p_stage");
     expect(stage.options.map((option) => option.value)).toEqual(["operating", "side", "idea"]);
-    expect(nextStep({ p_stage: "operating" })?.question.id).toBe("p_age");
-    expect(nextStep({ p_stage: "side" })?.question.id).toBe("p_age");
-    expect(nextStep({ p_stage: "idea" })?.question.id).toBe("p_type");
+    // The business's name comes straight after the stage (optional), then years trading for anyone who trades.
+    expect(nextStep({ p_stage: "operating" })?.question.id).toBe("p_name");
+    expect(nextStep({ p_stage: "operating", p_name: "" })?.question.id).toBe("p_age");
+    expect(nextStep({ p_stage: "side", p_name: "Ada Foods" })?.question.id).toBe("p_age");
+    expect(nextStep({ p_stage: "idea", p_name: "" })?.question.id).toBe("p_type");
   });
 
   it("words questions for the owner's stage", () => {
@@ -199,6 +207,45 @@ describe("section copy", () => {
         }
       }
     }
+  });
+});
+
+describe("typed answers: the business's name and what it does", () => {
+  const nameQuestion = SECTIONS.profile.questions.find((question) => question.id === "p_name")!;
+
+  it("asks for the name and a one-line description inside the check, worded for the stage", () => {
+    const ids = questionPath({ p_stage: "operating" }).map((step) => step.question.id);
+    expect(ids.slice(0, 2)).toEqual(["p_stage", "p_name"]);
+    expect(ids.indexOf("p_description")).toBe(ids.indexOf("p_sector") + 1);
+    expect(promptFor(nameQuestion, { p_stage: "operating" })).toBe("What is the business called?");
+    expect(promptFor(nameQuestion, { p_stage: "idea" })).toBe("Does the idea have a name yet?");
+  });
+
+  it("treats them as optional: skipping stores an empty answer and the check can still be complete", () => {
+    const skipped = completeWith(operating("2to5"));
+    expect(skipped.p_name).toBe("");
+    expect(isComplete(skipped)).toBe(true);
+    const missing = { ...skipped };
+    delete missing.p_name;
+    delete missing.p_description;
+    expect(isComplete(missing)).toBe(true);
+    expect(nextStep(missing)?.question.id).toBe("p_name");
+  });
+
+  it("tidies typed text and keeps it within its limit", () => {
+    const clean = cleanAnswers({ p_stage: "operating", p_name: "  Ada   Foods  ", p_description: "x".repeat(400) });
+    expect(clean.p_name).toBe("Ada Foods");
+    expect((clean.p_description as string).length).toBe(300);
+    expect(businessDetails(clean)).toEqual({ businessName: "Ada Foods", description: "x".repeat(300) });
+    expect(cleanAnswers({ p_stage: "operating", p_name: ["not", "text"] }).p_name).toBeUndefined();
+  });
+
+  it("does not change the result: the outline and recommendations ignore the typed answers", () => {
+    const base = completeWith(operating("2to5"));
+    const named = { ...base, p_name: "Ada Foods", p_description: "We make and supply snacks in Lagos" };
+    const { summary: _a, ...withoutName } = evaluate(base);
+    const { summary: _b, ...withName } = evaluate(named);
+    expect(withName).toEqual(withoutName);
   });
 });
 

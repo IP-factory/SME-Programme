@@ -109,6 +109,8 @@ export function questionPath(answers: Answers): Step[] {
 
 export function isAnswered(question: Question, answers: Answers) {
   const value = answers[question.id];
+  // A typed answer counts once given, even if skipped (""), so it is asked only once.
+  if (question.kind === "text") return typeof value === "string";
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
 }
 
@@ -117,8 +119,9 @@ export function nextStep(answers: Answers): Step | null {
   return questionPath(answers).find((step) => !isAnswered(step.question, answers)) ?? null;
 }
 
+/** Complete when every required question on the path is answered; optional ones may be left out. */
 export function isComplete(answers: Answers) {
-  return nextStep(answers) === null;
+  return questionPath(answers).every(({ question }) => question.optional || isAnswered(question, answers));
 }
 
 /** Options and prompt for this owner (idea-stage founders see different wording). */
@@ -128,6 +131,16 @@ export function promptFor(question: Question, answers: Answers) {
   if (stage === "idea" && question.ideaPrompt) return question.ideaPrompt;
   if (stage === "side" && question.sidePrompt) return question.sidePrompt;
   return question.prompt;
+}
+
+export function placeholderFor(question: Question, answers: Answers) {
+  return stageOf(answers) === "idea" && question.ideaPlaceholder ? question.ideaPlaceholder : question.placeholder;
+}
+
+/** The business's name and one-line description, as typed in the check (empty when skipped). */
+export function businessDetails(answers: Answers) {
+  const text = (id: string) => (typeof answers[id] === "string" ? (answers[id] as string).trim() : "");
+  return { businessName: text("p_name"), description: text("p_description") };
 }
 
 export function optionsFor(question: Question, answers: Answers): readonly Option[] {
@@ -170,6 +183,9 @@ export function exampleHeading(section: Section, answers: Answers) {
 }
 
 function validValue(question: Question, value: Answers[string], answers: Answers): Answers[string] {
+  if (question.kind === "text") {
+    return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, question.maxLength ?? 300) : undefined;
+  }
   const options = optionsFor(question, answers);
   const allowed = new Set(options.map((option) => option.value));
   if (question.kind === "multi") {
