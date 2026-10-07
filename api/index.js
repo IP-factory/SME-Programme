@@ -118,7 +118,9 @@ var init_env = __esm({
       /** Shared secret the host's scheduler sends as a Bearer token to /api/scheduled/* endpoints. */
       cronSecret: process.env.CRON_SECRET ?? "",
       /** Email address of the permanent Super Admin. */
-      ownerAdminEmail: (process.env.OWNER_ADMIN_EMAIL ?? "emmanueltarfa@gmail.com").trim().toLowerCase(),
+      // A blank value (`OWNER_ADMIN_EMAIL=`) is treated as unset: `??` alone would keep "" and make every user without an
+      // email look like the Super Admin.
+      ownerAdminEmail: (process.env.OWNER_ADMIN_EMAIL?.trim() || "emmanueltarfa@gmail.com").toLowerCase(),
       emailReplyTo: process.env.EMAIL_REPLY_TO ?? BRAND.administrationMailbox
     };
   }
@@ -1928,7 +1930,8 @@ function normalizeAdminEmail(email) {
   return (email || "").trim().toLowerCase();
 }
 function isOwnerAdmin(user) {
-  return normalizeAdminEmail(user.email) === OWNER_ADMIN_EMAIL;
+  const email = normalizeAdminEmail(user.email);
+  return email !== "" && email === OWNER_ADMIN_EMAIL;
 }
 function validateAdminPassword(password) {
   const categories = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((pattern) => pattern.test(password)).length;
@@ -7333,8 +7336,10 @@ function officeEmail(input) {
 
 // server/routers/businessCheck.ts
 var WINDOW_MS = 15 * 60 * 1e3;
+var limiters = [];
 function rateLimiter(maximum) {
   const counts = /* @__PURE__ */ new Map();
+  limiters.push({ clear: () => counts.clear() });
   return (key) => {
     const now = Date.now();
     const existing = counts.get(key);

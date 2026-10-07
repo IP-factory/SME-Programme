@@ -68,7 +68,9 @@ async function giveDetails() {
   await pick(/start the check/i);
 }
 
-describe("business check page", () => {
+// The idea-stage test walks a whole question path in jsdom and takes about 4.5 s even on a quiet machine, so the default
+// 5 s ceiling flaps with CPU load. Assertions are unchanged; this only stops a slow machine failing a correct test.
+describe("business check page", { timeout: 20_000 }, () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.scrollTo = vi.fn();

@@ -45,6 +45,8 @@ export const ENV = {
   /** Shared secret the host's scheduler sends as a Bearer token to /api/scheduled/* endpoints. */
   cronSecret: process.env.CRON_SECRET ?? "",
   /** Email address of the permanent Super Admin. */
-  ownerAdminEmail: (process.env.OWNER_ADMIN_EMAIL ?? "emmanueltarfa@gmail.com").trim().toLowerCase(),
+  // A blank value (`OWNER_ADMIN_EMAIL=`) is treated as unset: `??` alone would keep "" and make every user without an
+  // email look like the Super Admin.
+  ownerAdminEmail: (process.env.OWNER_ADMIN_EMAIL?.trim() || "emmanueltarfa@gmail.com").toLowerCase(),
   emailReplyTo: process.env.EMAIL_REPLY_TO ?? BRAND.administrationMailbox,
 };

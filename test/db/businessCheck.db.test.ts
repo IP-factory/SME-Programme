@@ -31,7 +31,7 @@ vi.mock("@server/email", async importOriginal => ({ ...(await importOriginal<typ
 vi.mock("@server/_core/llm", () => ({ invokeLLM: () => Promise.reject(new Error("offline")) }));
 vi.mock("@server/_core/env", async importOriginal => ({ ENV: { ...(await importOriginal<typeof import("@server/_core/env")>()).ENV, forgeApiKey: "test-key" } }));
 
-import { businessCheckRouter } from "@server/routers/businessCheck";
+import { businessCheckRouter, resetBusinessCheckRateLimitsForTests } from "@server/routers/businessCheck";
 import { JUMP_ADMINISTRATION_MAILBOX } from "@server/email";
 import { cleanAnswers, evaluate, founderRead } from "@shared/businessCheck/engine";
 import type { TrpcContext } from "@server/_core/context";
@@ -60,6 +60,8 @@ for (const target of targets) {
       await harness?.close();
     });
     beforeEach(() => {
+      // Each test gets a fresh allowance; the limiter is module-level and shared by every target in this process.
+      resetBusinessCheckRateLimitsForTests();
       mocked.deliverEmail.mockReset();
       mocked.deliverEmail.mockResolvedValue({ status: "Simulated", reason: "test_sender" });
     });

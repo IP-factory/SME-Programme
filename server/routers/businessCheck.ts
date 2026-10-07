@@ -15,9 +15,12 @@ import { publicProcedure, router } from "../_core/trpc";
 
 const WINDOW_MS = 15 * 60 * 1000;
 
+const limiters: Array<{ clear: () => void }> = [];
+
 /** Fixed-window counters, per key. Starting a check is rare; saving progress happens on every answer. */
 function rateLimiter(maximum: number) {
   const counts = new Map<string, { count: number; resetAt: number }>();
+  limiters.push({ clear: () => counts.clear() });
   return (key: string) => {
     const now = Date.now();
     const existing = counts.get(key);
@@ -35,6 +38,14 @@ const allowStart = rateLimiter(5);
 /** Caps new checks from one address whatever email is typed, so the table cannot be flooded with leads. */
 const allowStartFromIp = rateLimiter(20);
 const allowSave = rateLimiter(300);
+
+/**
+ * Clears every limiter's counters. Tests only: the limiters live at module level, so tests that share a process
+ * (and an address) would otherwise spend one another's allowance. Never call this from application code.
+ */
+export function resetBusinessCheckRateLimitsForTests() {
+  for (const limiter of limiters) limiter.clear();
+}
 
 const answerValue = z.union([z.string().max(300), z.array(z.string().max(64)).max(10)]);
 const answersInput = z.record(z.string().max(32), answerValue.optional()).refine((value) => Object.keys(value).length <= 80);

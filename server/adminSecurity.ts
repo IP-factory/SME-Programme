@@ -18,7 +18,8 @@ export function normalizeAdminEmail(email: string | null | undefined) {
 }
 
 export function isOwnerAdmin(user: Pick<User, "email">) {
-  return normalizeAdminEmail(user.email) === OWNER_ADMIN_EMAIL;
+  const email = normalizeAdminEmail(user.email);
+  return email !== "" && email === OWNER_ADMIN_EMAIL;
 }
 
 export function validateAdminPassword(password: string) {

@@ -190,6 +190,25 @@ for (const target of targets) {
         await expect(browser().call().account.signUp(signUpInput(invited))).rejects.toMatchObject({ code: "CONFLICT" });
       });
 
+      it("answers each kind of email problem with its own code: invalid is BAD_REQUEST, taken or reserved is CONFLICT", async () => {
+        const taken = uniqueEmail("outcome-taken");
+        await browser().call().account.signUp(signUpInput(taken));
+        const invited = uniqueEmail("outcome-invited");
+        const [admin] = await db.insert(schema.users).values({ openId: `outcome-${invited}`, role: "admin" }).returning();
+        await db.insert(schema.adminInvitations).values({ email: invited, tokenHash: `h-${invited}`.slice(0, 64), createdByUserId: admin.id, expiresAt: new Date(Date.now() + 86_400_000), proposedPermissionsJson: "[]" });
+
+        // The owner address must itself be well formed, whatever the environment says (it falls back to a default when blank).
+        expect(OWNER_ADMIN_EMAIL).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
+        const outcomes = async (email: string) => browser().call().account.signUp(signUpInput(email)).then(() => "created", (error: { code: string }) => error.code);
+        expect(await outcomes("not-an-email")).toBe("BAD_REQUEST");
+        expect(await outcomes("")).toBe("BAD_REQUEST");
+        expect(await outcomes(taken)).toBe("CONFLICT");
+        expect(await outcomes(OWNER_ADMIN_EMAIL)).toBe("CONFLICT");
+        expect(await outcomes(OWNER_ADMIN_EMAIL.toUpperCase())).toBe("CONFLICT");
+        expect(await outcomes(invited)).toBe("CONFLICT");
+        expect(await outcomes(uniqueEmail("outcome-free"))).toBe("created");
+      });
+
       it.each([
         ["a short password", { password: "a1", confirmPassword: "a1" }, /at least 10/],
         ["no number", { password: "onlyletters!!", confirmPassword: "onlyletters!!" }, /letter and one number/],
