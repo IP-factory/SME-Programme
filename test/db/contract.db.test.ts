@@ -98,11 +98,11 @@ for (const target of targets) {
     });
 
     describe("schema", () => {
-      it("creates exactly the 35 expected tables", async () => {
+      it("creates exactly the 36 expected tables", async () => {
         const rows = await harness.query(sql`select table_name from information_schema.tables where table_schema = current_schema() and table_type = 'BASE TABLE'`);
         const created = rows.map(row => String(row.table_name)).sort();
-        // 30 from the MySQL migration + user_credentials, user_sessions, businesses, business_memberships, client_onboarding_invitations.
-        expect(expectedTableNames).toHaveLength(35);
+        // 30 from the MySQL migration + user_credentials, user_sessions, businesses, business_memberships, client_onboarding_invitations, user_platform_roles.
+        expect(expectedTableNames).toHaveLength(36);
         expect(expectedTableNames.filter(name => !created.includes(name))).toEqual([]);
         expect(created.filter(name => !expectedTableNames.includes(name))).toEqual([]);
       });
@@ -175,15 +175,15 @@ for (const target of targets) {
           }
         }
         expect(declared).toBe(rows.length); // no foreign key exists that the schema does not declare
-        expect(declared).toBe(9);
+        expect(declared).toBe(12);
       });
 
       it("stores a declared name longer than 63 bytes truncated, which is why lookups must use pgIdentifier", async () => {
         const declared = getTableConfig(schema.clientOnboardingInvitations).foreignKeys.map(foreignKey => foreignKey.getName());
         const tooLong = declared.filter(name => Buffer.byteLength(name) > 63);
         expect(tooLong).toEqual(["client_onboarding_invitations_businessCheckId_business_checks_id_fk"]);
-        const rows = await harness.query(sql`select conname from pg_constraint where contype = 'f' and conname like 'client_onboarding_invitations_businessCheckId%'`);
-        expect(rows.map(row => row.conname)).toEqual(["client_onboarding_invitations_businessCheckId_business_checks_i"]);
+        const rows = await harness.query(sql`select k.conname from pg_constraint k join pg_namespace n on n.oid = k.connamespace where n.nspname = current_schema() and k.contype = 'f' and k.conname like 'client_onboarding_invitations_businessCheckId%'`);
+        expect(rows.map(row => row.conname)).toEqual(["client_onboarding_invitations_businessCheckId_business_checks_i"]); // scoped to this schema: a real database also holds the migrated public schema
         expect(pgIdentifier(tooLong[0])).toBe("client_onboarding_invitations_businessCheckId_business_checks_i");
         expect(pgIdentifier("short_name")).toBe("short_name");
       });
@@ -227,10 +227,10 @@ for (const target of targets) {
         expect(await db.select().from(schema.businessMemberships).where(eq(schema.businessMemberships.userId, user.id))).toHaveLength(0);
       });
 
-      it("creates all 49 enum types with their exact labels in order", async () => {
+      it("creates all 50 enum types with their exact labels in order", async () => {
         const rows = await harness.query(sql`select t.typname, array_agg(e.enumlabel::text order by e.enumsortorder) as labels from pg_type t join pg_enum e on e.enumtypid = t.oid join pg_namespace n on n.oid = t.typnamespace where n.nspname = current_schema() group by t.typname`);
         const actual = new Map(rows.map(row => [String(row.typname), row.labels as string[]]));
-        expect(enums).toHaveLength(49);
+        expect(enums).toHaveLength(50);
         for (const definition of enums) expect(actual.get(definition.enumName), definition.enumName).toEqual([...definition.enumValues]);
         expect(actual.size).toBe(enums.length);
       });

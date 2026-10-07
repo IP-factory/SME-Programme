@@ -169,6 +169,10 @@ export async function createDriverHarness(): Promise<DbHarness> {
     close: async () => {
       await database.closeDb();
       await server.stop();
+      // The socket server detaches each connection on a later event-loop turn; let those handlers finish before the
+      // database underneath them is closed, or they run against a closed instance and throw.
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
       await pg.close();
     },
   };

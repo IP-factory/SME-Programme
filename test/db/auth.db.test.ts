@@ -141,9 +141,12 @@ for (const target of targets) {
         expect(rows.sessions).toHaveLength(1);
 
         expect(view).toEqual({
-          user: { id: rows.user.id, fullName: "Ada Example", email },
-          memberships: [{ businessId: rows.businesses[0].id, businessName: "Example Traders", role: "owner", profileComplete: false }],
-          activeBusiness: { businessId: rows.businesses[0].id, businessName: "Example Traders", role: "owner", profileComplete: false },
+          user: { id: rows.user.id, fullName: "Ada Example", email, status: "active" },
+          platformRoles: [],
+          permissions: [],
+          memberships: [{ businessId: rows.businesses[0].id, businessName: "Example Traders", role: "owner", status: "active", profileComplete: false, profilePercent: 20 }],
+          activeBusiness: { businessId: rows.businesses[0].id, businessName: "Example Traders", role: "owner", status: "active", profileComplete: false, profilePercent: 20 },
+          landingPath: "/dashboard",
         });
         // Only safe data is returned.
         expect(JSON.stringify(view)).not.toMatch(/passwordHash|scrypt|tokenHash/);
@@ -409,8 +412,8 @@ for (const target of targets) {
 
         const after = (await owner.call().account.me())!;
         expect(after.memberships.map(m => [m.businessName, m.role])).toEqual([["First Co", "owner"], ["Second Co", "business_admin"]]);
-        // Two businesses: no workspace is chosen for the user yet (the switcher is a later phase).
-        expect(after.activeBusiness).toBeNull();
+        // Two businesses: one is the active workspace (the first until the person switches).
+        expect(after.activeBusiness?.businessName).toBe("First Co");
         expect((await owner.call().account.business({ businessId: second.id })).role).toBe("business_admin");
 
         const teammate = browser();

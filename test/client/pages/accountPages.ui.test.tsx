@@ -9,17 +9,32 @@ import { Route, Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import type { AccountSessionView } from "@shared/auth";
 
+const RICHIE_TECH = { businessId: 7, businessName: "Richie Tech", role: "owner", status: "active", profileComplete: false, profilePercent: 60 } as const;
+const SECOND_CO = { businessId: 8, businessName: "Second Co", role: "member", status: "active", profileComplete: false, profilePercent: 20 } as const;
 const SESSION: AccountSessionView = {
-  user: { id: 1, fullName: "Richie Okafor", email: "richie@example.com" },
-  memberships: [{ businessId: 7, businessName: "Richie Tech", role: "owner", profileComplete: false }],
-  activeBusiness: { businessId: 7, businessName: "Richie Tech", role: "owner", profileComplete: false },
+  user: { id: 1, fullName: "Richie Okafor", email: "richie@example.com", status: "active" },
+  platformRoles: [],
+  permissions: [],
+  memberships: [RICHIE_TECH],
+  activeBusiness: RICHIE_TECH,
+  landingPath: "/dashboard",
+};
+const STAFF: AccountSessionView = {
+  user: { id: 2, fullName: "Lewis Staff", email: "lewis@example.com", status: "active" },
+  platformRoles: ["desk_lead"],
+  permissions: ["view_all_businesses"],
+  memberships: [],
+  activeBusiness: null,
+  landingPath: "/admin",
 };
 
 const api = vi.hoisted(() => {
-  const state = { me: null as unknown, loading: false, preview: undefined as unknown, previewLoading: false, acceptCalls: [] as unknown[], signInCalls: [] as unknown[], signOutCalls: 0, setData: [] as unknown[] };
-  const replies: { accept?: unknown; signIn?: unknown; acceptError?: string; signInError?: string } = {};
+  const state = { switchCalls: [] as unknown[], updateBusinessCalls: [] as unknown[], updateProfileCalls: [] as unknown[], changePasswordCalls: [] as unknown[], businessProfile: undefined as unknown, me: null as unknown, loading: false, preview: undefined as unknown, previewLoading: false, acceptCalls: [] as unknown[], signInCalls: [] as unknown[], signOutCalls: 0, setData: [] as unknown[] };
+  const replies: { switchTo?: unknown; businessError?: string; passwordError?: string; accept?: unknown; signIn?: unknown; acceptError?: string; signInError?: string } = {};
   return { state, replies };
 });
+
+const SESSION_FOR_MOCK = { user: { id: 1, fullName: "Richie Okafor", email: "richie@example.com", status: "active" } };
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -36,7 +51,7 @@ vi.mock("@/lib/trpc", () => ({
         }),
       },
     },
-    useUtils: () => ({ account: { me: { setData: (_: unknown, value: unknown) => api.state.setData.push(value) } } }),
+    useUtils: () => ({ account: { me: { setData: (_: unknown, value: unknown) => api.state.setData.push(value), invalidate: () => undefined }, business: { invalidate: () => undefined } } }),
     account: {
       me: { useQuery: () => ({ data: api.state.me, isLoading: api.state.loading, refetch: () => undefined }) },
       signIn: {
@@ -46,6 +61,45 @@ vi.mock("@/lib/trpc", () => ({
             api.state.signInCalls.push(input);
             if (api.replies.signInError) options.onError?.(new Error(api.replies.signInError));
             else options.onSuccess?.(api.replies.signIn);
+          },
+        }),
+      },
+      switchWorkspace: {
+        useMutation: (options: { onSuccess?: (v: unknown) => void }) => ({
+          isPending: false,
+          mutate: (input: unknown) => {
+            api.state.switchCalls.push(input);
+            options.onSuccess?.(api.replies.switchTo);
+          },
+        }),
+      },
+      business: { useQuery: () => ({ data: api.state.businessProfile, isLoading: false, error: null }) },
+      updateBusiness: {
+        useMutation: (options: { onSuccess?: () => void; onError?: (e: Error) => void }) => ({
+          isPending: false,
+          mutate: (input: unknown) => {
+            api.state.updateBusinessCalls.push(input);
+            if (api.replies.businessError) options.onError?.(new Error(api.replies.businessError));
+            else options.onSuccess?.();
+          },
+        }),
+      },
+      updateProfile: {
+        useMutation: (options: { onSuccess?: (v: unknown) => void }) => ({
+          isPending: false,
+          mutate: (input: { fullName: string }) => {
+            api.state.updateProfileCalls.push(input);
+            options.onSuccess?.({ ...SESSION_FOR_MOCK, user: { ...SESSION_FOR_MOCK.user, fullName: input.fullName } });
+          },
+        }),
+      },
+      changePassword: {
+        useMutation: (options: { onSuccess?: () => void; onError?: (e: Error) => void }) => ({
+          isPending: false,
+          mutate: (input: unknown) => {
+            api.state.changePasswordCalls.push(input);
+            if (api.replies.passwordError) options.onError?.(new Error(api.replies.passwordError));
+            else options.onSuccess?.();
           },
         }),
       },
@@ -65,6 +119,8 @@ vi.mock("@/lib/trpc", () => ({
 import OnboardingPage from "@/pages/OnboardingPage";
 import LoginPage from "@/pages/LoginPage";
 import AccountDashboard from "@/pages/AccountDashboard";
+import AccountSettingsPage from "@/pages/AccountSettingsPage";
+import BusinessSettingsPage from "@/pages/BusinessSettingsPage";
 
 function renderAt(path: string, element: React.ReactElement) {
   const location = memoryLocation({ path, record: true });
@@ -83,6 +139,14 @@ beforeEach(() => {
   api.state.signInCalls = [];
   api.state.signOutCalls = 0;
   api.state.setData = [];
+  api.state.switchCalls = [];
+  api.state.updateBusinessCalls = [];
+  api.state.updateProfileCalls = [];
+  api.state.changePasswordCalls = [];
+  api.state.businessProfile = undefined;
+  delete api.replies.switchTo;
+  delete api.replies.businessError;
+  delete api.replies.passwordError;
   delete api.replies.accept;
   delete api.replies.signIn;
   delete api.replies.acceptError;
@@ -223,17 +287,59 @@ describe("sign-in screen", () => {
 });
 
 describe("account dashboard", () => {
-  it("welcomes the person and shows their business workspace and incomplete profile", () => {
+  it("welcomes the person and shows their business workspace, the incomplete profile and a way to finish it", () => {
     api.state.me = SESSION;
     renderAt("/dashboard", <AccountDashboard />);
     expect(screen.getByRole("heading", { name: "Welcome, Richie" })).toBeTruthy();
     expect(screen.getByText("Richie Tech")).toBeTruthy();
     expect(screen.getByText("Incomplete")).toBeTruthy();
+    expect(screen.getByText(/60% complete/)).toBeTruthy();
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("60");
     expect(screen.getByText("richie@example.com")).toBeTruthy();
     expect(screen.getByText(/Your account is you\. Your business is the workspace/)).toBeTruthy();
-    const complete = screen.getByRole("button", { name: "Complete business profile" }) as HTMLButtonElement;
-    expect(complete.disabled).toBe(true);
-    expect(screen.queryByText(/switch/i)).toBeNull();
+    expect(screen.getByRole("link", { name: "Complete profile" }).getAttribute("href")).toBe("/settings/business");
+  });
+
+  it("shows no workspace switcher for a person with one business", () => {
+    api.state.me = SESSION;
+    renderAt("/dashboard", <AccountDashboard />);
+    expect(screen.queryByLabelText("Workspace")).toBeNull();
+  });
+
+  it("shows a workspace switcher, listing each business with the person's role, for two or more", () => {
+    api.state.me = { ...SESSION, memberships: [RICHIE_TECH, SECOND_CO] };
+    renderAt("/dashboard", <AccountDashboard />);
+    const select = screen.getByLabelText("Workspace") as HTMLSelectElement;
+    expect(Array.from(select.options).map(option => option.textContent)).toEqual(["Richie Tech · Owner", "Second Co · Member"]);
+    expect(select.value).toBe("7");
+  });
+
+  it("switches workspace through the server and uses the refreshed context", () => {
+    api.state.me = { ...SESSION, memberships: [RICHIE_TECH, SECOND_CO] };
+    const switched = { ...SESSION, memberships: [RICHIE_TECH, SECOND_CO], activeBusiness: SECOND_CO };
+    api.replies.switchTo = switched;
+    renderAt("/dashboard", <AccountDashboard />);
+    fireEvent.change(screen.getByLabelText("Workspace"), { target: { value: "8" } });
+    expect(api.state.switchCalls).toEqual([{ businessId: 8 }]);
+    expect(api.state.setData).toEqual([switched]);
+  });
+
+  it("does not offer a business to someone who has none and has no internal role", () => {
+    api.state.me = { ...SESSION, memberships: [], activeBusiness: null };
+    renderAt("/dashboard", <AccountDashboard />);
+    expect(screen.getByText("You are not a member of a business yet.")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Complete profile" })).toBeNull();
+  });
+
+  it("gives an internal person with no business an internal workspace, not a fake business", () => {
+    api.state.me = STAFF;
+    renderAt("/dashboard", <AccountDashboard />);
+    expect(screen.getByText("Internal workspace")).toBeTruthy();
+    expect(screen.getByText(/desk lead/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open the internal area" }).getAttribute("href")).toBe("/admin");
+    expect(screen.queryByText("You are not a member of a business yet.")).toBeNull();
+    expect(screen.queryByText("Your business")).toBeNull();
+    expect(screen.queryByLabelText("Workspace")).toBeNull();
   });
 
   it("redirects an anonymous visitor to the sign-in screen", async () => {
@@ -257,10 +363,136 @@ describe("account dashboard", () => {
     expect(api.state.setData).toEqual([null]);
   });
 
-  it("lists businesses without a switcher when the person belongs to several", () => {
-    api.state.me = { ...SESSION, activeBusiness: null, memberships: [...SESSION.memberships, { businessId: 8, businessName: "Second Co", role: "member", profileComplete: false }] };
+  it("links to the settings pages, and to business settings only while working inside a business", () => {
+    api.state.me = SESSION;
     renderAt("/dashboard", <AccountDashboard />);
-    expect(screen.getByText("Second Co")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /switch/i })).toBeNull();
+    expect(screen.getByRole("link", { name: "Account settings" }).getAttribute("href")).toBe("/settings/account");
+    expect(screen.getByRole("link", { name: "Business settings" }).getAttribute("href")).toBe("/settings/business");
+    cleanup();
+    api.state.me = STAFF;
+    renderAt("/dashboard", <AccountDashboard />);
+    expect(screen.queryByRole("link", { name: "Business settings" })).toBeNull();
+  });
+});
+
+describe("landing after sign-in", () => {
+  it("sends a client with a business to the dashboard and internal staff without one to the internal area", async () => {
+    api.state.me = SESSION;
+    const client = renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(client.history.at(-1)).toBe("/dashboard"));
+    cleanup();
+    api.state.me = STAFF;
+    const staff = renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(staff.history.at(-1)).toBe("/admin"));
+  });
+
+  it("uses the landing path the server returns after signing in, with no loop back to sign-in", async () => {
+    api.replies.signIn = STAFF;
+    const location = renderAt("/login", <LoginPage />);
+    fill("Email", "lewis@example.com");
+    fill("Password", "correct horse 42");
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(location.history.at(-1)).toBe("/admin"));
+    expect(location.history.filter(path => path === "/login")).toHaveLength(1);
+  });
+});
+
+const PROFILE = { businessId: 7, name: "Richie Tech", description: null, yearFounded: null, sector: null, website: null, staffBand: null, revenueBand: null, country: null, state: null, logoUrl: null, role: "owner", canEdit: true, completion: { percent: 20, missing: ["description", "yearFounded", "sector", "website"], complete: false } };
+
+describe("business settings", () => {
+  it("lets an owner edit and save the profile for the active business", () => {
+    api.state.me = SESSION;
+    api.state.businessProfile = PROFILE;
+    renderAt("/settings/business", <BusinessSettingsPage />);
+    fill("Description", "We sell fabric.");
+    fill("Year founded", "2019");
+    fill("Sector", "Retail");
+    fill("Website", "example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Save business profile" }));
+    expect(api.state.updateBusinessCalls).toEqual([{ businessId: 7, name: "Richie Tech", description: "We sell fabric.", yearFounded: 2019, sector: "Retail", website: "example.com" }]);
+    expect(screen.getByText("Logo upload is coming soon.")).toBeTruthy();
+  });
+
+  it("rejects a malformed year before calling the server", () => {
+    api.state.me = SESSION;
+    api.state.businessProfile = PROFILE;
+    renderAt("/settings/business", <BusinessSettingsPage />);
+    fill("Year founded", "19");
+    fireEvent.click(screen.getByRole("button", { name: "Save business profile" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/four digits/);
+    expect(api.state.updateBusinessCalls).toEqual([]);
+  });
+
+  it("shows a member the profile read-only, with no save button", () => {
+    api.state.me = { ...SESSION, activeBusiness: { ...RICHIE_TECH, role: "member" } };
+    api.state.businessProfile = { ...PROFILE, role: "member", canEdit: false };
+    renderAt("/settings/business", <BusinessSettingsPage />);
+    expect((screen.getByLabelText("Business name") as HTMLInputElement).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Save business profile" })).toBeNull();
+    expect(screen.getByText(/Only owners and business admins can change these details/)).toBeTruthy();
+  });
+
+  it("explains that internal staff without a business have no business profile", () => {
+    api.state.me = STAFF;
+    renderAt("/settings/business", <BusinessSettingsPage />);
+    expect(screen.getByText(/not working inside a business/)).toBeTruthy();
+  });
+
+  it("shows the server's refusal", () => {
+    api.state.me = SESSION;
+    api.state.businessProfile = PROFILE;
+    api.replies.businessError = "Your role in this business does not allow you to change its profile.";
+    renderAt("/settings/business", <BusinessSettingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Save business profile" }));
+    expect(screen.getByRole("alert").textContent).toContain("does not allow");
+  });
+});
+
+describe("account settings", () => {
+  it("shows the email read-only and saves only the person's own name", () => {
+    api.state.me = SESSION;
+    renderAt("/settings/account", <AccountSettingsPage />);
+    const email = screen.getByLabelText("Email") as HTMLInputElement;
+    expect(email.value).toBe("richie@example.com");
+    expect(email.readOnly).toBe(true);
+    fill("Full name", "Richie A. Okafor");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(api.state.updateProfileCalls).toEqual([{ fullName: "Richie A. Okafor" }]);
+    expect(api.state.setData).toHaveLength(1);
+  });
+
+  it("changes the password after checking it in the browser, and sends the current password", () => {
+    api.state.me = SESSION;
+    renderAt("/settings/account", <AccountSettingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    expect(screen.getAllByRole("alert").at(-1)!.textContent).toMatch(/current password/);
+    fill("Current password", "correct horse 42");
+    fill("New password", "short1");
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    expect(screen.getAllByRole("alert").at(-1)!.textContent).toMatch(/at least 10/);
+    fill("New password", "brand new pass 7");
+    fill("Confirm new password", "other pass 99999");
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    expect(screen.getAllByRole("alert").at(-1)!.textContent).toMatch(/does not match/);
+    expect(api.state.changePasswordCalls).toEqual([]);
+    fill("Confirm new password", "brand new pass 7");
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    expect(api.state.changePasswordCalls).toEqual([{ currentPassword: "correct horse 42", newPassword: "brand new pass 7", confirmPassword: "brand new pass 7" }]);
+  });
+
+  it("shows the server's message when the current password is wrong", () => {
+    api.state.me = SESSION;
+    api.replies.passwordError = "Your current password is not correct.";
+    renderAt("/settings/account", <AccountSettingsPage />);
+    fill("Current password", "wrong password 1");
+    fill("New password", "brand new pass 7");
+    fill("Confirm new password", "brand new pass 7");
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    expect(screen.getAllByRole("alert").at(-1)!.textContent).toBe("Your current password is not correct.");
+  });
+
+  it("redirects an anonymous visitor to sign-in", async () => {
+    const location = renderAt("/settings/account", <AccountSettingsPage />);
+    await waitFor(() => expect(location.history.at(-1)).toBe("/login"));
   });
 });

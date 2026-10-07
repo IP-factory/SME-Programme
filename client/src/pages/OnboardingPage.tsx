@@ -23,7 +23,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (account) setLocation("/dashboard");
+    if (account) setLocation(account.landingPath);
   }, [account, setLocation]);
 
   useEffect(() => {

@@ -79,10 +79,12 @@ describe("roles and vocabulary", () => {
     expect(ACCOUNT_AUTH_ERRORS.signInRequired).not.toMatch(/10001/);
   });
 
-  it("treats a business profile as complete only when description, sector and country are set", () => {
+  it("treats a business profile as complete only when every completion field is filled", () => {
+    const filled = { name: "Example Traders", description: "d", yearFounded: 2019, sector: "Retail", website: "https://example.com" };
     expect(isBusinessProfileComplete({})).toBe(false);
-    expect(isBusinessProfileComplete({ description: "d", sector: "s", country: " " })).toBe(false);
-    expect(isBusinessProfileComplete({ description: "d", sector: "s", country: "Nigeria" })).toBe(true);
+    expect(isBusinessProfileComplete({ ...filled, website: " " })).toBe(false);
+    expect(isBusinessProfileComplete({ ...filled, yearFounded: null })).toBe(false);
+    expect(isBusinessProfileComplete(filled)).toBe(true);
   });
 });
 

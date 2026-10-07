@@ -16,13 +16,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (account) setLocation("/dashboard");
+    if (account) setLocation(account.landingPath);
   }, [account, setLocation]);
 
   const signIn = trpc.account.signIn.useMutation({
     onSuccess: view => {
       utils.account.me.setData(undefined, view);
-      setLocation("/dashboard");
+      setLocation(view.landingPath);
     },
     onError: failure => setError(failure.message),
   });

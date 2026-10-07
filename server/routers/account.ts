@@ -1,6 +1,16 @@
 import { z } from "zod";
-import { signInInputSchema } from "../../shared/auth";
-import { requireBusinessMembership, resolveAccountSession, signInAccount, signOutAccount, toAccountView } from "../accountAuth";
+import { signInInputSchema, switchWorkspaceInputSchema } from "../../shared/auth";
+import {
+  changeAccountPassword,
+  getBusinessProfile,
+  resolveAccountSession,
+  signInAccount,
+  signOutAccount,
+  switchWorkspace,
+  toAccountView,
+  updateAccountProfile,
+  updateBusinessProfile,
+} from "../accountAuth";
 import { accountProcedure, publicProcedure, router } from "../_core/trpc";
 
 /**
@@ -19,13 +29,20 @@ export const accountRouter = router({
     return session ? toAccountView(session) : null;
   }),
 
-  /** The signed-in user's workspace. Requires a session. */
+  /** The signed-in person's canonical context. Requires a session. */
   workspace: accountProcedure.query(({ ctx }) => toAccountView(ctx.account)),
 
-  /** A business the caller belongs to. The id is checked against the caller's memberships, never trusted. */
-  business: accountProcedure.input(z.object({ businessId: z.number().int().positive() })).query(({ ctx, input }) => {
-    const membership = requireBusinessMembership(ctx.account, input.businessId);
-    return { businessId: membership.businessId, name: membership.businessName, role: membership.role, profileComplete: membership.profileComplete };
-  }),
-});
+  /** Chooses the active workspace. The id is verified against the caller's active memberships. */
+  switchWorkspace: accountProcedure.input(switchWorkspaceInputSchema).mutation(({ ctx, input }) => switchWorkspace(ctx.req, ctx.account, input.businessId)),
 
+  /** A business the caller belongs to, with what their role may do. The id is checked, never trusted. */
+  business: accountProcedure.input(z.object({ businessId: z.number().int().positive() })).query(({ ctx, input }) => getBusinessProfile(ctx.account, input.businessId)),
+
+  /** Updates the business profile. Owners and business admins only; members and outsiders are refused. */
+  updateBusiness: accountProcedure.input(z.unknown()).mutation(({ ctx, input }) => updateBusinessProfile(ctx.req, ctx.account, input)),
+
+  /** The signed-in person's own name. Never another person, never the email. */
+  updateProfile: accountProcedure.input(z.unknown()).mutation(({ ctx, input }) => updateAccountProfile(ctx.req, ctx.account, input)),
+
+  changePassword: accountProcedure.input(z.unknown()).mutation(({ ctx, input }) => changeAccountPassword(ctx.req, ctx.account, input)),
+});

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { PIPELINE_STAGES } from "../shared/businessCheck/pipeline";
 
 /**
@@ -47,8 +47,26 @@ export const userSessions = pgTable("user_sessions", {
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
   expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
   revokedAt: timestamp("revokedAt", { withTimezone: true }),
+  /** The workspace chosen for this session. Always re-verified against an active membership; never trusted as proof of access. */
+  activeBusinessId: integer("activeBusinessId").references((): AnyPgColumn => businesses.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const userPlatformRolesRoleEnum = pgEnum("user_platform_roles_role", ["super_admin", "admin", "desk_lead", "analyst", "partner", "subject_matter_expert", "finance"]);
+
+/**
+ * Internal IPF responsibilities, separate from business membership. A person may hold several roles, with or without
+ * any business membership. What a role grants is defined in shared/platformPermissions.ts, not here. The legacy
+ * `users.role` flag and the owner-email Super Admin bridge are folded in when authority is resolved, so these rows are
+ * the long-term source of role identity without removing the legacy ones.
+ */
+export const userPlatformRoles = pgTable("user_platform_roles", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: userPlatformRolesRoleEnum("role").notNull(),
+  grantedByUserId: integer("grantedByUserId").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+}, table => [unique("user_platform_roles_user_role_unique").on(table.userId, table.role), index("user_platform_roles_role_idx").on(table.role)]);
 
 export const businessesStatusEnum = pgEnum("businesses_status", ["active", "suspended", "archived"]);
 

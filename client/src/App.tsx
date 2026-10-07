@@ -13,6 +13,8 @@ import BusinessCheck from "./pages/BusinessCheck";
 import OnboardingPage from "./pages/OnboardingPage";
 import LoginPage from "./pages/LoginPage";
 import AccountDashboard from "./pages/AccountDashboard";
+import AccountSettingsPage from "./pages/AccountSettingsPage";
+import BusinessSettingsPage from "./pages/BusinessSettingsPage";
 import Home from "./pages/Home";
 import Schedule from "./pages/Schedule";
 import ParticipantDashboard from "./pages/ParticipantDashboard";
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/onboarding/:token" component={OnboardingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/dashboard" component={AccountDashboard} />
+      <Route path="/settings/business" component={BusinessSettingsPage} />
+      <Route path="/settings/account" component={AccountSettingsPage} />
       <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/admin/reset" component={AdminPasswordResetPage} />
       <Route path="/admin/invite" component={AdminInvitationPage} />

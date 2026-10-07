@@ -17,9 +17,23 @@ export type BusinessStatus = (typeof BUSINESS_STATUSES)[number];
 
 export const BUSINESS_NAME_MAX_LENGTH = 255;
 
-/** Profile fields completed after signup. Signup itself asks only for the business name. */
-export const BUSINESS_PROFILE_FIELDS = ["description", "sector", "country"] as const;
+/**
+ * Profile completion is derived from what is filled in, never stored. `logoUrl` joins the list once logo upload exists
+ * (storage is still the legacy Manus proxy, so upload is deferred); until then it is not required.
+ */
+export const BUSINESS_PROFILE_COMPLETION_FIELDS = ["name", "description", "yearFounded", "sector", "website"] as const;
+export type BusinessProfileField = (typeof BUSINESS_PROFILE_COMPLETION_FIELDS)[number];
 
-export function isBusinessProfileComplete(business: Partial<Record<(typeof BUSINESS_PROFILE_FIELDS)[number], string | null>>) {
-  return BUSINESS_PROFILE_FIELDS.every(field => Boolean(business[field]?.trim()));
+type ProfileValues = Partial<Record<BusinessProfileField, string | number | null | undefined>>;
+
+const isFilled = (value: string | number | null | undefined) => (typeof value === "number" ? Number.isFinite(value) : Boolean(value?.toString().trim()));
+
+export function businessProfileCompletion(business: ProfileValues) {
+  const missing = BUSINESS_PROFILE_COMPLETION_FIELDS.filter(field => !isFilled(business[field]));
+  const filled = BUSINESS_PROFILE_COMPLETION_FIELDS.length - missing.length;
+  return { percent: Math.round((filled / BUSINESS_PROFILE_COMPLETION_FIELDS.length) * 100), missing, complete: missing.length === 0 };
+}
+
+export function isBusinessProfileComplete(business: ProfileValues) {
+  return businessProfileCompletion(business).complete;
 }

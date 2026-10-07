@@ -72,6 +72,79 @@ Free Business Check (public, creates no account) -> discovery call -> fit -> pay
   future platform-role system. New accounts are always `user`, and an account session never grants admin access
   (`adminProcedure` still requires the legacy session plus the administrator password).
 
+## Phase 2: workspaces, roles and permissions
+
+Four separate things, never mixed:
+
+| Concept | Question | Where |
+|---|---|---|
+| User | Who is this person? | `users`, `user_credentials`, `user_sessions` |
+| Business membership | Which business may they act inside, and as what? | `business_memberships` (`owner`, `business_admin`, `member`), `shared/businessCapabilities.ts` |
+| Platform role | What responsibility do they have inside IPF? | `user_platform_roles` (`super_admin`, `admin`, `desk_lead`, `analyst`, `partner`, `subject_matter_expert`, `finance`) |
+| Permission | What may that responsibility do? | `shared/platformPermissions.ts` (code-defined matrix) |
+
+A business owner is not an IPF administrator, and an IPF administrator is not a member of a client business. Internal staff
+may have platform roles and **no** memberships (no fake "IPF business" is ever created for them).
+
+**The canonical context.** `account.me` / `account.workspace` return one safe object: `user`, `platformRoles`, `permissions`,
+`memberships`, `activeBusiness`, `landingPath`. It never contains hashes, tokens or credential internals. The authenticated UI
+uses only this.
+
+**Active workspace.** Stored server-side on the session (`user_sessions.activeBusinessId`), never in the browser. One
+membership selects itself and shows no switcher; two or more show a switcher and the stored choice (or the first) is active.
+`account.switchWorkspace` verifies the id against an active membership, reuses the same session and is audited. A stored
+choice is re-checked on every request, so ending a membership (or deleting the business) invalidates it immediately. A new
+sign-in restores the last workspace the person still belongs to. Zero memberships is a valid state.
+
+**Business access boundary** (`server/accountAuth.ts`): `requireBusinessMembership`, `requireBusinessCapability`,
+`requireActiveBusiness`, `requirePlatformPermission`, and the procedures `accountProcedure` / `platformPermissionProcedure`.
+A business id sent by a client is never proof of access; a business that does not exist and one the caller cannot see give
+the same `FORBIDDEN` answer. Business roles are checked through capabilities (`canEditBusiness(role)` ...), never by comparing
+role names in routers. Owners and business admins edit the profile; members view. Internal staff have no automatic access to a
+client's business (future, explicit staff permissions will cover that).
+
+**Permission resolution: one rule, one function.** `resolveAuthority` (pure) is called by `loadAuthority` for BOTH channels: the
+legacy administrator channel (OAuth + administrator password, via `adminPermissionProcedure`) and the account channel
+(`platformPermissionProcedure`), so one person always gets one answer. A permission is granted if **any** source grants it:
+
+1. **Super Admin bridge**: the recognised owner email, or a stored `super_admin` role, holds everything.
+2. **Platform roles**: the matrix. `users.role = 'admin'` counts as the `admin` role, which grants nothing by itself.
+3. **Legacy admin profile** (`admin_permission_profiles`): mapped to platform permissions where an equivalent exists
+   (`manage_payments`, `manage_scheduling`, `manage_client_onboarding`), and the platform permission grants the legacy
+   capability back (`manage_communications` grants `view_communications`). Legacy participant capabilities with no equivalent
+   (participant review, documents, portal access) stay governed by the legacy profile and the Super Admin.
+
+There is no "deny", so sources can only add authority and can never contradict each other. A disabled or suspended person has
+none. `admin_permission_profiles`, `admin_access_sessions` and `users.role` are **not** removed.
+
+**Legacy `users.role` migration path.** Today `users.role = 'admin'` still gates entry to the admin area (together with the
+administrator password session). Long term: assign real roles in `user_platform_roles`, move each admin gate onto
+`adminPermissionProcedure` / `platformPermissionProcedure`, stop reading `users.role`, then drop it in a later migration.
+Staff do not yet have a unified email/password sign-in into the admin area: the internal landing (`/admin`) uses the existing
+admin sign-in.
+
+**Super Admin safeguards** (`server/platformAccess.ts`): only a Super Admin grants or revokes `super_admin`; nobody but a Super
+Admin changes their own roles; the last Super Admin (counting the owner bridge) cannot be removed; the owner-email Super Admin
+cannot be revoked through roles or demoted through the legacy `setUserRole`; only an active person can receive a role; a
+business owner never receives any platform role. Role assignment is the `platformRoles` router (`manage_roles`), with no UI yet.
+
+**Settings.** `/settings/business` edits name, description, year founded, sector and website (owners and business admins; members
+see it read-only). Staff band, revenue band, country and state are supported by the API and left out of the form. Completion is
+derived from the filled fields (name, description, year, sector, website), never stored; the logo joins that list when upload
+exists. **Logo upload is deferred**: storage is still the legacy Manus proxy, so `logoUrl` stays null and a placeholder is shown.
+`/settings/account` changes the person's own name and password. Email is the identity key and cannot be changed. Changing the
+password verifies the current one (wrong guesses share the sign-in lockout), rehashes, and signs out every other session.
+
+**Audit** (`admin_access_audit_events`): sign-in, failed sign-in (existing accounts only, so an unknown address cannot flood the
+log), lockout, sign-out, workspace switch, business and account profile updates, password change, platform role grant and
+revoke. Details hold identifiers and field names only, never secrets or values.
+
+**Admin counts** (`onboarding.metrics`): business checks, users, portal users (can sign in with a password), businesses,
+memberships and platform role assignments are separate numbers, never derived from one another.
+
+**Deferred:** team invitations, member management, ownership transfer, second-business creation, engagement assignments, logo
+upload, email change, password-reset email, a role-management UI, and a unified staff sign-in.
+
 ## Legacy authentication that remains (unchanged in Phase 1)
 
 | System | Identity | Used for |

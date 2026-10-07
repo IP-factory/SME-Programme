@@ -1,3 +1,4 @@
+import { isOwnerAdmin } from "../adminSecurity";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -133,6 +134,12 @@ export const registrationRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const target = (await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, Number(input.userId))).limit(1))[0];
+      // The permanent Super Admin cannot be demoted through this legacy switch (including by themselves): the owner
+      // bridge would otherwise be undone by one click, locking everyone out of the admin area.
+      if (target && isOwnerAdmin(target) && input.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "The super administrator keeps permanent access and cannot be demoted." });
+      }
       await db.update(users).set({ role: input.role }).where(eq(users.id, Number(input.userId)));
       return { success: true };
     }),

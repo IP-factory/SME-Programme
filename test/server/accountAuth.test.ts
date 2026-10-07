@@ -34,13 +34,19 @@ describe("assertSameOrigin", () => {
 describe("session view and business membership", () => {
   const session = {
     sessionId: 9,
-    user: { id: 1, fullName: "Ada Example", email: "ada@example.test" },
-    memberships: [{ businessId: 5, businessName: "Example Traders", role: "owner" as const, profileComplete: false }],
-    activeBusiness: { businessId: 5, businessName: "Example Traders", role: "owner" as const, profileComplete: false },
+    authority: { roles: [], permissions: [], legacyCapabilities: [], isSuperAdmin: false },
+    user: { id: 1, fullName: "Ada Example", email: "ada@example.test", status: "active" as const },
+    platformRoles: [],
+    permissions: [],
+    memberships: [{ businessId: 5, businessName: "Example Traders", role: "owner" as const, status: "active" as const, profileComplete: false, profilePercent: 20 }],
+    activeBusiness: { businessId: 5, businessName: "Example Traders", role: "owner" as const, status: "active" as const, profileComplete: false, profilePercent: 20 },
+    landingPath: "/dashboard" as const,
   } satisfies AccountSession;
 
-  it("never exposes the internal session id", () => {
-    expect(toAccountView(session)).not.toHaveProperty("sessionId");
+  it("never exposes the internal session id or the authority internals", () => {
+    const view = toAccountView(session);
+    expect(view).not.toHaveProperty("sessionId");
+    expect(view).not.toHaveProperty("authority");
   });
 
   it("grants only the user's own business and gives one answer for any other id", () => {

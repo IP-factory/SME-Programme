@@ -12,7 +12,8 @@ async function loadEnv(value: string | undefined) {
   return (await import("@server/_core/env")).ENV.ownerAdminEmail;
 }
 
-describe("OWNER_ADMIN_EMAIL", () => {
+// These reload the server modules inside the test, so a cold import can take several seconds when files run in parallel.
+describe("OWNER_ADMIN_EMAIL", { timeout: 30_000 }, () => {
   it("falls back to the default when unset, blank or only spaces", async () => {
     const fallback = await loadEnv(undefined);
     expect(fallback).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
@@ -25,7 +26,7 @@ describe("OWNER_ADMIN_EMAIL", () => {
   });
 });
 
-describe("isOwnerAdmin", () => {
+describe("isOwnerAdmin", { timeout: 30_000 }, () => {
   it("matches the owner email case-insensitively and nobody else", async () => {
     vi.resetModules();
     vi.stubEnv("OWNER_ADMIN_EMAIL", "owner@example.com");

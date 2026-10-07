@@ -1,80 +1,73 @@
+import AccountLayout from "@/components/AccountLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAccount } from "@/hooks/useAccount";
-import { trpc } from "@/lib/trpc";
-import type { BusinessMembershipRole } from "@shared/businessMemberships";
-import React, { useEffect } from "react";
-import { useLocation } from "wouter";
+import { BUSINESS_ROLE_LABELS } from "@shared/businessCapabilities";
+import React from "react";
+import { Link } from "wouter";
 
-const ROLE_LABELS: Record<BusinessMembershipRole, string> = { owner: "Owner", business_admin: "Business admin", member: "Member" };
-
-/** The signed-in home. The server session decides who sees this; the redirect below is only a convenience. */
+/** The signed-in home: the active business for a client, the internal entry point for staff without a business. */
 export default function AccountDashboard() {
-  const [, setLocation] = useLocation();
-  const { account, loading } = useAccount();
-  const utils = trpc.useUtils();
-
-  useEffect(() => {
-    if (!loading && !account) setLocation("/login");
-  }, [loading, account, setLocation]);
-
-  const signOut = trpc.account.signOut.useMutation({
-    onSuccess: () => {
-      utils.account.me.setData(undefined, null);
-      setLocation("/login");
-    },
-  });
-
-  if (loading || !account) {
-    return <main className="flex min-h-screen items-center justify-center bg-paper p-6 text-sm text-ink-muted">Loading…</main>;
-  }
-
-  const firstName = account.user.fullName.split(" ")[0] || account.user.fullName;
-  const business = account.activeBusiness;
-
   return (
-    <main className="min-h-screen bg-paper p-6 text-ink">
-      <div className="mx-auto w-full max-w-2xl space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <h1 className="font-serif text-3xl font-bold tracking-tight">Welcome, {firstName}</h1>
-          <Button variant="outline" disabled={signOut.isPending} onClick={() => signOut.mutate()} className="rounded-none text-xs uppercase tracking-wider">
-            {signOut.isPending ? "Signing out…" : "Sign out"}
-          </Button>
-        </header>
+    <AccountLayout>
+      {account => {
+        const firstName = account.user.fullName.split(" ")[0] || account.user.fullName;
+        const business = account.activeBusiness;
+        const internal = account.platformRoles.length > 0;
+        return (
+          <>
+            <h1 className="font-serif text-3xl font-bold tracking-tight">Welcome, {firstName}</h1>
 
-        <Card className="rounded-none border-line-soft bg-white shadow-sm">
-          <CardHeader className="space-y-1 pb-3">
-            <CardDescription className="text-xs uppercase tracking-widest">Your business</CardDescription>
-            <CardTitle className="font-serif text-2xl font-bold tracking-tight">{business ? business.businessName : "No business yet"}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
             {business ? (
-              <>
-                <p>Business profile: <strong>{business.profileComplete ? "Complete" : "Incomplete"}</strong></p>
-                <p className="text-ink-muted">Your role: {ROLE_LABELS[business.role]}</p>
-                <Button disabled title="Business profile editing arrives in the next update" className="rounded-none text-xs uppercase tracking-wider">
-                  Complete business profile
-                </Button>
-              </>
-            ) : account.memberships.length > 1 ? (
-              <ul className="list-disc pl-5">{account.memberships.map(item => <li key={item.businessId}>{item.businessName}</li>)}</ul>
-            ) : (
-              <p className="text-ink-muted">You are not a member of a business yet.</p>
-            )}
-          </CardContent>
-        </Card>
+              <Card className="rounded-none border-line-soft bg-white shadow-sm">
+                <CardHeader className="space-y-1 pb-3">
+                  <CardDescription className="text-xs uppercase tracking-widest">Your business</CardDescription>
+                  <CardTitle className="font-serif text-2xl font-bold tracking-tight">{business.businessName}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm">
+                  <p>Business profile: <strong>{business.profileComplete ? "Complete" : "Incomplete"}</strong> <span className="text-ink-muted">({business.profilePercent}% complete)</span></p>
+                  <div className="h-2 w-full bg-line-soft" role="progressbar" aria-label="Business profile completion" aria-valuenow={business.profilePercent} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="h-2 bg-brand" style={{ width: `${business.profilePercent}%` }} />
+                  </div>
+                  <p className="text-ink-muted">Your role: {BUSINESS_ROLE_LABELS[business.role]}</p>
+                  {!business.profileComplete && (
+                    <Button asChild className="rounded-none bg-brand text-xs uppercase tracking-wider text-white">
+                      <Link href="/settings/business">Complete profile</Link>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : !internal ? (
+              <Card className="rounded-none border-line-soft bg-white shadow-sm">
+                <CardContent className="p-6 text-sm text-ink-muted">You are not a member of a business yet.</CardContent>
+              </Card>
+            ) : null}
 
-        <Card className="rounded-none border-line-soft bg-white shadow-sm">
-          <CardHeader className="space-y-1 pb-3">
-            <CardDescription className="text-xs uppercase tracking-widest">Your account</CardDescription>
-            <CardTitle className="text-lg font-semibold">{account.user.fullName}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-ink-muted">
-            <p>{account.user.email}</p>
-            <p className="mt-2">Your account is you. Your business is the workspace you act inside.</p>
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+            {internal && (
+              <Card className="rounded-none border-line-soft bg-white shadow-sm">
+                <CardHeader className="space-y-1 pb-3">
+                  <CardDescription className="text-xs uppercase tracking-widest">IPF team</CardDescription>
+                  <CardTitle className="text-lg font-semibold">Internal workspace</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <p className="text-ink-muted">Your responsibilities: {account.platformRoles.map(role => role.replace(/_/g, " ")).join(", ")}.</p>
+                  <Button asChild variant="outline" className="rounded-none text-xs uppercase tracking-wider"><a href="/admin">Open the internal area</a></Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="rounded-none border-line-soft bg-white shadow-sm">
+              <CardHeader className="space-y-1 pb-3">
+                <CardDescription className="text-xs uppercase tracking-widest">Your account</CardDescription>
+                <CardTitle className="text-lg font-semibold">{account.user.fullName}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-ink-muted">
+                <p>{account.user.email}</p>
+                <p className="mt-2">Your account is you. Your business is the workspace you act inside.</p>
+              </CardContent>
+            </Card>
+          </>
+        );
+      }}
+    </AccountLayout>
   );
 }

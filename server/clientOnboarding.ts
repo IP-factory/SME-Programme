@@ -9,6 +9,7 @@ import {
   businesses,
   clientOnboardingInvitations,
   userCredentials,
+  userPlatformRoles,
   users,
   userSessions,
   type ClientOnboardingInvitation,
@@ -21,6 +22,7 @@ import {
   onboardingAcceptInputSchema,
 } from "../shared/auth";
 import { BRAND } from "../shared/brand";
+import { businessProfileCompletion } from "../shared/businessMemberships";
 import { z } from "zod";
 import {
   assertSameOrigin,
@@ -37,6 +39,7 @@ import { getDb } from "./db";
 import { databaseNow, emailEquals } from "./dbHelpers";
 import { deliverEmail } from "./email";
 import { hashAdminPassword, sha256 } from "./adminSecurity";
+import { NO_AUTHORITY } from "./platformAccess";
 import { getTrustedApplicationOrigin } from "./security";
 
 const emailSchema = z.string().trim().email().max(320);
@@ -214,9 +217,12 @@ export async function acceptOnboardingInvitation(req: Request, res: Response, ra
   }
 
   setSessionCookie(req, res, created.session.token);
+  // A new client has no platform role: platform roles are never granted by onboarding.
   return buildView(
     { id: created.userId, name: input.fullName, email: created.email },
-    [{ businessId: created.business.id, businessName: created.business.name, role: "owner", profileComplete: false }],
+    NO_AUTHORITY,
+    [{ businessId: created.business.id, businessName: created.business.name, role: "owner", status: "active", profileComplete: false, profilePercent: businessProfileCompletion({ name: created.business.name }).percent }],
+    created.business.id,
   );
 }
 
@@ -258,9 +264,12 @@ export async function onboardingMetrics() {
   const one = async (query: PromiseLike<Array<{ n: number | string }>>) => Number((await query)[0]?.n ?? 0);
   return {
     businessChecks: await one(db.select({ n: count() }).from(businessChecks)),
+    /** Every identity (clients, staff and legacy sign-ins); portalUsers is the subset who can sign in with a password. */
+    users: await one(db.select({ n: count() }).from(users)),
     portalUsers: await one(db.select({ n: count() }).from(userCredentials)),
     businesses: await one(db.select({ n: count() }).from(businesses)),
     memberships: await one(db.select({ n: count() }).from(businessMemberships)),
+    platformRoleAssignments: await one(db.select({ n: count() }).from(userPlatformRoles)),
     pendingInvitations: await one(db.select({ n: count() }).from(clientOnboardingInvitations).where(and(eq(clientOnboardingInvitations.status, "pending"), gt(clientOnboardingInvitations.expiresAt, new Date())))),
     activeSessions: await one(db.select({ n: count() }).from(userSessions).where(and(isNull(userSessions.revokedAt), gt(userSessions.expiresAt, new Date())))),
   };

@@ -1,0 +1,128 @@
+import { ADMIN_PERMISSION_IDS, type AdminPermission } from "./adminPermissions";
+import { PLATFORM_ROLES, type PlatformRole } from "./auth";
+
+/**
+ * Platform authority: what a person may do INSIDE IPF. It answers "what responsibility does this person have?" and
+ * is separate from business membership ("which business may they act inside?"). One source of truth, code-defined:
+ * roles are assigned in the database (`user_platform_roles`); what each role grants is decided here.
+ *
+ * Resolution rule (the only one; there is no "deny"): a permission is granted if ANY source grants it. Sources are
+ *   1. the Super Admin bridge   - the recognised owner email, or a stored `super_admin` role: everything
+ *   2. platform roles           - the matrix below (the legacy `users.role = 'admin'` counts as the `admin` role)
+ *   3. the legacy admin profile - `admin_permission_profiles`, mapped to platform permissions below
+ * so the legacy and the new systems can never contradict each other: adding a source can only add authority.
+ */
+
+export const PLATFORM_PERMISSIONS = [
+  "view_all_businesses",
+  "view_assigned_businesses",
+  "manage_businesses",
+  "manage_client_onboarding",
+  "manage_engagements",
+  "assign_engagements",
+  "review_engagements",
+  "manage_payments",
+  "view_financials",
+  "manage_scheduling",
+  "manage_communications",
+  "manage_users",
+  "manage_roles",
+  "manage_admins",
+  "manage_platform_settings",
+] as const;
+export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[number];
+
+export function isPlatformRole(value: string): value is PlatformRole {
+  return (PLATFORM_ROLES as readonly string[]).includes(value);
+}
+export function isPlatformPermission(value: string): value is PlatformPermission {
+  return (PLATFORM_PERMISSIONS as readonly string[]).includes(value);
+}
+
+/**
+ * What each role grants by default. `admin` deliberately grants nothing on its own: an administrator is capability
+ * based and receives responsibilities one at a time (through the admin permission profile). Being an admin is not
+ * unrestricted access. Scope ("assigned" businesses) is enforced later through engagement assignments.
+ */
+export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, readonly PlatformPermission[]> = {
+  super_admin: PLATFORM_PERMISSIONS,
+  admin: [],
+  desk_lead: ["view_all_businesses", "manage_engagements", "assign_engagements", "review_engagements", "manage_scheduling", "manage_communications"],
+  analyst: ["view_assigned_businesses", "manage_engagements"],
+  partner: ["view_assigned_businesses", "review_engagements"],
+  subject_matter_expert: ["view_assigned_businesses"],
+  finance: ["manage_payments", "view_financials"],
+};
+
+/**
+ * Compatibility with the existing administrator capabilities (`admin_permission_profiles`). A legacy capability that
+ * has a platform equivalent grants it, and the platform permission grants the legacy capability back, so the same
+ * responsibility gives the same answer whichever system is asked. Legacy capabilities with no equivalent
+ * (participant review, documents, portal access, ...) stay governed by the legacy profile and the Super Admin only.
+ */
+export const LEGACY_CAPABILITY_TO_PLATFORM: Partial<Record<AdminPermission, PlatformPermission>> = {
+  manage_payments: "manage_payments",
+  manage_scheduling: "manage_scheduling",
+  manage_client_onboarding: "manage_client_onboarding",
+};
+export const PLATFORM_TO_LEGACY_CAPABILITIES: Partial<Record<PlatformPermission, readonly AdminPermission[]>> = {
+  manage_payments: ["manage_payments"],
+  manage_scheduling: ["manage_scheduling"],
+  manage_client_onboarding: ["manage_client_onboarding"],
+  manage_communications: ["view_communications"],
+};
+
+export type Authority = {
+  /** Stored roles plus the roles implied by the legacy admin flag and the Super Admin bridge. */
+  roles: PlatformRole[];
+  permissions: PlatformPermission[];
+  /** Legacy administrator capability ids this person holds. */
+  legacyCapabilities: AdminPermission[];
+  isSuperAdmin: boolean;
+};
+
+/** Pure resolution. Inputs come from the database; no I/O here, so it can be tested exhaustively. */
+export function resolveAuthority(input: {
+  storedRoles: readonly PlatformRole[];
+  /** `users.role === "admin"`: the legacy flag counts as the `admin` role. */
+  legacyAdmin: boolean;
+  /** The recognised owner email (the Super Admin bridge). */
+  ownerBridge: boolean;
+  /** Capabilities from `admin_permission_profiles`. */
+  legacyProfile: readonly AdminPermission[];
+  /** A disabled or suspended person has no authority at all. */
+  active: boolean;
+}): Authority {
+  if (!input.active) return { roles: [], permissions: [], legacyCapabilities: [], isSuperAdmin: false };
+
+  const roles = new Set<PlatformRole>(input.storedRoles);
+  if (input.legacyAdmin) roles.add("admin");
+  if (input.ownerBridge) roles.add("super_admin");
+  const isSuperAdmin = roles.has("super_admin");
+
+  const permissions = new Set<PlatformPermission>();
+  for (const role of Array.from(roles)) for (const permission of PLATFORM_ROLE_PERMISSIONS[role]) permissions.add(permission);
+  for (const capability of input.legacyProfile) {
+    const equivalent = LEGACY_CAPABILITY_TO_PLATFORM[capability];
+    if (equivalent) permissions.add(equivalent);
+  }
+
+  const legacy = new Set<AdminPermission>(isSuperAdmin ? ADMIN_PERMISSION_IDS : input.legacyProfile);
+  for (const permission of Array.from(permissions)) for (const capability of PLATFORM_TO_LEGACY_CAPABILITIES[permission] ?? []) legacy.add(capability);
+
+  const order = (list: readonly string[]) => (item: string) => list.indexOf(item);
+  return {
+    roles: Array.from(roles).sort((a, b) => order(PLATFORM_ROLES)(a) - order(PLATFORM_ROLES)(b)),
+    permissions: Array.from(permissions).sort((a, b) => order(PLATFORM_PERMISSIONS)(a) - order(PLATFORM_PERMISSIONS)(b)),
+    legacyCapabilities: Array.from(legacy).sort((a, b) => order(ADMIN_PERMISSION_IDS)(a) - order(ADMIN_PERMISSION_IDS)(b)),
+    isSuperAdmin,
+  };
+}
+
+/** A gate may name either a platform permission or a legacy administrator capability. */
+export type AnyAuthorityPermission = PlatformPermission | AdminPermission;
+
+export function authorityAllows(authority: Authority, permission: AnyAuthorityPermission): boolean {
+  if (authority.isSuperAdmin) return true;
+  return (authority.permissions as readonly string[]).includes(permission) || (authority.legacyCapabilities as readonly string[]).includes(permission);
+}

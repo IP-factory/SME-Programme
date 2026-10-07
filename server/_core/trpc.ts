@@ -4,12 +4,11 @@ import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { getAuthenticatedParticipant } from "../participantAuth";
 import { resolveAccountSession } from "../accountAuth";
+import { loadAuthority } from "../platformAccess";
+import { authorityAllows, type AnyAuthorityPermission, type PlatformPermission } from "../../shared/platformPermissions";
 import { ACCOUNT_AUTH_ERRORS } from "../../shared/auth";
 import { hasVerifiedAdminAccess, isOwnerAdmin } from "../adminSecurity";
 import { getDb } from "../db";
-import { adminPermissionProfiles } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
-import { type AdminPermission, parseAdminPermissions } from "../../shared/adminPermissions";
 import { BRAND } from "../../shared/brand";
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -92,25 +91,35 @@ export const ownerAdminProcedure = adminProcedure.use(
 );
 
 /**
- * A capability-scoped administrative procedure. Emmanuel’s recognised Super Admin
- * identity retains full control; every other administrator must have the selected
- * capability persisted in their permission profile.
+ * A capability-scoped administrative procedure. The decision comes from the central authority resolver
+ * (shared/platformPermissions.ts): the Super Admin has everything, otherwise a responsibility is granted if the
+ * person's platform roles or their legacy administrator profile grant it. It accepts a legacy capability id or a
+ * platform permission, and the answer is the same whichever system names it.
  */
-export function adminPermissionProcedure(permission: AdminPermission) {
+export function adminPermissionProcedure(permission: AnyAuthorityPermission) {
   return adminProcedure.use(
     t.middleware(async ({ ctx, next }) => {
       if (!ctx.user) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-      if (isOwnerAdmin(ctx.user)) return next({ ctx: { ...ctx, user: ctx.user } });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      const profile = (await db.select({ permissionsJson: adminPermissionProfiles.permissionsJson })
-        .from(adminPermissionProfiles)
-        .where(eq(adminPermissionProfiles.userId, ctx.user.id))
-        .limit(1))[0];
-      if (!parseAdminPermissions(profile?.permissionsJson).includes(permission)) {
+      const authority = await loadAuthority(db, ctx.user);
+      if (!authorityAllows(authority, permission)) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Your ${BRAND.programmeShortName} administrator role does not include this responsibility.` });
       }
-      return next({ ctx: { ...ctx, user: ctx.user } });
+      return next({ ctx: { ...ctx, user: ctx.user, authority } });
     }),
   );
+}
+
+/**
+ * A procedure for an account-session user who holds a platform permission (an internal IPF person signed in with
+ * email and password). Business membership is irrelevant here: platform authority and business access are separate.
+ */
+export function platformPermissionProcedure(permission: PlatformPermission) {
+  return accountProcedure.use(async ({ ctx, next }) => {
+    if (!ctx.account.permissions.includes(permission)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Your role does not include this responsibility." });
+    }
+    return next({ ctx });
+  });
 }
