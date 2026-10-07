@@ -144,6 +144,34 @@ memberships and platform role assignments are separate numbers, never derived fr
 **Deferred:** team invitations, member management, ownership transfer, second-business creation, engagement assignments, logo
 upload, email change, password-reset email, and a role-management UI.
 
+## The admin console (IPF Business Support)
+
+`/admin` opens on the Business Support funnel, in order: **Business Checks**, **Discovery Calls**, **Client Onboarding**,
+**Clients**, **Admin Team**, and the earlier **JUMP programme (legacy)** desk in its own section (unchanged, not mixed with
+prospects). A person sees only the sections their permissions allow, taken from what the server resolved (`adminAccess.status`
+returns `isSuperAdmin`, the legacy capabilities and the platform permissions); there is no owner email or role name in the
+browser, and the server still decides every action.
+
+| Section | Needs |
+|---|---|
+| Business Checks, Discovery Calls, Client Onboarding | `manage_client_onboarding` |
+| Clients | `view_all_businesses` |
+| Admin Team | Super Admin |
+| JUMP programme (legacy) | `view_participants` |
+
+The funnel: Free Business Check (a prospect: no user, no business) -> the owner **requests** a free discovery call
+(`callRequestedAt`, stage `call_booked`; there is no booking provider yet, so nothing is booked) -> the team agrees a time by
+WhatsApp or email and records it (`callScheduledFor`) -> records the outcome using the existing pipeline stages: **fit** =
+`opportunity`, **refer** = `referred`, **decline** = `lost` -> an authorised administrator generates an onboarding link after
+confirming the client is approved (payment is not automated yet, and the screen says so) -> the client accepts it and only then
+do a user and a business exist.
+
+**Super Admin is a stored fact.** Super Admin = the recognised owner email OR a stored `super_admin` role, decided by the central
+resolver for both the UI and the owner-only procedures. Relying on the email alone made the console depend on
+`OWNER_ADMIN_EMAIL` matching exactly at runtime: if the deployed value differs from the owner's address, the owner is only an
+admin with no permissions, and "Client Onboarding" is hidden. `pnpm owner:bootstrap` stores the role (and, when a password
+already exists, does only that, with no prompt).
+
 ## Staff sign-in (`/admin/login`)
 
 Internal staff and administrators use the SAME email-and-password identity as everyone else; there is no third identity or

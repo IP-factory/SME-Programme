@@ -709,7 +709,7 @@ function Result({ response, contact, businessName, onRestart }: { response: Busi
       <motion.div variants={itemMotion}>
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink">Your business check{businessName ? ` · ${businessName}` : ""}</p>
         <h1 className="font-serif text-4xl font-black leading-tight sm:text-5xl">Here is what we see.</h1>
-        <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted"><Mail className="h-4 w-4" />A copy is on its way to {contact.email}.</p>
+        <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted"><Mail className="h-4 w-4" />{response.emailStatus === "Sent" ? `A copy has been sent to ${contact.email}.` : "Your result has been saved. Email delivery is not active yet."}</p>
       </motion.div>
 
       {result.outline.length > 1 && (
@@ -810,12 +810,12 @@ function Result({ response, contact, businessName, onRestart }: { response: Busi
             {requested.call ? (
               <motion.p key="booked" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="mt-6 flex items-start gap-3 border border-highlight/40 p-4 text-sm leading-relaxed">
                 <motion.span initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-highlight" /></motion.span>
-                {response.discoveryCallUrl ? "Pick a time on the booking page that opened. If it didn't open, we'll contact you to agree a time." : `Thank you. We'll contact you by ${contact.whatsapp ? "WhatsApp or " : ""}email within one working day to agree a time.`}
+                {response.discoveryCallUrl ? "Pick a time on the booking page that opened. If it didn't open, we'll contact you to agree a time." : `Thank you. Your request has been sent to the IPF team. We will contact you by ${contact.whatsapp ? "WhatsApp or " : ""}email to agree a time.`}
               </motion.p>
             ) : (
               <motion.div key="book" exit={{ opacity: 0, scale: 0.96 }}>
                 <motion.button type="button" onClick={bookCall} disabled={requestNext.isPending} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} className="group mt-6 inline-flex h-14 w-full items-center justify-center bg-highlight px-8 text-sm font-semibold uppercase tracking-widest text-brand-deep shadow-[0_18px_40px_-18px_rgba(54,183,224,0.9)] transition-colors hover:bg-highlight-hover disabled:opacity-60 sm:w-auto">
-                  <PhoneCall className="mr-2 h-4 w-4 transition-transform group-hover:-rotate-12" /> Book my free call
+                  <PhoneCall className="mr-2 h-4 w-4 transition-transform group-hover:-rotate-12" /> {response.discoveryCallUrl ? "Book my free call" : "Request my free 20-minute call"}
                 </motion.button>
               </motion.div>
             )}

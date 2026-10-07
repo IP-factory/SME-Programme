@@ -1,12 +1,12 @@
 import { randomUUID } from "crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import { userCredentials, users, userSessions } from "../drizzle/schema";
+import { userCredentials, userPlatformRoles, users, userSessions } from "../drizzle/schema";
 import { hashAdminPassword, normalizeAdminEmail, OWNER_ADMIN_EMAIL, validateAdminPassword } from "./adminSecurity";
 import type { Database } from "./accountAuth";
 import { recordAudit } from "./audit";
 import { databaseNow, emailEquals } from "./dbHelpers";
 
-export type OwnerBootstrapResult = { action: "created-account" | "set-password" | "reset-password"; userId: number };
+export type OwnerBootstrapResult = { action: "created-account" | "set-password" | "reset-password" | "ensured-role"; userId: number };
 
 /**
  * Gives the recognised owner (OWNER_ADMIN_EMAIL) a universal email-and-password credential, so the Super Admin can sign
@@ -59,8 +59,29 @@ export async function bootstrapOwnerCredential(
     } else {
       await tx.insert(userCredentials).values({ userId: user.id, passwordHash });
     }
+    await tx.insert(userPlatformRoles).values({ userId: user.id, role: "super_admin", grantedByUserId: user.id }).onConflictDoNothing();
     const action = existing ? "reset-password" : created ? "created-account" : "set-password";
     await recordAudit(tx, { action: existing ? "owner_credential_reset" : "owner_credential_bootstrapped", actorUserId: user.id, targetEmail: email, details: { action } });
     return { action, userId: user.id };
+  });
+}
+
+/**
+ * Stores the `super_admin` platform role for the recognised owner without touching the password. Safe to repeat. The
+ * role makes Super Admin status a stored fact, so it no longer depends on OWNER_ADMIN_EMAIL matching at runtime.
+ * Refuses when the owner has no sign-in yet (use the bootstrap) or is not active.
+ */
+export async function ensureOwnerSuperAdminRole(db: Database, input: { email: string }): Promise<OwnerBootstrapResult> {
+  const email = normalizeAdminEmail(input.email);
+  if (!email || email !== normalizeAdminEmail(OWNER_ADMIN_EMAIL)) {
+    throw new Error("Only the recognised owner address (OWNER_ADMIN_EMAIL) can be updated.");
+  }
+  return db.transaction(async tx => {
+    const user = (await tx.select().from(users).where(emailEquals(users.email, email)).limit(1))[0];
+    if (!user) throw new Error("The owner account does not exist yet. Run the bootstrap to create it.");
+    if (user.status !== "active") throw new Error("The owner account is not active. Reactivate it deliberately first.");
+    const stored = await tx.insert(userPlatformRoles).values({ userId: user.id, role: "super_admin", grantedByUserId: user.id }).onConflictDoNothing().returning({ id: userPlatformRoles.id });
+    if (stored.length > 0) await recordAudit(tx, { action: "platform_role_granted", actorUserId: user.id, targetEmail: email, details: { targetUserId: user.id, role: "super_admin", via: "owner-bootstrap" } });
+    return { action: "ensured-role" as const, userId: user.id };
   });
 }

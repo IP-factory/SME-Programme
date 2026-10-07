@@ -173,7 +173,7 @@ describe("business check page", { timeout: 20_000 }, () => {
   it("shows the summary, the outline and the free call as the next step", async () => {
     const answers = { p_stage: "operating", p_name: "Ada Foods", p_type: "maker", p_age: "2to5", p_staff: "6to10", p_revenue: "3to5m", f_instinct: "S", f_seen: "S", f_team: "solo", f_tough: "nobody", f_hours: "lt2", s7_status: "tight_guess" };
     const result = evaluate(answers);
-    const response = { token: TOKEN, result, summary: { found: "Found text for the test.", think: "Think text for the test.", next: "Book the free call.", offerings: [{ id: "financial-performance", name: "Financial Performance & Decision Support", why: "Your prices are guesses." }] }, summarySource: "AI", discoveryCallUrl: "" };
+    const response = { token: TOKEN, result, summary: { found: "Found text for the test.", think: "Think text for the test.", next: "Book the free call.", offerings: [{ id: "financial-performance", name: "Financial Performance & Decision Support", why: "Your prices are guesses." }] }, summarySource: "AI", discoveryCallUrl: "", emailStatus: "Sent" };
     preload({ token: TOKEN, answers, response });
     render(React.createElement(BusinessCheck));
     expect(screen.getByText("What we found")).toBeTruthy();
@@ -183,7 +183,38 @@ describe("business check page", { timeout: 20_000 }, () => {
     expect(screen.getByText(/Nobody in the business reliably makes the hard call/)).toBeTruthy();
     expect(screen.getByText("Finance & Capital")).toBeTruthy();
     expect(screen.getByText(/₦100,000/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /book my free call/i }));
+    // With no booking page, the button says what it does: it requests a call, it does not book one.
+    expect(screen.queryByRole("button", { name: /book my free call/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /request my free 20-minute call/i }));
     expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "call" }]);
+  });
+
+  describe("result page, honest about email and about the call", () => {
+    const answers = { p_stage: "operating", p_name: "Ada Foods", p_type: "maker", p_age: "2to5", p_staff: "6to10", p_revenue: "3to5m", f_instinct: "S", f_seen: "S", f_team: "solo", f_tough: "nobody", f_hours: "lt2", s7_status: "tight_guess" };
+    const responseWith = (extra: Record<string, unknown>) => ({ token: TOKEN, result: evaluate(answers), summary: { found: "Found.", think: "Think.", next: "Next.", offerings: [] }, summarySource: "Rules", discoveryCallUrl: "", ...extra });
+
+    it("says a copy was sent only when the email was actually sent", () => {
+      preload({ token: TOKEN, answers, response: responseWith({ emailStatus: "Sent" }) });
+      render(React.createElement(BusinessCheck));
+      expect(screen.getByText(/A copy has been sent to/)).toBeTruthy();
+      expect(screen.queryByText(/Email delivery is not active yet/)).toBeNull();
+    });
+
+    it.each([["Simulated"], ["Failed"], [undefined]])("does not claim an email was sent when delivery was %s", status => {
+      preload({ token: TOKEN, answers, response: responseWith({ emailStatus: status }) });
+      render(React.createElement(BusinessCheck));
+      expect(screen.getByText("Your result has been saved. Email delivery is not active yet.")).toBeTruthy();
+      expect(screen.queryByText(/on its way/)).toBeNull();
+      expect(screen.queryByText(/A copy has been sent/)).toBeNull();
+    });
+
+    it("confirms the request without claiming a time has been booked", async () => {
+      preload({ token: TOKEN, answers, response: responseWith({ emailStatus: "Simulated" }) });
+      api.replies.requestNext = () => ({ success: true, choice: "call" });
+      render(React.createElement(BusinessCheck));
+      fireEvent.click(screen.getByRole("button", { name: /request my free 20-minute call/i }));
+      expect(await screen.findByText(/Thank you\. Your request has been sent to the IPF team\. We will contact you by (WhatsApp or )?email to agree a time\./)).toBeTruthy();
+      expect(document.body.textContent).not.toMatch(/within one working day|your slot|is booked|has been booked/i);
+    });
   });
 });

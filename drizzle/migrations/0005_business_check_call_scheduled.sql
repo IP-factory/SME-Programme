@@ -1,0 +1,1 @@
+ALTER TABLE "business_checks" ADD COLUMN "callScheduledFor" timestamp with time zone;

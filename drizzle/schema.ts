@@ -653,6 +653,8 @@ export const businessChecks = pgTable("business_checks", {
   summarySource: businessChecksSummarySourceEnum("summarySource"),
   notificationStatus: businessChecksNotificationStatusEnum("notificationStatus").default("Simulated").notNull(),
   callRequestedAt: timestamp("callRequestedAt", { withTimezone: true }),
+  /** When the team and the owner agreed the discovery call for (set by an administrator; callRequestedAt is the owner's request). */
+  callScheduledFor: timestamp("callScheduledFor", { withTimezone: true }),
   reportRequestedAt: timestamp("reportRequestedAt", { withTimezone: true }),
   completedAt: timestamp("completedAt", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),

@@ -178,7 +178,7 @@ var init_ics = __esm({
 // server/_core/app.ts
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { TRPCError as TRPCError15 } from "@trpc/server";
+import { TRPCError as TRPCError16 } from "@trpc/server";
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
@@ -678,6 +678,8 @@ var businessChecks = pgTable("business_checks", {
   summarySource: businessChecksSummarySourceEnum("summarySource"),
   notificationStatus: businessChecksNotificationStatusEnum("notificationStatus").default("Simulated").notNull(),
   callRequestedAt: timestamp("callRequestedAt", { withTimezone: true }),
+  /** When the team and the owner agreed the discovery call for (set by an administrator; callRequestedAt is the owner's request). */
+  callScheduledFor: timestamp("callScheduledFor", { withTimezone: true }),
   reportRequestedAt: timestamp("reportRequestedAt", { withTimezone: true }),
   completedAt: timestamp("completedAt", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
@@ -2933,7 +2935,9 @@ var adminProcedure = t.procedure.use(
 );
 var ownerAdminProcedure = adminProcedure.use(
   t.middleware(async ({ ctx, next }) => {
-    if (!ctx.user || !isOwnerAdmin(ctx.user)) {
+    const db = await getDb();
+    if (!db) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!ctx.user || !(await loadAuthority(db, ctx.user)).isSuperAdmin) {
       throw new TRPCError5({ code: "FORBIDDEN", message: `This action is reserved for the ${BRAND.programmeShortName} super administrator.` });
     }
     return next({ ctx: { ...ctx, user: ctx.user } });
@@ -5451,14 +5455,17 @@ var adminAccessRouter = router({
     return {
       email: ctx.user.email,
       isAdmin: ctx.user.role === "admin" || internal,
-      isOwner: isOwnerAdmin(ctx.user),
+      // Super Admin by the central resolver (owner email OR stored super_admin role), not by the email alone.
+      isOwner: authority.isSuperAdmin,
+      isSuperAdmin: authority.isSuperAdmin,
       hasPassword: credentials.length > 0,
       passwordVerified,
       signedInVia: ctx.authChannel ?? "legacy",
       platformRoles: authority.roles,
       // Resolved by the central authority resolver: the Super Admin has everything, everyone else what their roles and
       // legacy administrator profile grant.
-      permissions: authority.legacyCapabilities
+      permissions: authority.legacyCapabilities,
+      platformPermissions: authority.permissions
     };
   }),
   enrollOwnerPassword: protectedProcedure.input(z8.object({ password: passwordSchema, confirmPassword: passwordSchema })).mutation(async ({ ctx, input }) => {
@@ -7793,7 +7800,7 @@ var businessCheckRouter = router({
     const db = await database("record your business check");
     const check = await findCheck(db, input.token);
     if (check.completedAt && check.resultJson && check.summaryJson && check.summarySource) {
-      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: BRAND.discoveryCallUrl };
+      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: check.notificationStatus };
     }
     const answers = cleanAnswers(input.answers);
     if (!isComplete(answers)) {
@@ -7804,9 +7811,10 @@ var businessCheckRouter = router({
     const { summary, source } = await summariseCheck({ answers, result, contact });
     const office = officeEmail({ contact, answers, summary, source, result });
     const owner = ownerEmail({ contact, summary, result });
-    const [officeDelivery] = await Promise.all([
-      deliverEmail({ to: JUMP_ADMINISTRATION_MAILBOX, subject: office.subject, body: office.body }),
-      deliverEmail({ to: check.email, subject: owner.subject, body: owner.body })
+    const failed = { status: "Failed" };
+    const [officeDelivery, ownerDelivery] = await Promise.all([
+      deliverEmail({ to: JUMP_ADMINISTRATION_MAILBOX, subject: office.subject, body: office.body }).catch(() => failed),
+      deliverEmail({ to: check.email, subject: owner.subject, body: owner.body }).catch(() => failed)
     ]);
     await db.update(businessChecks).set({
       ...answerColumns(answers),
@@ -7820,7 +7828,7 @@ var businessCheckRouter = router({
       notificationStatus: officeDelivery.status === "Failed" ? "Failed" : officeDelivery.status === "Simulated" ? "Simulated" : "Sent",
       completedAt: databaseNow()
     }).where(eq14(businessChecks.id, check.id));
-    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl };
+    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: ownerDelivery.status === "Sent" ? "Sent" : ownerDelivery.status === "Failed" ? "Failed" : "Simulated" };
   }),
   /** The owner asks for the free call or the full report from the result screen. */
   requestNext: publicProcedure.input(z14.object({ token: tokenInput, choice: z14.enum(["call", "report"]), note: z14.string().trim().max(500).optional() })).mutation(async ({ input }) => {
@@ -8032,16 +8040,29 @@ async function acceptOnboardingInvitation(req, res, rawInput) {
 }
 async function listOnboardingCandidates() {
   const db = await requireDatabase();
-  return db.select({
-    id: businessChecks.id,
-    fullName: businessChecks.fullName,
-    email: businessChecks.email,
-    businessName: businessChecks.businessName,
-    pipelineStage: businessChecks.pipelineStage,
-    callRequestedAt: businessChecks.callRequestedAt,
-    completedAt: businessChecks.completedAt,
-    createdAt: businessChecks.createdAt
-  }).from(businessChecks).orderBy(desc8(businessChecks.createdAt)).limit(200);
+  const [checks, invitations] = await Promise.all([
+    db.select({
+      id: businessChecks.id,
+      fullName: businessChecks.fullName,
+      email: businessChecks.email,
+      businessName: businessChecks.businessName,
+      whatsapp: businessChecks.whatsapp,
+      pipelineStage: businessChecks.pipelineStage,
+      callRequestedAt: businessChecks.callRequestedAt,
+      callScheduledFor: businessChecks.callScheduledFor,
+      completedAt: businessChecks.completedAt,
+      createdAt: businessChecks.createdAt
+    }).from(businessChecks).orderBy(desc8(businessChecks.createdAt)).limit(200),
+    db.select({
+      businessCheckId: clientOnboardingInvitations.businessCheckId,
+      status: clientOnboardingInvitations.status,
+      expiresAt: clientOnboardingInvitations.expiresAt,
+      createdAt: clientOnboardingInvitations.createdAt
+    }).from(clientOnboardingInvitations).orderBy(desc8(clientOnboardingInvitations.id))
+  ]);
+  const latest = /* @__PURE__ */ new Map();
+  for (const invitation of invitations) if (!latest.has(invitation.businessCheckId)) latest.set(invitation.businessCheckId, effectiveInvitationStatus(invitation));
+  return checks.map((check) => ({ ...check, invitationStatus: latest.get(check.id) ?? null }));
 }
 async function listOnboardingInvitations() {
   const db = await requireDatabase();
@@ -8105,6 +8126,96 @@ var platformRolesRouter = router({
   revoke: manageRoles.input(roleInput).mutation(async ({ ctx, input }) => revokePlatformRole(await database2(), { actor: { ...ctx.user, authority: ctx.authority }, targetUserId: input.userId, role: input.role }))
 });
 
+// server/routers/businessSupport.ts
+import { z as z19 } from "zod";
+
+// server/businessSupportAdmin.ts
+import { desc as desc9, eq as eq16, isNotNull as isNotNull2 } from "drizzle-orm";
+import { TRPCError as TRPCError15 } from "@trpc/server";
+async function requireDatabase2() {
+  const db = await getDb();
+  if (!db) throw new TRPCError15({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  return db;
+}
+var CHECK_COLUMNS = {
+  id: businessChecks.id,
+  fullName: businessChecks.fullName,
+  businessName: businessChecks.businessName,
+  email: businessChecks.email,
+  whatsapp: businessChecks.whatsapp,
+  stage: businessChecks.stage,
+  route: businessChecks.route,
+  readiness: businessChecks.readiness,
+  primaryArea: businessChecks.primaryArea,
+  pipelineStage: businessChecks.pipelineStage,
+  callRequestedAt: businessChecks.callRequestedAt,
+  callScheduledFor: businessChecks.callScheduledFor,
+  reportRequestedAt: businessChecks.reportRequestedAt,
+  completedAt: businessChecks.completedAt,
+  createdAt: businessChecks.createdAt
+};
+async function listBusinessChecks(db) {
+  return db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc9(businessChecks.createdAt)).limit(500);
+}
+async function listDiscoveryCalls(db) {
+  return db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull2(businessChecks.callRequestedAt)).orderBy(desc9(businessChecks.callRequestedAt)).limit(500);
+}
+async function requestedCheck(db, businessCheckId) {
+  const check = (await db.select({ id: businessChecks.id, email: businessChecks.email, pipelineStage: businessChecks.pipelineStage, callRequestedAt: businessChecks.callRequestedAt }).from(businessChecks).where(eq16(businessChecks.id, businessCheckId)).limit(1))[0];
+  if (!check) throw new TRPCError15({ code: "NOT_FOUND", message: "That business check does not exist." });
+  if (!check.callRequestedAt) throw new TRPCError15({ code: "BAD_REQUEST", message: "This business check has not asked for a discovery call." });
+  if (check.pipelineStage === "won") throw new TRPCError15({ code: "CONFLICT", message: "This business has already been won, so its call outcome can no longer be changed here." });
+  return check;
+}
+async function scheduleDiscoveryCall(db, input) {
+  const check = await requestedCheck(db, input.businessCheckId);
+  await db.transaction(async (tx) => {
+    await tx.update(businessChecks).set({ callScheduledFor: input.scheduledFor, pipelineStage: advancePipeline(check.pipelineStage, "call_booked") }).where(eq16(businessChecks.id, check.id));
+    await recordAudit(tx, { action: "business_check_call_scheduled", actorUserId: input.actorUserId, targetEmail: check.email, details: { businessCheckId: check.id, scheduledFor: input.scheduledFor.toISOString() } });
+  });
+  return { success: true };
+}
+var CALL_OUTCOMES = ["fit", "refer", "decline"];
+var OUTCOME_STAGE = { fit: "opportunity", refer: "referred", decline: "lost" };
+async function recordDiscoveryCallOutcome(db, input) {
+  const check = await requestedCheck(db, input.businessCheckId);
+  const stage = OUTCOME_STAGE[input.outcome];
+  await db.transaction(async (tx) => {
+    await tx.update(businessChecks).set({ pipelineStage: stage }).where(eq16(businessChecks.id, check.id));
+    await recordAudit(tx, { action: "business_check_call_outcome", actorUserId: input.actorUserId, targetEmail: check.email, details: { businessCheckId: check.id, outcome: input.outcome, from: check.pipelineStage, to: stage } });
+  });
+  return { success: true, pipelineStage: stage };
+}
+async function listClients(db) {
+  return db.select({
+    membershipId: businessMemberships.id,
+    businessId: businesses.id,
+    businessName: businesses.name,
+    businessStatus: businesses.status,
+    userId: users.id,
+    userName: users.name,
+    email: users.email,
+    role: businessMemberships.role,
+    membershipStatus: businessMemberships.status,
+    joinedAt: businessMemberships.createdAt,
+    businessCreatedAt: businesses.createdAt
+  }).from(businessMemberships).innerJoin(businesses, eq16(businessMemberships.businessId, businesses.id)).innerJoin(users, eq16(businessMemberships.userId, users.id)).orderBy(desc9(businesses.createdAt), businessMemberships.id).limit(500);
+}
+async function businessSupportDb() {
+  return requireDatabase2();
+}
+
+// server/routers/businessSupport.ts
+var prospects = adminPermissionProcedure("manage_client_onboarding");
+var clients = adminPermissionProcedure("view_all_businesses");
+var businessSupportRouter = router({
+  checks: prospects.query(async () => listBusinessChecks(await businessSupportDb())),
+  discoveryCalls: prospects.query(async () => listDiscoveryCalls(await businessSupportDb())),
+  scheduleCall: prospects.input(z19.object({ businessCheckId: z19.number().int().positive(), scheduledFor: z19.coerce.date() })).mutation(async ({ ctx, input }) => scheduleDiscoveryCall(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
+  recordOutcome: prospects.input(z19.object({ businessCheckId: z19.number().int().positive(), outcome: z19.enum(CALL_OUTCOMES) })).mutation(async ({ ctx, input }) => recordDiscoveryCallOutcome(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
+  clients: clients.query(async () => listClients(await businessSupportDb()))
+});
+
 // server/routers.ts
 var appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -8132,11 +8243,12 @@ var appRouter = router({
   businessCheck: businessCheckRouter,
   account: accountRouter,
   onboarding: clientOnboardingRouter,
-  platformRoles: platformRolesRouter
+  platformRoles: platformRolesRouter,
+  businessSupport: businessSupportRouter
 });
 
 // server/_core/context.ts
-import { eq as eq16 } from "drizzle-orm";
+import { eq as eq17 } from "drizzle-orm";
 async function createContext(opts) {
   let user = null;
   let authChannel;
@@ -8151,7 +8263,7 @@ async function createContext(opts) {
       const session = await resolveAccountSession(opts.req);
       if (session && session.authority.roles.length > 0) {
         const db = await getDb();
-        const row = db ? (await db.select().from(users).where(eq16(users.id, session.user.id)).limit(1))[0] : void 0;
+        const row = db ? (await db.select().from(users).where(eq17(users.id, session.user.id)).limit(1))[0] : void 0;
         if (row && row.status === "active") {
           user = row;
           authChannel = "account";
@@ -8281,7 +8393,7 @@ function createApp() {
       return res.status(201).json(uploaded);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to upload the file.";
-      const status = error instanceof TRPCError15 && error.code === "UNAUTHORIZED" ? 401 : 500;
+      const status = error instanceof TRPCError16 && error.code === "UNAUTHORIZED" ? 401 : 500;
       console.warn("[Participant upload] Failed:", message);
       return res.status(status).json({ message: status === 401 ? "Kindly sign in to your participant portal again and try again." : "We could not store this file. Kindly try again shortly." });
     }
@@ -8301,7 +8413,7 @@ function createApp() {
       return res.status(201).json(uploaded);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to upload the payment receipt.";
-      const status = error instanceof TRPCError15 && error.code === "UNAUTHORIZED" ? 401 : 500;
+      const status = error instanceof TRPCError16 && error.code === "UNAUTHORIZED" ? 401 : 500;
       console.warn("[Payment receipt upload] Failed:", message);
       return res.status(status).json({ message: status === 401 ? "Kindly sign in to your participant portal again and try again." : "We could not store the receipt. Kindly try again shortly." });
     }

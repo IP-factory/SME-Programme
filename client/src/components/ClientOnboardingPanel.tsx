@@ -3,6 +3,9 @@ import { trpc } from "@/lib/trpc";
 import React, { useState } from "react";
 import { toast } from "sonner";
 
+const STAGE_NAMES: Record<string, string> = { lead: "Lead", qualified_lead: "Qualified lead", call_booked: "Call requested", opportunity: "Opportunity", won: "Won", lost: "Lost", nurture: "Nurture", referred: "Referred" };
+const INVITATION_NAMES: Record<string, string> = { pending: "Link sent, waiting", accepted: "Accepted", revoked: "Revoked", expired: "Expired" };
+
 const formatDate = (value: Date | string | null) => (value ? new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-");
 
 /**
@@ -35,8 +38,11 @@ export default function ClientOnboardingPanel() {
   const stats = metrics.data;
   return (
     <div className="space-y-6 p-6">
+      <p role="note" className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+        Payment confirmation is not automated yet. Confirm the client is approved to proceed before generating an onboarding link.
+      </p>
       <p className="text-sm text-ink-muted">
-        Invite only a client who has had a discovery call, is a fit and has paid. The link creates their account and business workspace. It works once and expires in seven days.
+        The link creates the client's account and business workspace. It works once, is tied to their email, and expires in seven days.
       </p>
       {stats && (
         <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
@@ -47,8 +53,8 @@ export default function ClientOnboardingPanel() {
       )}
       {issued && (
         <div role="status" className="space-y-2 border border-brand-line bg-brand-tint-softest p-4 text-sm">
-          <p className="font-semibold">Secure link for {issued.email} ({issued.delivery === "Sent" ? "emailed" : issued.delivery === "Failed" ? "email failed" : "email not sent"})</p>
-          <p className="text-ink-muted">Shown once. Do not post it publicly.</p>
+          <p className="font-semibold">Secure link for {issued.email}</p>
+          <p className="text-ink-muted">{issued.delivery === "Sent" ? "The link was also emailed to the client. It is shown only once; do not post it publicly." : "Email not sent. Copy this secure link and send it to the client manually. It is shown only once; do not post it publicly."}</p>
           <div className="flex gap-2">
             <input readOnly value={issued.url} className="w-full border border-line bg-white px-2 py-1 text-xs" aria-label="Onboarding link" onFocus={event => event.currentTarget.select()} />
             <Button type="button" variant="outline" className="rounded-none text-xs" onClick={() => { void navigator.clipboard?.writeText(issued.url); toast.success("Link copied."); }}>Copy</Button>
@@ -60,14 +66,14 @@ export default function ClientOnboardingPanel() {
       <section>
         <h3 className="mb-2 font-serif text-lg">Business checks</h3>
         {candidates.isLoading ? <p className="text-sm text-ink-muted">Loading…</p> : (
-          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-line text-xs uppercase tracking-wider text-ink-muted"><th className="py-2 pr-3">Name</th><th className="pr-3">Business</th><th className="pr-3">Email</th><th className="pr-3">Stage</th><th /></tr></thead><tbody>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-line text-xs uppercase tracking-wider text-ink-muted"><th className="py-2 pr-3">Name</th><th className="pr-3">Business</th><th className="pr-3">Email</th><th className="pr-3">Call</th><th className="pr-3">Stage</th><th className="pr-3">Onboarding link</th><th /></tr></thead><tbody>
             {candidates.data?.map(item => (
               <tr key={item.id} className="border-b border-line-soft">
-                <td className="py-2 pr-3">{item.fullName}</td><td className="pr-3">{item.businessName ?? "-"}</td><td className="pr-3">{item.email}</td><td className="pr-3">{item.pipelineStage.replace(/_/g, " ")}</td>
+                <td className="py-2 pr-3">{item.fullName}</td><td className="pr-3">{item.businessName ?? "-"}</td><td className="pr-3">{item.email}</td><td className="pr-3">{item.callRequestedAt ? `Requested ${formatDate(item.callRequestedAt)}` : "Not requested"}</td><td className="pr-3">{STAGE_NAMES[item.pipelineStage] ?? item.pipelineStage}</td><td className="pr-3">{item.invitationStatus ? INVITATION_NAMES[item.invitationStatus] ?? item.invitationStatus : "None"}</td>
                 <td className="text-right"><Button type="button" size="sm" disabled={invite.isPending} className="rounded-none bg-brand text-xs text-white" onClick={() => invite.mutate({ businessCheckId: item.id })}>Invite to onboard</Button></td>
               </tr>
             ))}
-            {candidates.data?.length === 0 && <tr><td colSpan={5} className="py-4 text-ink-muted">No business checks yet.</td></tr>}
+            {candidates.data?.length === 0 && <tr><td colSpan={7} className="py-4 text-ink-muted">No business checks yet.</td></tr>}
           </tbody></table></div>
         )}
       </section>

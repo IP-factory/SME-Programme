@@ -46,7 +46,9 @@ export const adminAccessRouter = router({
     return {
       email: ctx.user.email,
       isAdmin: ctx.user.role === "admin" || internal,
-      isOwner: isOwnerAdmin(ctx.user),
+      // Super Admin by the central resolver (owner email OR stored super_admin role), not by the email alone.
+      isOwner: authority.isSuperAdmin,
+      isSuperAdmin: authority.isSuperAdmin,
       hasPassword: credentials.length > 0,
       passwordVerified,
       signedInVia: ctx.authChannel ?? "legacy",
@@ -54,6 +56,7 @@ export const adminAccessRouter = router({
       // Resolved by the central authority resolver: the Super Admin has everything, everyone else what their roles and
       // legacy administrator profile grant.
       permissions: authority.legacyCapabilities,
+      platformPermissions: authority.permissions,
     };
   }),
 

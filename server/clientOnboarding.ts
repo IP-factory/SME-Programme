@@ -226,19 +226,32 @@ export async function acceptOnboardingInvitation(req: Request, res: Response, ra
   );
 }
 
-/** Business checks an administrator can invite. Prospects only: no account or business exists for them yet. */
+/** Business checks an administrator can invite, with the call request and the state of their latest invitation. Prospects only. */
 export async function listOnboardingCandidates() {
   const db = await requireDatabase();
-  return db.select({
-    id: businessChecks.id,
-    fullName: businessChecks.fullName,
-    email: businessChecks.email,
-    businessName: businessChecks.businessName,
-    pipelineStage: businessChecks.pipelineStage,
-    callRequestedAt: businessChecks.callRequestedAt,
-    completedAt: businessChecks.completedAt,
-    createdAt: businessChecks.createdAt,
-  }).from(businessChecks).orderBy(desc(businessChecks.createdAt)).limit(200);
+  const [checks, invitations] = await Promise.all([
+    db.select({
+      id: businessChecks.id,
+      fullName: businessChecks.fullName,
+      email: businessChecks.email,
+      businessName: businessChecks.businessName,
+      whatsapp: businessChecks.whatsapp,
+      pipelineStage: businessChecks.pipelineStage,
+      callRequestedAt: businessChecks.callRequestedAt,
+      callScheduledFor: businessChecks.callScheduledFor,
+      completedAt: businessChecks.completedAt,
+      createdAt: businessChecks.createdAt,
+    }).from(businessChecks).orderBy(desc(businessChecks.createdAt)).limit(200),
+    db.select({
+      businessCheckId: clientOnboardingInvitations.businessCheckId,
+      status: clientOnboardingInvitations.status,
+      expiresAt: clientOnboardingInvitations.expiresAt,
+      createdAt: clientOnboardingInvitations.createdAt,
+    }).from(clientOnboardingInvitations).orderBy(desc(clientOnboardingInvitations.id)),
+  ]);
+  const latest = new Map<number, InvitationStatus>();
+  for (const invitation of invitations) if (!latest.has(invitation.businessCheckId)) latest.set(invitation.businessCheckId, effectiveInvitationStatus(invitation));
+  return checks.map(check => ({ ...check, invitationStatus: latest.get(check.id) ?? null }));
 }
 
 export async function listOnboardingInvitations() {

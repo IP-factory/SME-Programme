@@ -1,13 +1,17 @@
 /**
  * One-time (or deliberate reset) setup of the Super Admin's email-and-password sign-in.
  *
- *   pnpm owner:bootstrap            set the password for the owner in OWNER_ADMIN_EMAIL
+ *   pnpm owner:bootstrap            set the password for the owner in OWNER_ADMIN_EMAIL (or, if one exists, just store
+ *                                   the Super Admin role)
  *   pnpm owner:bootstrap --reset    replace an existing password
  *
  * Needs DATABASE_URL and OWNER_ADMIN_EMAIL (read from .env). The password is typed at a hidden prompt: it is never
  * a command-line argument, never an environment variable, never printed and never logged.
  */
-import { bootstrapOwnerCredential } from "../server/ownerBootstrap";
+import { userCredentials, users } from "../drizzle/schema";
+import { bootstrapOwnerCredential, ensureOwnerSuperAdminRole } from "../server/ownerBootstrap";
+import { emailEquals } from "../server/dbHelpers";
+import { eq } from "drizzle-orm";
 import { closeDb, getDb } from "../server/db";
 import { ENV } from "../server/_core/env";
 
@@ -47,6 +51,14 @@ async function main() {
   const replaceExisting = process.argv.includes("--reset");
   const db = await getDb();
   if (!db) throw new Error("DATABASE_URL is not set, so there is no database to update.");
+  // An owner who already has a password does not need to type one again: just make sure Super Admin is stored as a role.
+  const owner = (await db.select({ id: users.id }).from(users).where(emailEquals(users.email, ENV.ownerAdminEmail)).limit(1))[0];
+  const hasPassword = owner ? (await db.select({ id: userCredentials.id }).from(userCredentials).where(eq(userCredentials.userId, owner.id)).limit(1)).length > 0 : false;
+  if (hasPassword && !replaceExisting) {
+    await ensureOwnerSuperAdminRole(db, { email: ENV.ownerAdminEmail });
+    console.log(`The owner (${ENV.ownerAdminEmail}) already has a password. The Super Admin role is stored. Use --reset to replace the password.`);
+    return;
+  }
   console.log(`Setting the sign-in password for the owner (${ENV.ownerAdminEmail}).`);
   const password = await promptHidden("New password: ");
   const confirmation = await promptHidden("Confirm password: ");

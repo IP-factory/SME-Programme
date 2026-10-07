@@ -65,6 +65,12 @@ export type BusinessCheckResponse = {
   summary: CheckSummary;
   summarySource: "AI" | "Rules";
   discoveryCallUrl: string;
+  /**
+   * Whether the owner's emailed copy was really sent. "Sent" only when the provider accepted it; otherwise the result
+   * is saved but no email went out ("Simulated" when email is not configured, "Failed" when it was refused). The page
+   * must not claim an email was sent unless this is "Sent".
+   */
+  emailStatus: "Sent" | "Failed" | "Simulated";
 };
 
 const unavailable = (what: string) => new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `We could not ${what} just now. Kindly try again shortly.` });
@@ -131,7 +137,8 @@ export const businessCheckRouter = router({
     const check = await findCheck(db, input.token);
     if (check.completedAt && check.resultJson && check.summaryJson && check.summarySource) {
       // Already submitted (a double click or a retry): return what was recorded, without emailing again.
-      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: BRAND.discoveryCallUrl };
+      // The owner's own delivery status is not stored; the office copy goes through the same provider, so its status stands in.
+      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: check.notificationStatus };
     }
     const answers = cleanAnswers(input.answers);
     if (!isComplete(answers)) {
@@ -144,9 +151,11 @@ export const businessCheckRouter = router({
 
     const office = officeEmail({ contact, answers, summary, source, result });
     const owner = ownerEmail({ contact, summary, result });
-    const [officeDelivery] = await Promise.all([
-      deliverEmail({ to: JUMP_ADMINISTRATION_MAILBOX, subject: office.subject, body: office.body }),
-      deliverEmail({ to: check.email, subject: owner.subject, body: owner.body }),
+    // A delivery problem never blocks the check: the result is saved either way and the page says whether email went out.
+    const failed = { status: "Failed" as const };
+    const [officeDelivery, ownerDelivery] = await Promise.all([
+      deliverEmail({ to: JUMP_ADMINISTRATION_MAILBOX, subject: office.subject, body: office.body }).catch(() => failed),
+      deliverEmail({ to: check.email, subject: owner.subject, body: owner.body }).catch(() => failed),
     ]);
 
     await db.update(businessChecks).set({
@@ -162,7 +171,7 @@ export const businessCheckRouter = router({
       completedAt: databaseNow(),
     }).where(eq(businessChecks.id, check.id));
 
-    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl };
+    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: ownerDelivery.status === "Sent" ? "Sent" : ownerDelivery.status === "Failed" ? "Failed" : "Simulated" };
   }),
 
   /** The owner asks for the free call or the full report from the result screen. */

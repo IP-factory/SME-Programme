@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
-import ClientOnboardingPanel from "@/components/ClientOnboardingPanel";
+import BusinessSupportConsole from "@/components/admin/BusinessSupportConsole";
 import { Ban, CalendarDays, Check, CheckCircle2, CircleDollarSign, ClipboardList, Copy, ExternalLink, FileText, Layers3, Mail, MessageSquare, RefreshCw, Search, Shield, ShieldAlert, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -59,10 +59,23 @@ export default function Admin() {
   if (!access.data?.passwordVerified) {
     return <div className="min-h-screen bg-paper flex items-center justify-center p-6"><Card className="w-full max-w-md rounded-none border-line-soft bg-white"><CardHeader><div className="mb-3 flex h-10 w-10 items-center justify-center bg-amber-50 text-amber-800"><ShieldAlert className="h-5 w-5" /></div><CardTitle className="font-serif text-2xl">Secure admin verification required</CardTitle></CardHeader><CardContent className="space-y-5"><p className="text-sm leading-6 text-ink-muted">Your Gmail account must be recognised and your separate {BRAND.programmeShortName} administrator password verified before the administration console can open.</p><Button onClick={() => setLocation("/admin/login")} className="w-full rounded-none bg-brand text-xs uppercase tracking-wider text-white hover:bg-brand-deep-hover">Continue to secure admin sign in</Button></CardContent></Card></div>;
   }
-  return <AdminConsole />;
+  return (
+    <DashboardLayout>
+      <div className="-m-4 min-h-screen bg-paper p-6 text-ink lg:p-10">
+        <div className="mx-auto max-w-7xl">
+          <BusinessSupportConsole
+            access={access.data}
+            team={<AdminTeamManagement />}
+            jump={<JumpProgrammeConsole />}
+          />
+        </div>
+      </div>
+    </DashboardLayout>
+  );
 }
 
-function AdminConsole() {
+/** The earlier JUMP programme registration desk, unchanged, now inside the console as its own legacy section. */
+function JumpProgrammeConsole() {
   const access = trpc.adminAccess.status.useQuery(undefined, { retry: false });
   const can = (permission: AdminPermission) => access.data?.isOwner === true || access.data?.permissions.includes(permission) === true;
   const canReviewParticipants = can("view_participants");
@@ -80,7 +93,7 @@ function AdminConsole() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [scheduleKind, setScheduleKind] = useState<"Decide" | "Learn" | "Apply">("Decide");
-  const [activeTab, setActiveTab] = useState<"applicants" | "users" | "referrals" | "onboarding">("applicants");
+  const [activeTab, setActiveTab] = useState<"applicants" | "referrals">("applicants");
   const [emailSearch, setEmailSearch] = useState("");
   const [emailStatusFilter, setEmailStatusFilter] = useState("All");
   const [selectedEmailLog, setSelectedEmailLog] = useState<{ id: number; recipientEmail: string; subject: string; body: string; status: string; sentAt: Date | string } | null>(null);
@@ -247,13 +260,13 @@ function AdminConsole() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="min-h-screen bg-paper -m-4 p-6 lg:p-10 text-ink">
+    <>
+      <div className="text-ink">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-brand mb-2">{BRAND.programmeName} / Owner Console</p>
-              <h1 className="font-serif text-4xl font-bold tracking-tight">Registration Desk</h1>
+              <p className="text-xs uppercase tracking-[0.22em] text-brand mb-2">{BRAND.programmeName} / Legacy programme</p>
+              <h2 className="font-serif text-3xl font-bold tracking-tight">Registration Desk</h2>
               <p className="text-sm text-ink-muted mt-2 max-w-xl">Review applications, track payment milestones, and shape the cohort after onboarding.</p>
             </div>
             <Button onClick={() => window.location.href = "/"} variant="outline" className="border-brand text-brand hover:bg-brand-tint rounded-none uppercase tracking-wider text-xs">View Public Page</Button>
@@ -274,28 +287,12 @@ function AdminConsole() {
               Registrations & Cohort
             </Button>
             <Button
-              variant={activeTab === "users" ? "default" : "outline"}
-              onClick={() => setActiveTab("users")}
-              className={`rounded-none text-xs uppercase tracking-wider ${activeTab === "users" ? "bg-brand text-paper" : "border-brand-line-strong text-brand"}`}
-            >
-              Admin Team & Users
-            </Button>
-            <Button
               variant={activeTab === "referrals" ? "default" : "outline"}
               onClick={() => setActiveTab("referrals")}
               className={`rounded-none text-xs uppercase tracking-wider ${activeTab === "referrals" ? "bg-brand text-paper" : "border-brand-line-strong text-brand"}`}
             >
               Referrals & Credits
             </Button>
-            {can("manage_client_onboarding") && (
-              <Button
-                variant={activeTab === "onboarding" ? "default" : "outline"}
-                onClick={() => setActiveTab("onboarding")}
-                className={`rounded-none text-xs uppercase tracking-wider ${activeTab === "onboarding" ? "bg-brand text-paper" : "border-brand-line-strong text-brand"}`}
-              >
-                Client onboarding
-              </Button>
-            )}
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -333,22 +330,7 @@ function AdminConsole() {
             </CardContent>
           </Card>
 
-          {activeTab === "users" ? (
-            <Card className="rounded-none border-line shadow-sm bg-paper overflow-hidden">
-              <CardHeader className="border-b border-line px-6 py-4 flex flex-row items-center justify-between">
-                <CardTitle className="font-serif text-xl">{BRAND.programmeShortName} Administration Team</CardTitle>
-                <span className="text-xs text-ink-muted">Invite, review, and revoke administrator access</span>
-              </CardHeader>
-              <CardContent className="p-0">
-                <AdminTeamManagement />
-              </CardContent>
-            </Card>
-          ) : activeTab === "onboarding" ? (
-            <Card className="rounded-none border-line bg-paper shadow-sm">
-              <CardHeader className="border-b border-line px-6 py-4"><CardTitle className="font-serif text-xl">Client onboarding</CardTitle></CardHeader>
-              <CardContent className="p-0"><ClientOnboardingPanel /></CardContent>
-            </Card>
-          ) : activeTab === "referrals" ? (
+          {activeTab === "referrals" ? (
             <Card className="rounded-none border-line bg-paper shadow-sm">
               <CardHeader className="border-b border-line px-6 py-4"><CardTitle className="font-serif text-xl">Referral review desk</CardTitle><p className="mt-1 text-xs leading-5 text-ink-muted">A referral becomes eligible only when the referred business is accepted and its first commitment payment is confirmed. Credits remain manual: approving one does not alter a payment balance.</p></CardHeader>
               <CardContent className="p-0"><ReferralReview /></CardContent>
@@ -520,7 +502,7 @@ function AdminConsole() {
           {selectedInboundReply ? <div className="space-y-4 pt-3"><div className="border border-brand-line bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wider text-brand">Subject</p><p className="mt-1 text-sm font-medium">{selectedInboundReply.subject}</p><p className="mt-3 text-xs text-ink-muted">Received {new Date(selectedInboundReply.receivedAt).toLocaleString()}</p></div><div className="border border-line bg-white p-4"><p className="whitespace-pre-wrap text-sm leading-6 text-ink-700">{selectedInboundReply.body}</p></div></div> : null}
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }
 

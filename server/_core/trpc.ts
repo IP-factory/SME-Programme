@@ -101,9 +101,15 @@ export const adminProcedure = t.procedure.use(
   }),
 );
 
+/**
+ * Super Admin only. "Super Admin" is decided by the central authority resolver: the recognised owner email OR a stored
+ * `super_admin` role. Relying on the email alone made the console depend on OWNER_ADMIN_EMAIL matching exactly at runtime.
+ */
 export const ownerAdminProcedure = adminProcedure.use(
   t.middleware(async ({ ctx, next }) => {
-    if (!ctx.user || !isOwnerAdmin(ctx.user)) {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    if (!ctx.user || !(await loadAuthority(db, ctx.user)).isSuperAdmin) {
       throw new TRPCError({ code: "FORBIDDEN", message: `This action is reserved for the ${BRAND.programmeShortName} super administrator.` });
     }
     return next({ ctx: { ...ctx, user: ctx.user } });
