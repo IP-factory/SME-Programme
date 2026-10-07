@@ -44,6 +44,149 @@ docs/             Operational and migration notes; docs/vercel-env-inventory.md 
 
 - **Hosting:** Vercel. Static client from `vite build`; all server routes go through one function, `api/index.js`, via the rewrites in `vercel.json`.
 - **Database:** PostgreSQL on Supabase through Drizzle and node-postgres. At runtime `DATABASE_URL` uses the Transaction Pooler (port 6543, one connection per function instance). Migrations use `MIGRATION_DATABASE_URL` (Session Pooler, port 5432). Schema changes go through `drizzle/schema.ts` then `pnpm db:generate`; never edit the database by hand.
+## Authentication and authorisation
+
+The platform is multi-role. Do not design authentication around a simple
+`user/admin` distinction.
+
+### Identity
+
+A person has one platform identity. Roles and permissions are assigned to that
+identity.
+
+A person may hold more than one internal role. Do not duplicate accounts to
+represent different responsibilities.
+
+### Platform roles
+
+The platform must support:
+
+- `client` — an external business owner. May access only their own business,
+  engagement, diagnostic, measures, check-ins, files, payment information and
+  related portal records.
+
+- `analyst` — internal delivery staff. May work only on clients/engagements
+  assigned to them unless a wider permission is explicitly granted.
+
+- `desk_lead` — owns the engagement desk and delivery quality. May oversee all
+  engagements, assign analysts, run/review diagnostics, approve prescriptions,
+  review check-ins and close or extend engagements.
+
+- `partner` — partner/co-founder involvement. May access engagements assigned
+  to them or engagements requiring partner review. Partner status must not
+  automatically grant platform administration.
+
+- `subject_matter_expert` — specialist invited into a specific engagement or
+  problem area. Access is assignment-scoped and should be minimal.
+
+- `finance` — commercial/payment role. May access the financial and payment
+  information needed for collections, reconciliation and reporting, but does
+  not receive unrestricted access to confidential diagnostic material by
+  default.
+
+- `admin` — platform operations role. Administrative actions are capability
+  based; being an admin does not automatically mean unrestricted access.
+
+- `super_admin` — platform owner with full access to platform administration,
+  roles and permissions. This role cannot be restricted by ordinary admins.
+
+### Non-authenticated actor
+
+A `public/prospect` is not an authenticated role. Public visitors may access
+explicitly public procedures such as the Free Business Check and application
+forms.
+
+### System actors
+
+AI, scheduled jobs and other automated services are system actors, not human
+roles. Never create interactive user accounts for them. Their actions must be
+server-controlled and auditable.
+
+### RBAC rules
+
+Use role-based access control plus explicit permissions.
+
+Do not scatter checks such as:
+
+`if (role === "analyst")`
+
+through business logic when a named permission or scope is more appropriate.
+
+Prefer checks such as:
+
+- `view_all_engagements`
+- `view_assigned_engagements`
+- `manage_engagements`
+- `assign_engagements`
+- `review_prescriptions`
+- `manage_clients`
+- `manage_payments`
+- `view_financials`
+- `manage_scheduling`
+- `manage_communications`
+- `manage_users`
+- `manage_roles`
+- `manage_admins`
+- `manage_platform_settings`
+
+The exact permission catalogue lives in one shared source of truth.
+
+### Assignment scope
+
+Internal delivery access is not determined by role alone.
+
+Analysts, partners and subject-matter experts may be assigned to individual
+clients or engagements.
+
+A role answers:
+
+"What kind of responsibility does this person have?"
+
+An assignment answers:
+
+"Which client or engagement may this person exercise it on?"
+
+Server-side authorisation must check both where required.
+
+### Security boundary
+
+Client isolation is non-negotiable.
+
+A client must never be able to access another client's records by changing a
+URL, id, token or request payload.
+
+Authorisation is enforced on the server. Hiding a button in React is never an
+authorisation control.
+
+Every protected tRPC procedure must declare its required authentication,
+permission and/or resource scope.
+
+### Authentication
+
+Authentication and authorisation are separate:
+
+- Authentication proves who the person is.
+- Roles and permissions determine what that person may do.
+- Assignments determine which client/engagement records they may access.
+
+The authentication implementation must allow new roles to be introduced without
+redesigning login.
+
+### Current email constraint
+
+Email-domain verification and outbound transactional email are temporarily
+deferred.
+
+Do not make successful outbound email a prerequisite for the first
+authentication implementation.
+
+Password authentication may be implemented and tested without sending email.
+Password-reset and invitation delivery can remain simulated/manual until the
+mail domain is verified.
+
+Do not weaken token, password or session security simply because email delivery
+is deferred.
+
 - **Single sources of truth:** names, mailboxes and brand colours in `shared/brand.ts`; prices, the journey and the ten problem areas in `shared/businessSupport.ts`; business check questions in `shared/businessCheck/questions.ts`, sector examples in `sectorExamples.ts`, path and scoring rules in `engine.ts`, recommendable services in `catalogue.ts`.
 
 ## Testing
@@ -60,4 +203,31 @@ docs/             Operational and migration notes; docs/vercel-env-inventory.md 
 - Colours come from the theme tokens in `client/src/index.css`; do not hard-code hex values in components.
 - React effects must not return a value other than a cleanup function (the claude.ai preview frame breaks if they do).
 - Keep changes focused. Match the surrounding code's style and comment density.
-- Commit messages say what changed and why. Do not push to `main` directly; work on a branch and open a pull request.
+- Commit messages say what changed and why. - During pre-launch development, work on `main` for contained, reversible changes unless the change is high-risk or the owner explicitly asks for a branch. Database migrations, major auth redesigns and destructive changes should use a dedicated branch.
+
+
+
+
+
+PUBLIC
+      │
+      ├── Free Business Check
+      ├── Apply
+      └── Sign in
+              │
+              ▼
+      Email + password
+              │
+              ▼
+      Identify account
+              │
+              ▼
+      Create secure session
+              │
+              ▼
+      Resolve roles + permissions
+              │
+       ┌──────┼──────────────┐
+       ▼      ▼              ▼
+    Client  Internal       Admin
+    Portal  Workspace      Console
