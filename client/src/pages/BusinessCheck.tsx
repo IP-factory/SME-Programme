@@ -14,6 +14,7 @@ import {
   cleanAnswers,
   DISC_STYLES,
   exampleFor,
+  exampleHeading,
   isAnswered,
   nextStep,
   optionsFor,
@@ -340,7 +341,7 @@ function SectionIntro({ step, answers, onContinue, onBack }: { step: Step; answe
       </motion.div>
       {example && (
         <motion.div variants={itemMotion} className="border border-line bg-paper-raised p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">{stageOf(answers) === "idea" ? "For example" : "For a business like yours"}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">{exampleHeading(section, answers)}</p>
           <p className="mt-2 font-serif text-lg italic leading-relaxed text-ink-soft">{example}</p>
         </motion.div>
       )}

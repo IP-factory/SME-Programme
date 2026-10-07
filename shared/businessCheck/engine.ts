@@ -18,6 +18,7 @@
  * - Follow-up questions open only when the owner says an area is not clear.
  */
 import { OFFERINGS, offeringById, type Offering } from "./catalogue";
+import { SECTOR_EXAMPLES, SECTOR_IDS, SECTOR_NOUNS, type SectorId } from "./sectorExamples";
 import {
   AREA_NAMES,
   GAP_LABELS,
@@ -136,10 +137,36 @@ export function optionsFor(question: Question, answers: Answers): readonly Optio
 }
 
 /** The example shown under a section's definition, matched to the kind of business described. */
+export function sectorOf(answers: Answers): SectorId | undefined {
+  return SECTOR_IDS.find((sector) => sector === answers.p_sector);
+}
+
+type Example = { text: string; heading: string };
+
+/**
+ * The example under a section's definition. The owner's sector comes first, so a fashion designer
+ * reads about fashion. Founder readiness for someone who hasn't started yet keeps its example about
+ * leaving a job. Sector "other" falls back to the stage, then the kind of business.
+ */
+function pickExample(section: Section, answers: Answers): Example | undefined {
+  const stage = stageOf(answers);
+  const sector = sectorOf(answers);
+  if (stage === "idea" && section.examples.idea) return { text: section.examples.idea, heading: "For example" };
+  if (sector && section.id !== "profile") {
+    const noun = SECTOR_NOUNS[sector];
+    return { text: SECTOR_EXAMPLES[section.id][sector], heading: stage === "idea" ? `For a ${noun} idea like yours` : `For a ${noun} business like yours` };
+  }
+  if (stage === "side" && section.examples.side) return { text: section.examples.side, heading: "For a side business" };
+  const text = section.examples[typeOf(answers)] ?? section.examples.mixed;
+  return text ? { text, heading: stage === "idea" ? "For example" : "For a business like yours" } : undefined;
+}
+
 export function exampleFor(section: Section, answers: Answers) {
-  if (stageOf(answers) === "idea" && section.examples.idea) return section.examples.idea;
-  if (stageOf(answers) === "side" && section.examples.side) return section.examples.side;
-  return section.examples[typeOf(answers)] ?? section.examples.mixed;
+  return pickExample(section, answers)?.text;
+}
+
+export function exampleHeading(section: Section, answers: Answers) {
+  return pickExample(section, answers)?.heading;
 }
 
 function validValue(question: Question, value: Answers[string], answers: Answers): Answers[string] {

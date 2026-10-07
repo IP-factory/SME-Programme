@@ -4,6 +4,7 @@ import {
   cleanAnswers,
   evaluate,
   exampleFor,
+  exampleHeading,
   founderRead,
   isComplete,
   optionsFor,
@@ -13,6 +14,7 @@ import {
   sectionPath,
 } from "@shared/businessCheck/engine";
 import { SECTIONS, type Answers } from "@shared/businessCheck/questions";
+import { SECTOR_EXAMPLES, SECTOR_IDS } from "@shared/businessCheck/sectorExamples";
 
 const founderAnswers: Answers = {
   f_instinct: "S",
@@ -197,6 +199,40 @@ describe("section copy", () => {
         }
       }
     }
+  });
+});
+
+describe("examples for the owner's sector", () => {
+  it("has an example for every area in every sector the owner can pick", () => {
+    const sectorOptions = SECTIONS.profile.questions.find((question) => question.id === "p_sector")!.options.map((option) => option.value);
+    expect([...SECTOR_IDS, "other"].sort()).toEqual([...sectorOptions].sort());
+    for (const [area, bySector] of Object.entries(SECTOR_EXAMPLES)) {
+      for (const sector of SECTOR_IDS) expect(bySector[sector], `${area} / ${sector}`).toMatch(/\w{4,}.*\.|"$/);
+      expect(new Set(Object.values(bySector)).size).toBe(SECTOR_IDS.length);
+    }
+  });
+
+  it("shows the owner's sector, and names it in the heading", () => {
+    const fashion = { p_stage: "operating", p_type: "maker", p_sector: "fashion" };
+    expect(exampleFor(SECTIONS.offer, fashion)).toMatch(/agbada/);
+    expect(exampleHeading(SECTIONS.offer, fashion)).toBe("For a fashion business like yours");
+    const food = { ...fashion, p_sector: "food and drink" };
+    expect(exampleFor(SECTIONS.risk, food)).toMatch(/NAFDAC/);
+    expect(exampleHeading(SECTIONS.sales, { ...fashion, p_sector: "services" })).toBe("For a service business like yours");
+    expect(exampleFor(SECTIONS.founder, { ...fashion, p_stage: "side" })).toMatch(/designer/);
+  });
+
+  it("words the idea area for a business that hasn't started", () => {
+    const idea = { p_stage: "idea", p_type: "maker", p_sector: "agriculture" };
+    expect(exampleFor(SECTIONS.idea, idea)).toMatch(/^A planned/);
+    expect(exampleHeading(SECTIONS.idea, idea)).toBe("For a farming idea like yours");
+    expect(exampleFor(SECTIONS.founder, idea)).toMatch(/job/);
+  });
+
+  it("falls back to the kind of business when the sector is Other", () => {
+    const other = { p_stage: "operating", p_type: "trader", p_sector: "other" };
+    expect(exampleFor(SECTIONS.offer, other)).toBe(SECTIONS.offer.examples.trader);
+    expect(exampleHeading(SECTIONS.offer, other)).toBe("For a business like yours");
   });
 });
 
