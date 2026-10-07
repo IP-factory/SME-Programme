@@ -6572,7 +6572,7 @@ import { z as z12 } from "zod";
 // shared/businessSupport.ts
 var PRICES = {
   fullReport: 1e5,
-  currentStateFrom: 5e5,
+  currentState: 5e5,
   fix: 12e5,
   standardEngagementCap: 25e5
 };
@@ -6582,7 +6582,7 @@ function formatNaira2(amount) {
 var JOURNEY = [
   { id: "business-check", name: "Free business check", body: `Ten minutes. You get a first read on where you are stuck. Want the full report? ${formatNaira2(PRICES.fullReport)}, by email.` },
   { id: "discovery-call", name: "A free 20-minute call", body: "We tell you honestly whether we can help." },
-  { id: "current-state", name: "Current State", body: `Two weeks and two calls to see where your business really stands and name the one problem to fix first. From ${formatNaira2(PRICES.currentStateFrom)}, paid after the call. Three working days to get set up, then we start.` },
+  { id: "current-state", name: "Current State", body: `Two weeks and two calls to see where your business really stands and name the one problem to fix first. ${formatNaira2(PRICES.currentState)}, paid after the call. Three working days to get set up, then we start.` },
   { id: "fix", name: "The six-week fix", body: `One problem. You do the work; we tell you what to do, give you the tools and check it every week. ${formatNaira2(PRICES.fix)}.` },
   { id: "plan", name: "Your plan", body: `We stop at about ${formatNaira2(PRICES.standardEngagementCap)} with a plan in your hands. Want us to stay? We agree what that looks like.` }
 ];
