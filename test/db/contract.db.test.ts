@@ -10,6 +10,7 @@ import { getTableConfig, isPgEnum, type PgEnumColumn, type PgTable } from "drizz
 import { TRPCError } from "@trpc/server";
 import * as schema from "../../drizzle/schema";
 import { registerSchedulingCapacityTests } from "./schedulingCapacity";
+import { pgIdentifier } from "../../scripts/pgIdentifier.mjs";
 import { allTables, createPgliteHarness, createRemoteHarness, fixtureRow, insertFixture, pgErrorCode, type DbHarness } from "./harness";
 
 const holder = vi.hoisted(() => {
@@ -153,6 +154,60 @@ for (const target of targets) {
         expect(pgErrorCode(failure)).toBe("23505");
         await db.insert(schema.users).values({ openId: "ci-3", email: null });
         await db.insert(schema.users).values({ openId: "ci-4", email: null });
+      });
+
+      it("creates every declared foreign key with its declared delete behaviour, under the name PostgreSQL stores", async () => {
+        const rows = await harness.query(sql`select k.conname, k.confdeltype, c.relname as child, p.relname as parent, (select array_agg(a.attname::text order by a.attnum) from pg_attribute a where a.attrelid = k.conrelid and a.attnum = any(k.conkey)) as columns from pg_constraint k join pg_class c on c.oid = k.conrelid join pg_class p on p.oid = k.confrelid join pg_namespace n on n.oid = c.relnamespace where k.contype = 'f' and n.nspname = current_schema()`);
+        const stored = new Map(rows.map(row => [String(row.conname), row]));
+        const deleteCode: Record<string, string> = { cascade: "c", "no action": "a", restrict: "r", "set null": "n", "set default": "d" };
+        let declared = 0;
+        for (const table of allTables) {
+          const config = getTableConfig(table);
+          for (const foreignKey of config.foreignKeys) {
+            declared += 1;
+            const reference = foreignKey.reference();
+            const row = stored.get(pgIdentifier(foreignKey.getName()));
+            expect(row, `${foreignKey.getName()} exists as ${pgIdentifier(foreignKey.getName())}`).toBeDefined();
+            expect(row!.child).toBe(config.name);
+            expect(row!.parent).toBe(getTableConfig(reference.foreignTable as PgTable).name);
+            expect(row!.columns).toEqual(reference.columns.map(column => column.name));
+            expect(row!.confdeltype, `${foreignKey.getName()} delete rule`).toBe(deleteCode[foreignKey.onDelete ?? "no action"]);
+          }
+        }
+        expect(declared).toBe(rows.length); // no foreign key exists that the schema does not declare
+        expect(declared).toBe(9);
+      });
+
+      it("stores a declared name longer than 63 bytes truncated, which is why lookups must use pgIdentifier", async () => {
+        const declared = getTableConfig(schema.clientOnboardingInvitations).foreignKeys.map(foreignKey => foreignKey.getName());
+        const tooLong = declared.filter(name => Buffer.byteLength(name) > 63);
+        expect(tooLong).toEqual(["client_onboarding_invitations_businessCheckId_business_checks_id_fk"]);
+        const rows = await harness.query(sql`select conname from pg_constraint where contype = 'f' and conname like 'client_onboarding_invitations_businessCheckId%'`);
+        expect(rows.map(row => row.conname)).toEqual(["client_onboarding_invitations_businessCheckId_business_checks_i"]);
+        expect(pgIdentifier(tooLong[0])).toBe("client_onboarding_invitations_businessCheckId_business_checks_i");
+        expect(pgIdentifier("short_name")).toBe("short_name");
+      });
+
+      it("enforces the onboarding invitation's business check, and refuses to delete a check an invitation depends on", async () => {
+        const [admin] = await db.insert(schema.users).values({ openId: "fk-invite-admin" }).returning();
+        const [check] = await db.insert(schema.businessChecks).values(fixtureRow(schema.businessChecks, { publicToken: "fk-invite-check-1" })).returning();
+        const invitation = (businessCheckId: number, hash: string) => ({ businessCheckId, email: "fk@example.test", fullNameSnapshot: "x", businessNameSnapshot: "x", tokenHash: hash.padEnd(64, "0"), expiresAt: new Date(Date.now() + 60_000), createdByUserId: admin.id });
+
+        // The referenced business check is enforced...
+        const orphan = await db.insert(schema.clientOnboardingInvitations).values(invitation(2_000_000_000, "orphan")).then(() => null, (error: unknown) => error);
+        expect(pgErrorCode(orphan)).toBe("23503");
+
+        // ...and NO ACTION means a lead that has an invitation cannot be deleted out from under that security record.
+        await db.insert(schema.clientOnboardingInvitations).values(invitation(check.id, "kept"));
+        const blocked = await db.delete(schema.businessChecks).where(eq(schema.businessChecks.id, check.id)).then(() => null, (error: unknown) => error);
+        expect(pgErrorCode(blocked)).toBe("23503");
+        expect(await db.select().from(schema.businessChecks).where(eq(schema.businessChecks.id, check.id))).toHaveLength(1);
+        expect(await db.select().from(schema.clientOnboardingInvitations).where(eq(schema.clientOnboardingInvitations.businessCheckId, check.id))).toHaveLength(1);
+
+        // A lead with no invitation is still deletable: the rule only protects checks that have one.
+        const [lonely] = await db.insert(schema.businessChecks).values(fixtureRow(schema.businessChecks, { publicToken: "fk-invite-check-2" })).returning();
+        await db.delete(schema.businessChecks).where(eq(schema.businessChecks.id, lonely.id));
+        expect(await db.select().from(schema.businessChecks).where(eq(schema.businessChecks.id, lonely.id))).toHaveLength(0);
       });
 
       it("declares a foreign key from every account table and cascades deletes of a user", async () => {

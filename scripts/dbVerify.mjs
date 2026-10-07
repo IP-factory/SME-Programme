@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import pg from "pg";
+import { pgIdentifier } from "./pgIdentifier.mjs";
 
 const root = process.cwd();
 const MIGRATIONS = resolve(root, "drizzle/migrations");
@@ -197,7 +198,7 @@ async function main() {
     // ---- indexes (including the unique lower(email) index that backs account email uniqueness) and foreign keys ----
     const indexRows = await query("select indexname from pg_indexes where schemaname = $1", [SCHEMA]);
     const actualIndexes = new Set(indexRows.map(row => row.indexname));
-    const expectedIndexes = expectedTables.flatMap(table => Object.values(table.indexes ?? {}).map(index => index.name));
+    const expectedIndexes = expectedTables.flatMap(table => Object.values(table.indexes ?? {}).map(index => pgIdentifier(index.name)));
     const missingIndexes = expectedIndexes.filter(name => !actualIndexes.has(name));
     check(`all ${expectedIndexes.length} declared indexes present`, missingIndexes.length === 0, missingIndexes.join(", "));
     const foreignKeyRows = await query(
@@ -206,7 +207,7 @@ async function main() {
     const actualForeignKeys = new Map(foreignKeyRows.map(row => [row.name, row.on_delete]));
     const deleteCodes = { cascade: "c", "no action": "a", restrict: "r", "set null": "n", "set default": "d" };
     const expectedForeignKeys = expectedTables.flatMap(table => Object.values(table.foreignKeys ?? {}));
-    const foreignKeyProblems = expectedForeignKeys.filter(key => actualForeignKeys.get(key.name) !== (deleteCodes[key.onDelete ?? "no action"] ?? "a")).map(key => key.name);
+    const foreignKeyProblems = expectedForeignKeys.filter(key => actualForeignKeys.get(pgIdentifier(key.name)) !== (deleteCodes[key.onDelete ?? "no action"] ?? "a")).map(key => key.name);
     check(`all ${expectedForeignKeys.length} foreign keys present with the declared delete behaviour`, foreignKeyProblems.length === 0, foreignKeyProblems.join(", "));
 
     const criticalMissing = [];
