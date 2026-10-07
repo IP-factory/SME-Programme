@@ -20,7 +20,7 @@ Read this before changing anything. It applies to every agent and person working
 | `pnpm check` | Typecheck the app |
 | `pnpm check:tests` | Typecheck the tests |
 | `pnpm test` | All unit, UI and in-memory database tests (no network or secrets needed) |
-| `pnpm build` | Production bundle; also regenerates `api/index.js` for Vercel |
+| `pnpm build` | Production bundle; also regenerates `api/index.js` for Vercel. Commit the regenerated file: CI fails if it is stale |
 | `pnpm build:preview` | Static clickable preview in `dist/preview` with a simulated server |
 | `pnpm test:db` | Database contract tests against a real PostgreSQL (`TEST_DATABASE_URL`, disposable database only) |
 | `pnpm db:generate` / `pnpm db:migrate` | Create / apply a migration (`MIGRATION_DATABASE_URL`) |
