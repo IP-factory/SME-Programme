@@ -47,7 +47,7 @@ export const PROMISE = ["Find it.", "Fix it.", "See the results."] as const;
 /** Prices in naira (section 11). Ongoing support is deliberately unpriced: copy must not quote a figure. */
 export const PRICES = {
   fullReport: 100_000,
-  currentStateFrom: 500_000,
+  currentState: 500_000,
   fix: 1_200_000,
   standardEngagementCap: 2_500_000,
 } as const;
@@ -69,7 +69,7 @@ export function formatNaira(amount: number) {
 export const JOURNEY: readonly JourneyStep[] = [
   { id: "business-check", name: "Free business check", body: `Ten minutes. You get a first read on where you are stuck. Want the full report? ${formatNaira(PRICES.fullReport)}, by email.` },
   { id: "discovery-call", name: "A free 20-minute call", body: "We tell you honestly whether we can help." },
-  { id: "current-state", name: "Current State", body: `Two weeks and two calls to see where your business really stands and name the one problem to fix first. From ${formatNaira(PRICES.currentStateFrom)}, paid after the call. Three working days to get set up, then we start.` },
+  { id: "current-state", name: "Current State", body: `Two weeks and two calls to see where your business really stands and name the one problem to fix first. ${formatNaira(PRICES.currentState)}, paid after the call. Three working days to get set up, then we start.` },
   { id: "fix", name: "The six-week fix", body: `One problem. You do the work; we tell you what to do, give you the tools and check it every week. ${formatNaira(PRICES.fix)}.` },
   { id: "plan", name: "Your plan", body: `We stop at about ${formatNaira(PRICES.standardEngagementCap)} with a plan in your hands. Want us to stay? We agree what that looks like.` },
 ];
