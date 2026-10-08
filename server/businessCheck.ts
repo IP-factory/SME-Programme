@@ -194,7 +194,7 @@ export function ownerEmail(input: { contact: CheckContact; summary: CheckSummary
     "",
     "NEXT STEP",
     summary.next,
-    BRAND.discoveryCallUrl ? `Book here: ${BRAND.discoveryCallUrl}` : "Reply to this email and we will find a time that suits you.",
+    ENV.discoveryCallUrl ? `Pick a time here: ${ENV.discoveryCallUrl}` : "Book it from your result page on our website.",
     "",
     `Want the full written report? It costs ${formatNaira(PRICES.fullReport)} and comes by email. Reply "report" and we will send the details.`,
     "",

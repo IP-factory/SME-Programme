@@ -91,5 +91,8 @@ describe("business check summary", () => {
     expect(email.body).toContain("WHAT WE FOUND");
     expect(email.body).toContain("₦100,000");
     expect(email.body).toContain("Dear Ada,");
+    // Calls are booked in the booking app, not arranged by replying.
+    expect(email.body).not.toMatch(/Reply to this email and we will find a time/);
+    expect(email.body).toContain("Book it from your result page");
   });
 });

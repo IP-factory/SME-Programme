@@ -25,10 +25,11 @@ var init_brand = __esm({
       organisationName: "IP Factory",
       organisationLegalName: "Intellectual Property Factory",
       /**
-       * The business-support offer's public name ([NAME] in the concept note's site copy).
-       * "Operating Partner" is the working name until Lewis closes the name.
+       * The business-support offer's public name ([NAME] in the concept note's site copy), chosen
+       * 7 October 2026. Written out in full with its maker as productEndorsement.
        */
-      productName: "Operating Partner",
+      productName: "The Shift",
+      productEndorsement: "The Shift, by IP Factory",
       productTagline: "Support for business owners",
       /** External page for the free business check, if it runs elsewhere. Empty: the on-site form opens. */
       applyUrl: "",
@@ -101,6 +102,8 @@ var init_env = __esm({
       forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
       forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
       resendApiKey: process.env.RESEND_API_KEY ?? "",
+      /** Booking page for the free discovery call (Calendly, Microsoft Bookings…). Falls back to BRAND.discoveryCallUrl. */
+      discoveryCallUrl: process.env.DISCOVERY_CALL_URL?.trim() || BRAND.discoveryCallUrl,
       emailFrom: process.env.EMAIL_FROM ?? `${BRAND.senderDisplayName} <${BRAND.administrationMailbox}>`,
       googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
       googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
@@ -1682,7 +1685,7 @@ function applySecurityHeaders(req, res, next) {
     const analyticsSource = analyticsCspSource();
     res.setHeader(
       "Content-Security-Policy",
-      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com;`
+      `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; connect-src 'self' https://api.manus.im https://*.manus.com https://*.manus.space https://www.instagram.com${analyticsSource}; frame-src https://accounts.google.com https://www.instagram.com https://calendly.com;`
     );
   }
   if (req.path.startsWith("/api/") || req.path.startsWith("/portal/") || req.path.startsWith("/admin/")) {
@@ -6327,7 +6330,6 @@ import { TRPCError as TRPCError12 } from "@trpc/server";
 import { randomBytes as randomBytes5 } from "crypto";
 import { eq as eq14 } from "drizzle-orm";
 import { z as z14 } from "zod";
-init_brand();
 
 // shared/businessCheck/catalogue.ts
 var CAPABILITIES = {
@@ -7262,7 +7264,7 @@ function writeSummary(input) {
       next: "Book the free call. We will come prepared with questions for a business of your size."
     };
   }
-  const founderLine = `Founder readiness reads as ${READINESS_LABELS[founder.level].split(":")[0].toLowerCase()}.${style ? ` Under pressure you lead as a ${style.name.toLowerCase()}: ${lower(style.strength)}` : ""}${founder.needsDriver ? " Nobody in the business reliably makes the hard call yet; that role needs an owner." : ""}`;
+  const founderLine = `Founder readiness reads as ${READINESS_LABELS[founder.level].split(":")[0].toLowerCase()}.${style ? ` Under pressure you lead as ${/^[aeiou]/i.test(style.name) ? "an" : "a"} ${style.name.toLowerCase()}: ${lower(style.strength)}` : ""}${founder.needsDriver ? " Nobody in the business reliably makes the hard call yet; that role needs an owner." : ""}`;
   if (route === "idea") {
     const ideaRow = outline.find((row) => row.area === 1);
     return {
@@ -7683,7 +7685,7 @@ function ownerEmail(input) {
     "",
     "NEXT STEP",
     summary.next,
-    BRAND.discoveryCallUrl ? `Book here: ${BRAND.discoveryCallUrl}` : "Reply to this email and we will find a time that suits you.",
+    ENV.discoveryCallUrl ? `Pick a time here: ${ENV.discoveryCallUrl}` : "Book it from your result page on our website.",
     "",
     `Want the full written report? It costs ${formatNaira2(PRICES.fullReport)} and comes by email. Reply "report" and we will send the details.`,
     "",
@@ -7718,6 +7720,7 @@ function officeEmail(input) {
 }
 
 // server/routers/businessCheck.ts
+init_env();
 var WINDOW_MS = 15 * 60 * 1e3;
 var limiters = [];
 function rateLimiter(maximum) {
@@ -7801,7 +7804,7 @@ var businessCheckRouter = router({
     const db = await database("record your business check");
     const check = await findCheck(db, input.token);
     if (check.completedAt && check.resultJson && check.summaryJson && check.summarySource) {
-      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: check.notificationStatus };
+      return { token: check.publicToken, result: JSON.parse(check.resultJson), summary: JSON.parse(check.summaryJson), summarySource: check.summarySource, discoveryCallUrl: ENV.discoveryCallUrl, emailStatus: check.notificationStatus };
     }
     const answers = cleanAnswers(input.answers);
     if (!isComplete(answers)) {
@@ -7829,7 +7832,7 @@ var businessCheckRouter = router({
       notificationStatus: officeDelivery.status === "Failed" ? "Failed" : officeDelivery.status === "Simulated" ? "Simulated" : "Sent",
       completedAt: databaseNow()
     }).where(eq14(businessChecks.id, check.id));
-    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: BRAND.discoveryCallUrl, emailStatus: ownerDelivery.status === "Sent" ? "Sent" : ownerDelivery.status === "Failed" ? "Failed" : "Simulated" };
+    return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: ENV.discoveryCallUrl, emailStatus: ownerDelivery.status === "Sent" ? "Sent" : ownerDelivery.status === "Failed" ? "Failed" : "Simulated" };
   }),
   /** The owner asks for the free call or the full report from the result screen. */
   requestNext: publicProcedure.input(z14.object({ token: tokenInput, choice: z14.enum(["call", "report"]), note: z14.string().trim().max(500).optional() })).mutation(async ({ input }) => {

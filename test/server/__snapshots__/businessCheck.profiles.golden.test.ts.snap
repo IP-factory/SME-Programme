@@ -676,7 +676,7 @@ exports[`Free Business Check golden profiles > smallOperatingTrader keeps its pi
     "primaryGap": "clarity",
     "route": "programme",
     "summary": {
-      "found": "Founder readiness reads as intermediate. Under pressure you lead as a influencer: you sell, persuade and rally people. You described 7 areas as stuck: Strategic intent, Service and offering, Business model, Market entry and sales, Operations and people, Financials, Risk and compliance. Market and industry needs watching.",
+      "found": "Founder readiness reads as intermediate. Under pressure you lead as an influencer: you sell, persuade and rally people. You described 7 areas as stuck: Strategic intent, Service and offering, Business model, Market entry and sales, Operations and people, Financials, Risk and compliance. Market and industry needs watching.",
       "next": "Book the free 20-minute call. We will tell you honestly whether we can help, and what to fix first.",
       "think": "The place to start is financials, and the gap looks like clarity: it isn't yet clear what is really wrong, or what good would look like. That points to Embedded Performance Support, Business Model & Commercial Strategy, Financial Performance & Decision Support.",
     },
@@ -685,7 +685,7 @@ exports[`Free Business Check golden profiles > smallOperatingTrader keeps its pi
   "ruleFallback": {
     "source": "Rules",
     "summary": {
-      "found": "Founder readiness reads as intermediate. Under pressure you lead as a influencer: you sell, persuade and rally people. You described 7 areas as stuck: Strategic intent, Service and offering, Business model, Market entry and sales, Operations and people, Financials, Risk and compliance. Market and industry needs watching.",
+      "found": "Founder readiness reads as intermediate. Under pressure you lead as an influencer: you sell, persuade and rally people. You described 7 areas as stuck: Strategic intent, Service and offering, Business model, Market entry and sales, Operations and people, Financials, Risk and compliance. Market and industry needs watching.",
       "next": "Book the free 20-minute call. We will tell you honestly whether we can help, and what to fix first.",
       "offerings": [
         {

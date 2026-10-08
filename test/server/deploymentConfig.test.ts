@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const KEYS = ["APP_ORIGIN", "APP_ALTERNATE_ORIGINS", "OWNER_ADMIN_EMAIL"] as const;
+const KEYS = ["APP_ORIGIN", "APP_ALTERNATE_ORIGINS", "OWNER_ADMIN_EMAIL", "DISCOVERY_CALL_URL"] as const;
 const saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
 
 async function loadWith(env: Partial<Record<(typeof KEYS)[number], string>>) {
@@ -19,6 +19,13 @@ afterEach(() => {
     else process.env[key] = saved[key];
   }
   vi.resetModules();
+});
+
+describe("discovery call booking page", () => {
+  it("reads the booking page from DISCOVERY_CALL_URL, trimmed, and is empty when unset", async () => {
+    expect((await loadWith({ DISCOVERY_CALL_URL: " https://calendly.com/ip-factory/discovery-call " })).ENV.discoveryCallUrl).toBe("https://calendly.com/ip-factory/discovery-call");
+    expect((await loadWith({})).ENV.discoveryCallUrl).toBe("");
+  });
 });
 
 describe("deployment identity configuration", () => {

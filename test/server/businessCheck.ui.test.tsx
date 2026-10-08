@@ -170,23 +170,65 @@ describe("business check page", { timeout: 20_000 }, () => {
     expect(screen.queryByText("Where should we send your summary?")).toBeNull();
   });
 
-  it("shows the summary, the outline and the free call as the next step", async () => {
-    const answers = { p_stage: "operating", p_name: "Ada Foods", p_type: "maker", p_age: "2to5", p_staff: "6to10", p_revenue: "3to5m", f_instinct: "S", f_seen: "S", f_team: "solo", f_tough: "nobody", f_hours: "lt2", s7_status: "tight_guess" };
+  const resultFor = (discoveryCallUrl = "") => {
+    const answers = { p_stage: "operating", p_name: "Ada Foods", p_type: "maker", p_age: "2to5", p_staff: "6to10", p_revenue: "3to5m", f_instinct: "I", f_seen: "C", f_team: "solo", f_tough: "nobody", f_education: "degree", f_finance: ["pl", "cash"], f_hours: "lt2", s7_status: "tight_guess" };
     const result = evaluate(answers);
-    const response = { token: TOKEN, result, summary: { found: "Found text for the test.", think: "Think text for the test.", next: "Book the free call.", offerings: [{ id: "financial-performance", name: "Financial Performance & Decision Support", why: "Your prices are guesses." }] }, summarySource: "AI", discoveryCallUrl: "", emailStatus: "Sent" };
+    const response = { token: TOKEN, result, summary: { found: "Found text for the test.", think: "Think text for the test.", next: "Book the free call.", offerings: [{ id: "financial-performance", name: "Financial Performance & Decision Support", why: "Your prices are guesses." }] }, summarySource: "AI", discoveryCallUrl, emailStatus: "Sent" };
     preload({ token: TOKEN, answers, response });
     render(React.createElement(BusinessCheck));
+  };
+
+  it("shows the summary, the outline, founder readiness in words and the services that fit", () => {
+    resultFor();
     expect(screen.getByText("What we found")).toBeTruthy();
     expect(screen.getByText(/Your business check · Ada Foods/)).toBeTruthy();
     expect(screen.getByText("Think text for the test.")).toBeTruthy();
     expect(screen.getByText("7. Financials")).toBeTruthy();
-    expect(screen.getByText(/Nobody in the business reliably makes the hard call/)).toBeTruthy();
     expect(screen.getByText("Finance & Capital")).toBeTruthy();
-    expect(screen.getByText(/₦100,000/)).toBeTruthy();
+    // Founder readiness reads as sentences built from the answers, not abstract bars.
+    expect(screen.getByText(/^Intermediate \(\d of 6\)$/)).toBeTruthy();
+    expect(screen.getByText("You are confident with 2 of the 4 money basics. Cost per unit and margin are the ones to strengthen.")).toBeTruthy();
+    expect(screen.getByText(/Others see you as careful and precise \(Analyst\)/)).toBeTruthy();
+    expect(screen.queryByText(/ a analyst/i)).toBeNull();
+    expect(screen.getByText(/Nobody in the business reliably makes the hard call/)).toBeTruthy();
+  });
+
+  it("gives the ₦100,000 full report its own offer, with what is inside, and records the request", async () => {
+    resultFor();
+    expect(screen.getByText("The summary tells you where you stand. The full report tells you what to do about it.")).toBeTruthy();
+    expect(screen.getByText("Your full business check report")).toBeTruthy();
+    expect(screen.getByText("₦100,000", { selector: "p" })).toBeTruthy();
+    expect(screen.getByText(/The root cause behind each red and amber/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /get my full report/i }));
+    expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "report" }]);
+    expect(await screen.findByText(/We'll email the payment details to ada@example.com/)).toBeTruthy();
+  });
+
+  it("without a booking page configured, records the call request and never promises a WhatsApp call-back", async () => {
+    resultFor("");
     // With no booking page, the button says what it does: it requests a call, it does not book one.
     expect(screen.queryByRole("button", { name: /book my free call/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /request my free 20-minute call/i }));
     expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "call" }]);
+    expect(await screen.findByText("Thank you. Your request has been sent to the IPF team. We'll email you to agree a time.")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/WhatsApp/);
+  });
+
+  it("books the call in an embedded Calendly calendar, and counts it as booked only when Calendly confirms", async () => {
+    resultFor("https://calendly.com/ip-factory/discovery-call");
+    fireEvent.click(screen.getByRole("button", { name: /book my free call/i }));
+    const calendar = (await screen.findByTitle("Book your free call")) as HTMLIFrameElement;
+    const src = new URL(calendar.src);
+    expect(src.origin + src.pathname).toBe("https://calendly.com/ip-factory/discovery-call");
+    expect(src.searchParams.get("name")).toBe("Ada Example");
+    expect(src.searchParams.get("email")).toBe("ada@example.com");
+    expect(api.calls.requestNext).toEqual([]);
+
+    window.dispatchEvent(new MessageEvent("message", { origin: "https://evil.example", data: { event: "calendly.event_scheduled" } }));
+    expect(api.calls.requestNext).toEqual([]);
+    window.dispatchEvent(new MessageEvent("message", { origin: "https://calendly.com", data: { event: "calendly.event_scheduled" } }));
+    await waitFor(() => expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "call" }]));
+    expect(await screen.findByText("Booked. The confirmation is on its way to ada@example.com.")).toBeTruthy();
   });
 
   describe("result page, honest about email and about the call", () => {
@@ -213,8 +255,8 @@ describe("business check page", { timeout: 20_000 }, () => {
       api.replies.requestNext = () => ({ success: true, choice: "call" });
       render(React.createElement(BusinessCheck));
       fireEvent.click(screen.getByRole("button", { name: /request my free 20-minute call/i }));
-      expect(await screen.findByText(/Thank you\. Your request has been sent to the IPF team\. We will contact you by (WhatsApp or )?email to agree a time\./)).toBeTruthy();
-      expect(document.body.textContent).not.toMatch(/within one working day|your slot|is booked|has been booked/i);
+      expect(await screen.findByText("Thank you. Your request has been sent to the IPF team. We'll email you to agree a time.")).toBeTruthy();
+      expect(document.body.textContent).not.toMatch(/within one working day|your slot|is booked|has been booked|WhatsApp/i);
     });
   });
 });
