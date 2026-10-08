@@ -65,3 +65,18 @@ describe("the reset helper", () => {
     expect(users).toEqual(["server/routers/businessCheck.ts"]);
   });
 });
+
+describe("business check start: the WhatsApp number", () => {
+  // Same trick as above: a request that passes validation reaches the (missing) database.
+  const startWith = (whatsapp: string) => caller("203.0.113.40").start({ fullName: "Phone Check", email: `phone-${whatsapp.length}@example.test`, whatsapp });
+
+  it("accepts a number in international format", async () => {
+    await passes(startWith("+2348031234567"));
+  });
+
+  it("refuses a number that is not in international format before touching the database", async () => {
+    for (const bad of ["08031234567", "+234 803 123 4567", "not a number", "+12"]) {
+      await expect(startWith(bad), bad).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    }
+  });
+});

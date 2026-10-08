@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { INTERNATIONAL_PHONE } from "../../shared/phone";
 import { businessChecks, type BusinessCheck } from "../../drizzle/schema";
 import { businessDetails, cleanAnswers, evaluate, isComplete } from "../../shared/businessCheck/engine";
 import { advancePipeline } from "../../shared/businessCheck/pipeline";
@@ -55,7 +56,8 @@ const tokenInput = z.string().min(16).max(64);
 export const businessCheckStartInput = z.object({
   fullName: z.string().trim().min(2).max(255),
   email: z.string().trim().email().max(320),
-  whatsapp: z.string().trim().max(32).optional(),
+  /** International format from the country picker, e.g. +2348031234567. */
+  whatsapp: z.string().trim().regex(INTERNATIONAL_PHONE, "Kindly check the WhatsApp number.").optional(),
   heardFrom: z.string().trim().max(64).optional(),
 });
 

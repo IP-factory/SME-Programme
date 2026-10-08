@@ -92,13 +92,79 @@ describe("business check page", { timeout: 20_000 }, () => {
     const boxes = screen.getAllByRole("textbox");
     fireEvent.change(boxes[0], { target: { value: " Ada Example " } });
     fireEvent.change(boxes[1], { target: { value: "ada@example.com" } });
-    fireEvent.change(boxes[2], { target: { value: "+2348000000000" } });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "LinkedIn" } });
+    // Nigeria is preselected, so the owner types the local number; the first 0 is dropped and +234 added.
+    fireEvent.change(screen.getByLabelText("WhatsApp number"), { target: { value: "0800 000 0000" } });
+    fireEvent.change(screen.getByLabelText("How did you hear about us?"), { target: { value: "LinkedIn" } });
     fireEvent.click(start);
 
     expect(api.calls.start).toEqual([{ fullName: "Ada Example", email: "ada@example.com", whatsapp: "+2348000000000", heardFrom: "LinkedIn" }]);
     expect(await screen.findByText("What this means")).toBeTruthy();
     expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY)!).token).toBe(TOKEN);
+  });
+
+  describe("the WhatsApp number", () => {
+    const fillRequired = () => {
+      const boxes = screen.getAllByRole("textbox");
+      fireEvent.change(boxes[0], { target: { value: "Ada Example" } });
+      fireEvent.change(boxes[1], { target: { value: "ada@example.com" } });
+    };
+    const number = () => screen.getByLabelText("WhatsApp number") as HTMLInputElement;
+    const country = () => screen.getByLabelText("Country code") as HTMLSelectElement;
+    const startButton = () => screen.getByRole("button", { name: /start the check/i }) as HTMLButtonElement;
+
+    it("shows Nigeria's flag and +234 in the same box by default, with Nigeria first in the list", async () => {
+      render(React.createElement(BusinessCheck));
+      await pick(/take the check/i);
+      await screen.findByText("First, who are we talking to?");
+      expect(country().value).toBe("NG");
+      expect(number().closest("div")!.textContent).toContain("🇳🇬+234");
+      expect(country().options[0].textContent).toBe("🇳🇬 Nigeria (+234)");
+      expect(number().placeholder).toBe("803 123 4567");
+    });
+
+    it("drops a leading 0 as it is typed and says why", async () => {
+      render(React.createElement(BusinessCheck));
+      await pick(/take the check/i);
+      await screen.findByText("First, who are we talking to?");
+      fireEvent.change(number(), { target: { value: "08031234567" } });
+      expect(number().value).toBe("8031234567");
+      expect(screen.getByText("No need for the first 0: +234 replaces it.")).toBeTruthy();
+    });
+
+    it("sends the number with the chosen country's code", async () => {
+      render(React.createElement(BusinessCheck));
+      await pick(/take the check/i);
+      await screen.findByText("First, who are we talking to?");
+      fillRequired();
+      fireEvent.change(country(), { target: { value: "GB" } });
+      expect(number().closest("div")!.textContent).toContain("+44");
+      fireEvent.change(number(), { target: { value: "07700 900123" } });
+      fireEvent.click(startButton());
+      expect(api.calls.start).toEqual([{ fullName: "Ada Example", email: "ada@example.com", whatsapp: "+447700900123", heardFrom: undefined }]);
+    });
+
+    it("blocks a Nigerian number of the wrong length, and still lets the owner skip the number", async () => {
+      render(React.createElement(BusinessCheck));
+      await pick(/take the check/i);
+      await screen.findByText("First, who are we talking to?");
+      fillRequired();
+      fireEvent.change(number(), { target: { value: "803123" } });
+      fireEvent.blur(number());
+      expect(startButton().disabled).toBe(true);
+      expect(screen.getByRole("alert").textContent).toBe("Nigerian numbers have 10 digits after +234, e.g. 803 123 4567.");
+      fireEvent.change(number(), { target: { value: "" } });
+      expect(startButton().disabled).toBe(false);
+      fireEvent.click(startButton());
+      expect(api.calls.start).toEqual([{ fullName: "Ada Example", email: "ada@example.com", whatsapp: undefined, heardFrom: undefined }]);
+    });
+
+    it("reads a number saved before the country picker existed", async () => {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ started: true, seen: [], history: [], answers: {}, contact: { fullName: "Ada Example", email: "ada@example.com", whatsapp: "+44 7700 900123", heardFrom: "" } }));
+      render(React.createElement(BusinessCheck));
+      await screen.findByText("First, who are we talking to?");
+      expect(country().value).toBe("GB");
+      expect(number().value).toBe("7700900123");
+    });
   });
 
   it("asks the business's name and what it does inside the check, worded for an idea, and uses the name", async () => {
