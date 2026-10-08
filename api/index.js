@@ -8137,7 +8137,7 @@ var platformRolesRouter = router({
 import { z as z19 } from "zod";
 
 // server/businessSupportAdmin.ts
-import { desc as desc9, eq as eq16, isNotNull as isNotNull2 } from "drizzle-orm";
+import { and as and12, desc as desc9, eq as eq16, inArray as inArray4, isNotNull as isNotNull2, sql as sql6 } from "drizzle-orm";
 import { TRPCError as TRPCError15 } from "@trpc/server";
 async function requireDatabase2() {
   const db = await getDb();
@@ -8194,14 +8194,40 @@ async function getBusinessCheckDetail(db, businessCheckId) {
   const { resultJson, summaryJson, ...fields } = row;
   const result = parseJson(resultJson);
   const summary = parseJson(summaryJson);
-  const invitations = await latestInvitationStatuses(db);
+  const [invitations, stageHistory] = await Promise.all([latestInvitationStatuses(db), stageHistoryFor(db, row.id)]);
   return {
     ...fields,
     invitationStatus: invitations.get(row.id) ?? null,
+    stageHistory,
     summary: summary ? { found: summary.found, think: summary.think, next: summary.next, offerings: summary.offerings ?? [] } : null,
     outline: result?.outline ?? null,
     primaryAreaNumber: result?.primaryArea?.area ?? row.primaryArea ?? null
   };
+}
+var HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled"];
+async function stageHistoryFor(db, businessCheckId) {
+  const events = await db.select({ id: adminAccessAuditEvents.id, action: adminAccessAuditEvents.action, details: adminAccessAuditEvents.details, at: adminAccessAuditEvents.createdAt, by: users.name }).from(adminAccessAuditEvents).leftJoin(users, eq16(users.id, adminAccessAuditEvents.actorUserId)).where(and12(inArray4(adminAccessAuditEvents.action, [...HISTORY_ACTIONS]), sql6`${adminAccessAuditEvents.details}::jsonb ->> 'businessCheckId' = ${String(businessCheckId)}`)).orderBy(desc9(adminAccessAuditEvents.createdAt), desc9(adminAccessAuditEvents.id)).limit(100);
+  return events.map((event) => {
+    const details = parseJson(event.details) ?? {};
+    return { id: event.id, action: event.action, from: details.from ?? null, to: details.to ?? null, note: details.note ?? null, scheduledFor: details.scheduledFor ?? null, by: event.by ?? null, at: event.at };
+  });
+}
+var SETTABLE_STAGES = PIPELINE_STAGES.filter((stage) => stage !== "lead");
+async function setPipelineStage(db, input) {
+  const check = (await db.select({ id: businessChecks.id, email: businessChecks.email, pipelineStage: businessChecks.pipelineStage }).from(businessChecks).where(eq16(businessChecks.id, input.businessCheckId)).limit(1))[0];
+  if (!check) throw new TRPCError15({ code: "NOT_FOUND", message: "That business check does not exist." });
+  if (check.pipelineStage === input.stage) return { success: true, pipelineStage: check.pipelineStage, changed: false };
+  if (check.pipelineStage === "won") throw new TRPCError15({ code: "CONFLICT", message: "This business has already been won, so its stage can no longer be changed here." });
+  await db.transaction(async (tx) => {
+    await tx.update(businessChecks).set({ pipelineStage: input.stage }).where(eq16(businessChecks.id, check.id));
+    await recordAudit(tx, {
+      action: "business_check_stage_changed",
+      actorUserId: input.actorUserId,
+      targetEmail: check.email,
+      details: { businessCheckId: check.id, from: check.pipelineStage, to: input.stage, ...input.note ? { note: input.note } : {} }
+    });
+  });
+  return { success: true, pipelineStage: input.stage, changed: true };
 }
 async function requestedCheck(db, businessCheckId) {
   const check = (await db.select({ id: businessChecks.id, email: businessChecks.email, pipelineStage: businessChecks.pipelineStage, callRequestedAt: businessChecks.callRequestedAt }).from(businessChecks).where(eq16(businessChecks.id, businessCheckId)).limit(1))[0];
@@ -8257,6 +8283,8 @@ var businessSupportRouter = router({
   discoveryCalls: prospects.query(async () => listDiscoveryCalls(await businessSupportDb())),
   scheduleCall: prospects.input(z19.object({ businessCheckId: z19.number().int().positive(), scheduledFor: z19.coerce.date() })).mutation(async ({ ctx, input }) => scheduleDiscoveryCall(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
   recordOutcome: prospects.input(z19.object({ businessCheckId: z19.number().int().positive(), outcome: z19.enum(CALL_OUTCOMES) })).mutation(async ({ ctx, input }) => recordDiscoveryCallOutcome(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
+  /** Moves a business check to any later stage (Opportunity, Won, Lost, Nurture, Referred…), with an optional note. */
+  setStage: prospects.input(z19.object({ businessCheckId: z19.number().int().positive(), stage: z19.enum(SETTABLE_STAGES), note: z19.string().trim().max(500).optional() })).mutation(async ({ ctx, input }) => setPipelineStage(await businessSupportDb(), { ...input, note: input.note || void 0, actorUserId: ctx.user.id })),
   clients: clients.query(async () => listClients(await businessSupportDb()))
 });
 

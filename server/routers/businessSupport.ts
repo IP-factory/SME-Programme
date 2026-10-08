@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PipelineStage } from "../../shared/businessCheck/pipeline";
 import {
   CALL_OUTCOMES,
   businessSupportDb,
@@ -8,6 +9,8 @@ import {
   listDiscoveryCalls,
   recordDiscoveryCallOutcome,
   scheduleDiscoveryCall,
+  SETTABLE_STAGES,
+  setPipelineStage,
 } from "../businessSupportAdmin";
 import { adminPermissionProcedure, router } from "../_core/trpc";
 
@@ -32,5 +35,9 @@ export const businessSupportRouter = router({
   recordOutcome: prospects
     .input(z.object({ businessCheckId: z.number().int().positive(), outcome: z.enum(CALL_OUTCOMES) }))
     .mutation(async ({ ctx, input }) => recordDiscoveryCallOutcome(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
+  /** Moves a business check to any later stage (Opportunity, Won, Lost, Nurture, Referred…), with an optional note. */
+  setStage: prospects
+    .input(z.object({ businessCheckId: z.number().int().positive(), stage: z.enum(SETTABLE_STAGES as [Exclude<PipelineStage, "lead">, ...Exclude<PipelineStage, "lead">[]]), note: z.string().trim().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => setPipelineStage(await businessSupportDb(), { ...input, note: input.note || undefined, actorUserId: ctx.user.id })),
   clients: clients.query(async () => listClients(await businessSupportDb())),
 });

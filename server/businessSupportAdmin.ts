@@ -1,7 +1,7 @@
-import { desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { businessChecks, businessMemberships, businesses, users } from "../drizzle/schema";
-import { advancePipeline, type PipelineStage } from "../shared/businessCheck/pipeline";
+import { adminAccessAuditEvents, businessChecks, businessMemberships, businesses, users } from "../drizzle/schema";
+import { advancePipeline, PIPELINE_STAGES, type PipelineStage } from "../shared/businessCheck/pipeline";
 import type { CheckResult } from "../shared/businessCheck/engine";
 import type { Database } from "./accountAuth";
 import { recordAudit } from "./audit";
@@ -76,14 +76,57 @@ export async function getBusinessCheckDetail(db: Pick<Database, "select">, busin
   const { resultJson, summaryJson, ...fields } = row;
   const result = parseJson<Pick<CheckResult, "outline" | "primaryArea" | "founder">>(resultJson);
   const summary = parseJson<CheckSummary>(summaryJson);
-  const invitations = await latestInvitationStatuses(db);
+  const [invitations, stageHistory] = await Promise.all([latestInvitationStatuses(db), stageHistoryFor(db, row.id)]);
   return {
     ...fields,
     invitationStatus: invitations.get(row.id) ?? null,
+    stageHistory,
     summary: summary ? { found: summary.found, think: summary.think, next: summary.next, offerings: summary.offerings ?? [] } : null,
     outline: result?.outline ?? null,
     primaryAreaNumber: result?.primaryArea?.area ?? row.primaryArea ?? null,
   };
+}
+
+/** Audit actions that move a business check or record something about its call, shown as its history. */
+const HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled"] as const;
+
+/** What the team has done to one business check, newest first, with who did it. Read from the audit log. */
+async function stageHistoryFor(db: Pick<Database, "select">, businessCheckId: number) {
+  const events = await db
+    .select({ id: adminAccessAuditEvents.id, action: adminAccessAuditEvents.action, details: adminAccessAuditEvents.details, at: adminAccessAuditEvents.createdAt, by: users.name })
+    .from(adminAccessAuditEvents)
+    .leftJoin(users, eq(users.id, adminAccessAuditEvents.actorUserId))
+    .where(and(inArray(adminAccessAuditEvents.action, [...HISTORY_ACTIONS]), sql`${adminAccessAuditEvents.details}::jsonb ->> 'businessCheckId' = ${String(businessCheckId)}`))
+    .orderBy(desc(adminAccessAuditEvents.createdAt), desc(adminAccessAuditEvents.id))
+    .limit(100);
+  return events.map(event => {
+    const details = parseJson<{ from?: PipelineStage; to?: PipelineStage; note?: string; scheduledFor?: string }>(event.details) ?? {};
+    return { id: event.id, action: event.action as (typeof HISTORY_ACTIONS)[number], from: details.from ?? null, to: details.to ?? null, note: details.note ?? null, scheduledFor: details.scheduledFor ?? null, by: event.by ?? null, at: event.at };
+  });
+}
+
+/** Stages the team can move a check to. "lead" is where every check starts, so nothing moves back to it. */
+export const SETTABLE_STAGES = PIPELINE_STAGES.filter(stage => stage !== "lead") as Exclude<PipelineStage, "lead">[];
+
+/**
+ * Moves a business check to any later pipeline stage (after the call, a payment or a decision), with an optional note
+ * for the team. A won business is not reopened here, as with call outcomes. Every change is audited.
+ */
+export async function setPipelineStage(db: Database, input: { businessCheckId: number; stage: Exclude<PipelineStage, "lead">; note?: string; actorUserId: number }) {
+  const check = (await db.select({ id: businessChecks.id, email: businessChecks.email, pipelineStage: businessChecks.pipelineStage }).from(businessChecks).where(eq(businessChecks.id, input.businessCheckId)).limit(1))[0];
+  if (!check) throw new TRPCError({ code: "NOT_FOUND", message: "That business check does not exist." });
+  if (check.pipelineStage === input.stage) return { success: true, pipelineStage: check.pipelineStage, changed: false } as const;
+  if (check.pipelineStage === "won") throw new TRPCError({ code: "CONFLICT", message: "This business has already been won, so its stage can no longer be changed here." });
+  await db.transaction(async tx => {
+    await tx.update(businessChecks).set({ pipelineStage: input.stage }).where(eq(businessChecks.id, check.id));
+    await recordAudit(tx, {
+      action: "business_check_stage_changed",
+      actorUserId: input.actorUserId,
+      targetEmail: check.email,
+      details: { businessCheckId: check.id, from: check.pipelineStage, to: input.stage, ...(input.note ? { note: input.note } : {}) },
+    });
+  });
+  return { success: true, pipelineStage: input.stage, changed: true } as const;
 }
 
 async function requestedCheck(db: Pick<Database, "select">, businessCheckId: number) {

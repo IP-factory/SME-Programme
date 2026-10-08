@@ -165,10 +165,19 @@ leaves the table and its filters as they were. Contact details, the saved findin
 the call outcome live in the drawer. Rows are keyboard-accessible (each has a real button) and lower-priority columns drop out
 on narrow screens before the table scrolls.
 
+**The commercial pipeline.** Business Checks opens with one tab per stored pipeline stage (Lead, Qualified lead, Call
+requested, Opportunity, Won, Lost, Nurture, Referred) with its count, so the whole funnel shows at a glance; a tab filters
+the table. In the record drawer, **Move to** sets any later stage (`businessSupport.setStage`, permission
+`manage_client_onboarding`) with an optional note for the team, and **Stage history** lists every move, call outcome and
+recorded call time with who did it and when, read from the audit log (`business_check_stage_changed`,
+`business_check_call_outcome`, `business_check_call_scheduled`). Nothing moves back to Lead, and a won business is final, as
+with call outcomes. Stage names in the console come from `stageDisplayName` (`shared/businessCheck/funnelStatus.ts`).
+
 **Status wording** (`shared/businessCheck/funnelStatus.ts`) is display only: the stored stage is unchanged. The stored stage
 `call_booked` means the owner only REQUESTED a call, so it reads "Call requested" (or "Call scheduled" once a time is
-recorded). Fit = `opportunity`, Referred = `referred`, Declined = `lost`; an invitation that is out reads "Onboarding" and an
-accepted one "Onboarded".
+recorded). Every other label is the owner's agreed pipeline name: Lead (check not finished), Qualified lead (check
+finished), Opportunity = `opportunity` (call outcome "fit"), Referred, Lost = `lost` (call outcome "decline"), Nurture, Won;
+an invitation that is out reads "Onboarding" and an accepted one "Onboarded".
 
 The funnel: Free Business Check (a prospect: no user, no business) -> the owner **requests** a free discovery call
 (`callRequestedAt`, stage `call_booked`; there is no booking provider yet, so nothing is booked) -> the team agrees a time by

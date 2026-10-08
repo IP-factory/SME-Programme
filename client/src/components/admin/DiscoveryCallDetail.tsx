@@ -25,11 +25,11 @@ type Row = {
 };
 
 const OUTCOME_FOR_STATUS: Partial<Record<FunnelStatus, "fit" | "refer" | "decline">> = { fit: "fit", referred: "refer", declined: "decline" };
-const OUTCOME_NAME = { fit: "Fit", refer: "Referred", decline: "Declined" } as const;
+const OUTCOME_NAME = { fit: "Opportunity", refer: "Referred", decline: "Lost" } as const;
 
 /**
  * One discovery call: who to contact, when it is, and what came of it. Scheduling and the outcome use the existing
- * mutations unchanged; "Fit" does not create an account, it points to Client Onboarding as a separate, deliberate step.
+ * mutations unchanged; "Opportunity" (fit) does not create an account, it points to Client Onboarding as a separate, deliberate step.
  */
 export default function DiscoveryCallDetail({ row, onOpenSection, onClose }: { row: Row; onOpenSection: (section: AdminSectionId) => void; onClose: () => void }) {
   const utils = trpc.useUtils();
@@ -98,9 +98,9 @@ export default function DiscoveryCallDetail({ row, onOpenSection, onClose }: { r
         <DetailSection title="Record call outcome">
           {decided && <p className="mb-3 text-sm text-ink-muted">Recorded: <span className="font-medium text-ink">{OUTCOME_NAME[decided]}</span>. You can change it.</p>}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={busy || decided === "fit"} className="rounded-none bg-brand text-xs uppercase tracking-wider text-white" onClick={() => decide.mutate({ businessCheckId: row.id, outcome: "fit" })}>Fit</Button>
+            <Button type="button" disabled={busy || decided === "fit"} className="rounded-none bg-brand text-xs uppercase tracking-wider text-white" onClick={() => decide.mutate({ businessCheckId: row.id, outcome: "fit" })}>Opportunity</Button>
             <Button type="button" variant="outline" disabled={busy || decided === "refer"} className="rounded-none text-xs uppercase tracking-wider" onClick={() => decide.mutate({ businessCheckId: row.id, outcome: "refer" })}>Refer</Button>
-            <Button type="button" variant="outline" disabled={busy || decided === "decline"} className="rounded-none border-rose-200 text-xs uppercase tracking-wider text-rose-800 hover:bg-rose-50" onClick={() => decide.mutate({ businessCheckId: row.id, outcome: "decline" })}>Decline</Button>
+            <Button type="button" variant="outline" disabled={busy || decided === "decline"} className="rounded-none border-rose-200 text-xs uppercase tracking-wider text-rose-800 hover:bg-rose-50" onClick={() => decide.mutate({ businessCheckId: row.id, outcome: "decline" })}>Lost</Button>
           </div>
         </DetailSection>
       )}

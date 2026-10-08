@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FUNNEL_STATUSES, FUNNEL_STATUS_LABELS, funnelStatus, funnelStatusLabel, isReadyToOnboard } from "@shared/businessCheck/funnelStatus";
+import { FUNNEL_STATUSES, FUNNEL_STATUS_LABELS, funnelStatus, funnelStatusLabel, isReadyToOnboard, stageDisplayName } from "@shared/businessCheck/funnelStatus";
 import { PIPELINE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@shared/businessCheck/pipeline";
 
 const done = new Date("2026-10-05T09:00:00Z");
@@ -7,15 +7,15 @@ const scheduled = new Date("2026-10-08T13:00:00Z");
 
 describe("funnelStatus: the plain words the admin console uses", () => {
   it.each([
-    [{ pipelineStage: "lead" }, "in_progress", "Check in progress"],
-    [{ pipelineStage: "lead", completedAt: done }, "completed", "Check completed"],
-    [{ pipelineStage: "qualified_lead", completedAt: done }, "completed", "Check completed"],
+    [{ pipelineStage: "lead" }, "in_progress", "Lead"],
+    [{ pipelineStage: "lead", completedAt: done }, "completed", "Qualified lead"],
+    [{ pipelineStage: "qualified_lead", completedAt: done }, "completed", "Qualified lead"],
     [{ pipelineStage: "call_booked", completedAt: done }, "call_requested", "Call requested"],
     [{ pipelineStage: "call_booked", completedAt: done, callScheduledFor: scheduled }, "call_scheduled", "Call scheduled"],
-    [{ pipelineStage: "opportunity", completedAt: done }, "fit", "Fit"],
+    [{ pipelineStage: "opportunity", completedAt: done }, "fit", "Opportunity"],
     [{ pipelineStage: "referred", completedAt: done }, "referred", "Referred"],
-    [{ pipelineStage: "lost", completedAt: done }, "declined", "Declined"],
-    [{ pipelineStage: "nurture", completedAt: done }, "nurture", "Follow up later"],
+    [{ pipelineStage: "lost", completedAt: done }, "declined", "Lost"],
+    [{ pipelineStage: "nurture", completedAt: done }, "nurture", "Nurture"],
     [{ pipelineStage: "won", completedAt: done }, "won", "Won"],
   ] as const)("%j -> %s (%s)", (input, key, label) => {
     expect(funnelStatus(input as never)).toBe(key);
@@ -50,5 +50,11 @@ describe("funnelStatus: the plain words the admin console uses", () => {
 
   it("changes the wording only: the stored stage names are untouched", () => {
     expect(PIPELINE_STAGES.map(stage => PIPELINE_LABELS[stage].name)).toEqual(["Lead", "Qualified lead", "Call booked", "Opportunity", "Won", "Lost", "Nurture", "Referred"]);
+  });
+});
+
+describe("stageDisplayName: stage names in the admin console", () => {
+  it("uses the agreed pipeline names, except a call that is only requested", () => {
+    expect(PIPELINE_STAGES.map(stageDisplayName)).toEqual(["Lead", "Qualified lead", "Call requested", "Opportunity", "Won", "Lost", "Nurture", "Referred"]);
   });
 });
