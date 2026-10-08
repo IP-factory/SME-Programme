@@ -28,6 +28,8 @@ import { AREA_NAMES, GAP_LABELS, SECTIONS, stageOf, type Answers, type Health, t
 import { FULL_REPORT, formatNaira, PRICES, PROMISE } from "@shared/businessSupport";
 import { bookingTarget, isCalendlyBooking } from "@shared/booking";
 import { describeFounder, STRENGTH_LABELS, type Strength } from "@shared/businessCheck/founderNarrative";
+import { cleanNationalNumber, DEFAULT_COUNTRY, phoneProblem, toInternational } from "@shared/phone";
+import PhoneField from "@/components/PhoneField";
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarDays, Check, CheckCircle2, Clock3, FileText, Lightbulb, LockKeyhole, Mail, PencilLine, RotateCcw, type LucideIcon } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EASE } from "@/components/motion";
@@ -38,11 +40,12 @@ import type { BusinessCheckResponse } from "../../../server/routers/businessChec
 const STORAGE_KEY = "ipf-business-check-v1";
 
 /** The owner, asked first. Everything about the business is asked inside the check. */
-type Contact = { fullName: string; email: string; whatsapp: string; heardFrom: string };
+/** `whatsapp` is the national number as typed (no leading 0); `whatsappCountry` its ISO country. Sent in +234… form. */
+type Contact = { fullName: string; email: string; whatsapp: string; whatsappCountry: string; heardFrom: string };
 /** token: the saved check on the server, created when the details are given. */
 type Saved = { started: boolean; token?: string; answers: Answers; seen: SectionId[]; history: string[]; contact: Contact; response?: BusinessCheckResponse };
 
-const EMPTY_CONTACT: Contact = { fullName: "", email: "", whatsapp: "", heardFrom: "" };
+const EMPTY_CONTACT: Contact = { fullName: "", email: "", whatsapp: "", whatsappCountry: DEFAULT_COUNTRY, heardFrom: "" };
 const SAVE_DELAY_MS = 800;
 const FRESH: Saved = { started: false, answers: {}, seen: [], history: [], contact: EMPTY_CONTACT };
 
@@ -53,7 +56,13 @@ function load(): Saved {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return FRESH;
     const saved = { ...FRESH, ...JSON.parse(raw) } as Saved;
-    return { ...saved, contact: { ...EMPTY_CONTACT, ...saved.contact } };
+    const contact = { ...EMPTY_CONTACT, ...saved.contact };
+    // Saved before the country picker existed: the number was free text, possibly "+234…" or "0803…".
+    if (!saved.contact?.whatsappCountry && contact.whatsapp) {
+      const { iso, national } = cleanNationalNumber(DEFAULT_COUNTRY, contact.whatsapp);
+      Object.assign(contact, { whatsapp: national, whatsappCountry: iso });
+    }
+    return { ...saved, contact };
   } catch {
     return FRESH;
   }
@@ -198,8 +207,8 @@ export default function BusinessCheck() {
         onBack={() => { setDirection(-1); update({ started: false }); }}
         onSubmit={() => {
           setError("");
-          const { fullName, email, whatsapp, heardFrom } = state.contact;
-          start.mutate({ fullName: fullName.trim(), email: email.trim(), whatsapp: whatsapp.trim() || undefined, heardFrom: heardFrom || undefined });
+          const { fullName, email, whatsapp, whatsappCountry, heardFrom } = state.contact;
+          start.mutate({ fullName: fullName.trim(), email: email.trim(), whatsapp: toInternational(whatsappCountry, whatsapp) || undefined, heardFrom: heardFrom || undefined });
         }}
       />
     );
@@ -595,7 +604,7 @@ function Reading() {
 
 function DetailsScreen({ contact, pending, error, onChange, onBack, onSubmit }: { contact: Contact; pending: boolean; error: string; onChange: (contact: Contact) => void; onBack: () => void; onSubmit: () => void }) {
   const set = (key: keyof Contact) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange({ ...contact, [key]: event.target.value });
-  const valid = contact.fullName.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(contact.email.trim());
+  const valid = contact.fullName.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(contact.email.trim()) && !phoneProblem(contact.whatsappCountry, contact.whatsapp);
 
   return (
     <motion.form className="space-y-7" variants={listMotion} initial="hidden" animate="show" onSubmit={(event) => { event.preventDefault(); if (valid && !pending) onSubmit(); }}>
@@ -607,9 +616,11 @@ function DetailsScreen({ contact, pending, error, onChange, onBack, onSubmit }: 
       <motion.div variants={itemMotion} className="grid gap-5 sm:grid-cols-2">
         <Field label="Full name" required><Input value={contact.fullName} onChange={set("fullName")} autoComplete="name" className="h-12 rounded-none transition-shadow focus-visible:shadow-[0_0_0_4px_rgba(28,78,126,0.12)]" /></Field>
         <Field label="Email" required><Input type="email" value={contact.email} onChange={set("email")} autoComplete="email" className="h-12 rounded-none transition-shadow focus-visible:shadow-[0_0_0_4px_rgba(28,78,126,0.12)]" /></Field>
-        <Field label="WhatsApp number (optional, for a quicker reply)"><Input type="tel" value={contact.whatsapp} onChange={set("whatsapp")} autoComplete="tel" placeholder="+234" className="h-12 rounded-none" /></Field>
+        <Field label="WhatsApp number (optional, for a quicker reply)">
+          <PhoneField label="WhatsApp number" iso={contact.whatsappCountry} national={contact.whatsapp} onChange={({ iso, national }) => onChange({ ...contact, whatsappCountry: iso, whatsapp: national })} />
+        </Field>
         <Field label="How did you hear about us? (optional)">
-          <select value={contact.heardFrom} onChange={set("heardFrom")} className="h-12 w-full border border-input bg-paper-raised px-3 text-sm">
+          <select aria-label="How did you hear about us?" value={contact.heardFrom} onChange={set("heardFrom")} className="h-12 w-full border border-input bg-paper-raised px-3 text-sm">
             <option value="">Choose one</option>
             {HEARD_FROM.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
