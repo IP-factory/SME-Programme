@@ -222,6 +222,50 @@ for (const target of targets) {
       });
     });
 
+    describe("the whole journey up to Current State", () => {
+      it("takes an owner from the free check to a client account with Current State started", async () => {
+        // 1. The owner takes the free check and asks for the call and the full report.
+        const { token, email, visitor, id } = await finishedCheck("journey");
+        await (await visitor.call()).businessCheck.requestNext({ token, choice: "call" });
+        expect((await rowFor(token)).pipelineStage).toBe("call_booked");
+        await (await visitor.call()).businessCheck.requestNext({ token, choice: "report" });
+        const report = (await paymentsOf(id)).find((row: { item: string }) => row.item === "full_report");
+        expect(emails().some(sent => sent.to === email && sent.subject === "Payment details for your full business check report")).toBe(true);
+
+        // 2. They pay for the report and reply with proof; the team confirms.
+        await (await superAdmin.call()).businessSupport.markProofReceived({ paymentRequestId: report.id });
+        await (await superAdmin.call()).businessSupport.confirmPayment({ paymentRequestId: report.id });
+
+        // 3. After the call, the team sends the Current State details; the owner pays; the team confirms.
+        const { paymentRequestId } = await (await superAdmin.call()).businessSupport.requestPayment({ businessCheckId: id, item: "current_state" });
+        expect((await rowFor(token)).pipelineStage).toBe("opportunity");
+        await (await superAdmin.call()).businessSupport.markProofReceived({ paymentRequestId });
+        mocked.deliverEmail.mockClear();
+        expect(await (await superAdmin.call()).businessSupport.confirmPayment({ paymentRequestId })).toMatchObject({ invitation: "sent" });
+        expect((await rowFor(token)).pipelineStage).toBe("won");
+
+        // 4. The owner follows the link in the invitation email and creates their client account.
+        const invitation = emails().find(sent => sent.to === email && sent.subject === "Set up your client account on The Shift")!;
+        const link = invitation.body.match(/Create your account: (\S+)/)![1];
+        const inviteToken = decodeURIComponent(link.split("/onboarding/")[1]);
+        const owner = browser();
+        await (await owner.call()).onboarding.accept({ token: inviteToken, email, fullName: "Ada Journey", password: PASSWORD, confirmPassword: PASSWORD, businessName: "Journey Traders" });
+        const me = await (await owner.call()).account.me();
+        expect(me).toMatchObject({ user: { email } });
+        const workspace = await (await owner.call()).account.workspace();
+        expect(JSON.stringify(workspace)).toContain("Journey Traders");
+
+        // 5. The admin console tells the whole story.
+        const detail = await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: id });
+        expect(detail.invitationStatus).toBe("accepted");
+        expect(detail.payments!.map(payment => [payment.item, payment.status])).toEqual([["full_report", "confirmed"], ["current_state", "confirmed"]]);
+        const actions = detail.stageHistory.map(event => event.action);
+        expect(actions.filter(action => action === "payment_confirmed")).toHaveLength(2);
+        expect(actions.filter(action => action === "payment_details_sent")).toHaveLength(2);
+        expect(actions.filter(action => action === "payment_proof_received")).toHaveLength(2);
+      });
+    });
+
     describe("the admin console", () => {
       it("shows each check's payments in the list, the record and its history", async () => {
         const { token, email, visitor, id } = await finishedCheck("console");
