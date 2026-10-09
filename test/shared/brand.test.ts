@@ -21,6 +21,9 @@ describe("brand settings", () => {
     const token = (name: string) => css.match(new RegExp(`--color-${name}:\\s*(#[0-9A-Fa-f]{6})`))?.[1]?.toUpperCase();
     expect(token("brand")).toBe(BRAND.colorBrand.toUpperCase());
     expect(token("brand-deep")).toBe(BRAND.colorBrandDeep.toUpperCase());
+    for (const [name, value] of Object.entries(BRAND.palette)) {
+      expect(token(name), `--color-${name}`).toBe(value.toUpperCase());
+    }
   });
 });
 

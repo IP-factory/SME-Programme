@@ -16,7 +16,7 @@ import { previewLink } from "./previewLink";
 
 // Asset paths are site-absolute in the app; make them relative to wherever the preview is served.
 for (const key of ["logoUrl", "logoOnDarkUrl", "markUrl"] as const) {
-  (BRAND as Record<string, string>)[key] = `.${BRAND[key]}`;
+  (BRAND as unknown as Record<string, string>)[key] = `.${BRAND[key]}`;
 }
 
 // Same-page links (#how, #questions…) scroll instead of navigating away from the preview.

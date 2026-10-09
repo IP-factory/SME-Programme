@@ -1,4 +1,5 @@
 import { ENV } from "./_core/env";
+import { EMAIL_LOGO_CID, EMAIL_LOGO_PNG_BASE64 } from "./emailLogo";
 import { buildBusinessSupportEmailHtml, buildPlainTextEmailHtml } from "./emailTemplates";
 import { BRAND } from "../shared/brand";
 
@@ -83,13 +84,14 @@ export function resendRequestBody(input: {
   sender?: EmailSender;
 }) {
   const businessSupport = input.sender === "business_support";
+  const html = input.html || (businessSupport ? buildBusinessSupportEmailHtml(input.body) : buildPlainTextEmailHtml(input.body));
   return {
     from: businessSupport ? getBusinessSupportSender() : getJumpProgrammeSender(),
     to: [input.to],
     bcc: input.bcc ? (Array.isArray(input.bcc) ? input.bcc : [input.bcc]) : undefined,
     subject: input.subject,
     text: input.body,
-    html: input.html || (businessSupport ? buildBusinessSupportEmailHtml(input.body) : buildPlainTextEmailHtml(input.body)),
+    html,
     reply_to: businessSupport ? BUSINESS_SUPPORT_MAILBOX : getJumpProgrammeReplyTo(),
     attachments: [
       ...(input.attachments || []).map((attachment) => ({
@@ -99,6 +101,10 @@ export function resendRequestBody(input: {
       })),
       ...(input.icsContent
         ? [{ filename: input.icsFilename || "session-invite.ics", content: Buffer.from(input.icsContent).toString("base64"), content_type: "text/calendar" }]
+        : []),
+      // The IP Factory logo travels inside the email when the layout shows it.
+      ...(html.includes(`cid:${EMAIL_LOGO_CID}`)
+        ? [{ filename: "ip-factory-logo.png", content: EMAIL_LOGO_PNG_BASE64, content_type: "image/png", content_id: EMAIL_LOGO_CID }]
         : []),
     ],
   };

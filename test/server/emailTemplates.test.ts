@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BRAND } from "@shared/brand";
 import { buildBusinessSupportEmailHtml, buildDuplicatePathwayClarificationEmail, buildEngagementBriefInvitationEmail, buildInformationSessionInvitationEmail, buildRegistrationConfirmationEmail } from "@server/emailTemplates";
 
 describe("registration confirmation presentation", () => {
@@ -135,13 +136,25 @@ describe("business support email layout", () => {
   ].join("\n");
   const html = buildBusinessSupportEmailHtml(body);
 
-  it("brands the email The Shift, by IP Factory, with the greeting and a preview line", () => {
+  it("shows the IP Factory logo beside The Shift, with the greeting and a preview line", () => {
+    expect(html).toMatch(/<img src="cid:ipf-logo" width="96" height="90" alt="IP Factory"/);
     expect(html).toContain(">The Shift<");
-    expect(html).toContain(">by IP Factory<");
+    expect(html).toContain("The Shift, by IP Factory");
     expect(html).toContain("mailto:info@ipfactory.co");
     expect(html).toContain("<title>Thank you for taking the IP Factory business check. Here is your summary.</title>");
     expect(html).toMatch(/Georgia[^>]*>Dear Ada,<\/p>/);
     expect(html).not.toMatch(/JUMP|Genius Track|Emmanuel Tarfa/);
+  });
+
+  it("uses only the brand palette: crimson labels, the cyan button with navy text and the logo's colour line", () => {
+    const used = new Set(html.match(/#[0-9A-Fa-f]{6}/g)!.map((hex) => hex.toUpperCase()));
+    const palette = new Set(Object.values(BRAND.palette).map((hex) => hex.toUpperCase()));
+    expect([...used].filter((hex) => !palette.has(hex))).toEqual([]);
+    expect(html).toMatch(new RegExp(`color:${BRAND.palette["highlight-ink"]};font-weight:700;">WHAT WE FOUND<`));
+    expect(html).toMatch(new RegExp(`bgcolor="${BRAND.palette.highlight}"[^>]*><a [^>]*color:${BRAND.palette["brand-deep"]};[^>]*>Pick a time<`));
+    for (const colour of [BRAND.palette["brand-plum"], BRAND.palette["highlight-ink"], BRAND.palette.highlight]) {
+      expect(html).toContain(`height="4" bgcolor="${colour}"`);
+    }
   });
 
   it("turns capitals into headings, bullets into a list and a lone address line into a button", () => {

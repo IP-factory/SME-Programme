@@ -77,6 +77,26 @@ export const BRAND = {
    */
   colorBrand: "#1C4E7E",
   colorBrandDeep: "#12324F",
+  /**
+   * The theme tokens email HTML uses, keyed by their name in client/src/index.css (--color-<name>). Email cannot read
+   * CSS variables, so the values are copied here; brand.test.ts fails if any of them drifts from the stylesheet.
+   */
+  palette: {
+    "brand": "#1C4E7E",
+    "brand-deep": "#12324F",
+    "brand-plum": "#6C335C",
+    "highlight": "#36B7E0",
+    "highlight-ink": "#CB3756",
+    "ink": "#12324F",
+    "ink-soft": "#4F5A66",
+    "ink-muted": "#5F6B77",
+    "brand-slate": "#4A5E73",
+    "brand-tint-softer": "#F6F9FB",
+    "brand-line": "#D3DEEA",
+    "line": "#DDE3E8",
+    "paper": "#F7F9FA",
+    "paper-raised": "#FFFFFF",
+  },
 } as const;
 
 export type Brand = typeof BRAND;

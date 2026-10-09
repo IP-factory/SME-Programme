@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ENV } from "@server/_core/env";
+import { EMAIL_LOGO_CID, EMAIL_LOGO_PNG_BASE64 } from "@server/emailLogo";
 import { BUSINESS_SUPPORT_SENDER, getBusinessSupportSender, JUMP_PROGRAMME_MAILBOX, JUMP_PROGRAMME_SENDER, resendRequestBody } from "@server/email";
 
 describe("Business Support (business check) email sender", () => {
@@ -38,6 +39,13 @@ describe("the Resend request", () => {
     expect(body.html).toContain("by IP Factory");
     expect(body.html).toContain("info@ipfactory.co");
     expect(body.html).not.toMatch(/JUMP|Genius Track|Emmanuel Tarfa/);
+  });
+
+  it("carries the IP Factory logo inside business check email, and not inside JUMP email", () => {
+    const business = resendRequestBody({ to: "ada@example.com", subject: "Hi", body: "Hello", sender: "business_support" });
+    expect(business.attachments).toEqual([{ filename: "ip-factory-logo.png", content: EMAIL_LOGO_PNG_BASE64, content_type: "image/png", content_id: EMAIL_LOGO_CID }]);
+    expect(business.html).toContain(`src="cid:${EMAIL_LOGO_CID}"`);
+    expect(resendRequestBody({ to: "participant@example.com", subject: "JUMP", body: "Hello" }).attachments).toEqual([]);
   });
 
   it("keeps an HTML version the caller wrote", () => {
