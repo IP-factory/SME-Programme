@@ -53,6 +53,57 @@ export function getJumpProgrammeReplyTo(_configuredReplyTo = ENV.emailReplyTo): 
   return JUMP_PROGRAMME_MAILBOX;
 }
 
+/** Default sender for IP Factory Business Support (business check) email. */
+export const BUSINESS_SUPPORT_SENDER = `${BRAND.organisationName} <${BUSINESS_SUPPORT_MAILBOX}>`;
+
+/**
+ * Business check email is sent as IP Factory, not as the JUMP programme. EMAIL_FROM names the sending address Resend
+ * has verified (Resend's test address, onboarding@resend.dev, until ipfactory.co is verified). A leftover JUMP or
+ * personal address is ignored in favour of info@ipfactory.co.
+ */
+export function getBusinessSupportSender(configuredFrom = ENV.emailFrom): string {
+  const normalised = normalizeEmailHeaderValue(configuredFrom || "").trim();
+  if (!normalised || /emmanueltarfa\.com/i.test(normalised)) return BUSINESS_SUPPORT_SENDER;
+  return normalised;
+}
+
+/** Which identity an email is sent under. JUMP programme email keeps its own mailbox. */
+export type EmailSender = "jump" | "business_support";
+
+/** The Resend request body. Pure, so the sender and reply-to rules can be tested without sending anything. */
+export function resendRequestBody(input: {
+  to: string;
+  bcc?: string | string[];
+  subject: string;
+  body: string;
+  html?: string;
+  icsContent?: string;
+  icsFilename?: string;
+  attachments?: EmailAttachment[];
+  sender?: EmailSender;
+}) {
+  const businessSupport = input.sender === "business_support";
+  return {
+    from: businessSupport ? getBusinessSupportSender() : getJumpProgrammeSender(),
+    to: [input.to],
+    bcc: input.bcc ? (Array.isArray(input.bcc) ? input.bcc : [input.bcc]) : undefined,
+    subject: input.subject,
+    text: input.body,
+    html: input.html || buildPlainTextEmailHtml(input.body),
+    reply_to: businessSupport ? BUSINESS_SUPPORT_MAILBOX : getJumpProgrammeReplyTo(),
+    attachments: [
+      ...(input.attachments || []).map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content.toString("base64"),
+        content_type: attachment.contentType,
+      })),
+      ...(input.icsContent
+        ? [{ filename: input.icsFilename || "session-invite.ics", content: Buffer.from(input.icsContent).toString("base64"), content_type: "text/calendar" }]
+        : []),
+    ],
+  };
+}
+
 export async function deliverEmail(input: {
   to: string;
   bcc?: string | string[];
@@ -62,17 +113,18 @@ export async function deliverEmail(input: {
   icsContent?: string;
   icsFilename?: string;
   attachments?: EmailAttachment[];
+  /** Defaults to the JUMP programme; business check email passes "business_support". */
+  sender?: EmailSender;
 }): Promise<EmailDeliveryResult> {
   if (process.env.NODE_ENV === "test" || process.env.VITEST || process.env.VITEST_WORKER_ID) {
     return { status: "Simulated", reason: "test_sender" };
   }
 
   const apiKey = ENV.resendApiKey;
-  if (!apiKey) return { status: "Failed", reason: `${BRAND.programmeShortName} programme email delivery is not configured` };
-
-  const html = input.html || buildPlainTextEmailHtml(input.body);
-  const from = getJumpProgrammeSender();
-  const replyTo = getJumpProgrammeReplyTo();
+  if (!apiKey) {
+    console.warn("[Email] RESEND_API_KEY is not set, so no email was sent.");
+    return { status: "Failed", reason: `${BRAND.programmeShortName} programme email delivery is not configured` };
+  }
 
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -83,29 +135,14 @@ export async function deliverEmail(input: {
         authorization: `Bearer ${apiKey}`,
         "user-agent": "jump-2026-registration/1.0",
       },
-      body: JSON.stringify({
-        from,
-        to: [input.to],
-        bcc: input.bcc ? (Array.isArray(input.bcc) ? input.bcc : [input.bcc]) : undefined,
-        subject: input.subject,
-        text: input.body,
-        html,
-        reply_to: replyTo,
-        attachments: [
-          ...(input.attachments || []).map((attachment) => ({
-            filename: attachment.filename,
-            content: attachment.content.toString("base64"),
-            content_type: attachment.contentType,
-          })),
-          ...(input.icsContent
-            ? [{ filename: input.icsFilename || "session-invite.ics", content: Buffer.from(input.icsContent).toString("base64"), content_type: "text/calendar" }]
-            : []),
-        ],
-      }),
+      body: JSON.stringify(resendRequestBody(input)),
     });
     const data = (await response.json().catch(() => ({}))) as { id?: string; message?: string; name?: string };
     if (response.ok) return { status: "Sent", providerMessageId: data.id };
-    return { status: "Failed", reason: data.message || data.name || `Resend API error: HTTP ${response.status}` };
+    const reason = data.message || data.name || `Resend API error: HTTP ${response.status}`;
+    // Visible in the hosting logs (e.g. an unverified domain); never includes the API key.
+    console.warn(`[Email] Resend refused an email (HTTP ${response.status}): ${reason}`);
+    return { status: "Failed", reason };
   } catch (error) {
     return { status: "Failed", reason: error instanceof Error ? error.message : `Unknown error during ${BRAND.programmeShortName} email delivery` };
   }

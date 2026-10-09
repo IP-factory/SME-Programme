@@ -1412,15 +1412,41 @@ function getJumpProgrammeSender(configuredFrom = ENV.emailFrom) {
 function getJumpProgrammeReplyTo(_configuredReplyTo = ENV.emailReplyTo) {
   return JUMP_PROGRAMME_MAILBOX;
 }
+var BUSINESS_SUPPORT_SENDER = `${BRAND.organisationName} <${BUSINESS_SUPPORT_MAILBOX}>`;
+function getBusinessSupportSender(configuredFrom = ENV.emailFrom) {
+  const normalised = normalizeEmailHeaderValue(configuredFrom || "").trim();
+  if (!normalised || /emmanueltarfa\.com/i.test(normalised)) return BUSINESS_SUPPORT_SENDER;
+  return normalised;
+}
+function resendRequestBody(input) {
+  const businessSupport = input.sender === "business_support";
+  return {
+    from: businessSupport ? getBusinessSupportSender() : getJumpProgrammeSender(),
+    to: [input.to],
+    bcc: input.bcc ? Array.isArray(input.bcc) ? input.bcc : [input.bcc] : void 0,
+    subject: input.subject,
+    text: input.body,
+    html: input.html || buildPlainTextEmailHtml(input.body),
+    reply_to: businessSupport ? BUSINESS_SUPPORT_MAILBOX : getJumpProgrammeReplyTo(),
+    attachments: [
+      ...(input.attachments || []).map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content.toString("base64"),
+        content_type: attachment.contentType
+      })),
+      ...input.icsContent ? [{ filename: input.icsFilename || "session-invite.ics", content: Buffer.from(input.icsContent).toString("base64"), content_type: "text/calendar" }] : []
+    ]
+  };
+}
 async function deliverEmail(input) {
   if (process.env.NODE_ENV === "test" || process.env.VITEST || process.env.VITEST_WORKER_ID) {
     return { status: "Simulated", reason: "test_sender" };
   }
   const apiKey = ENV.resendApiKey;
-  if (!apiKey) return { status: "Failed", reason: `${BRAND.programmeShortName} programme email delivery is not configured` };
-  const html = input.html || buildPlainTextEmailHtml(input.body);
-  const from = getJumpProgrammeSender();
-  const replyTo = getJumpProgrammeReplyTo();
+  if (!apiKey) {
+    console.warn("[Email] RESEND_API_KEY is not set, so no email was sent.");
+    return { status: "Failed", reason: `${BRAND.programmeShortName} programme email delivery is not configured` };
+  }
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -1430,27 +1456,13 @@ async function deliverEmail(input) {
         authorization: `Bearer ${apiKey}`,
         "user-agent": "jump-2026-registration/1.0"
       },
-      body: JSON.stringify({
-        from,
-        to: [input.to],
-        bcc: input.bcc ? Array.isArray(input.bcc) ? input.bcc : [input.bcc] : void 0,
-        subject: input.subject,
-        text: input.body,
-        html,
-        reply_to: replyTo,
-        attachments: [
-          ...(input.attachments || []).map((attachment) => ({
-            filename: attachment.filename,
-            content: attachment.content.toString("base64"),
-            content_type: attachment.contentType
-          })),
-          ...input.icsContent ? [{ filename: input.icsFilename || "session-invite.ics", content: Buffer.from(input.icsContent).toString("base64"), content_type: "text/calendar" }] : []
-        ]
-      })
+      body: JSON.stringify(resendRequestBody(input))
     });
     const data = await response.json().catch(() => ({}));
     if (response.ok) return { status: "Sent", providerMessageId: data.id };
-    return { status: "Failed", reason: data.message || data.name || `Resend API error: HTTP ${response.status}` };
+    const reason = data.message || data.name || `Resend API error: HTTP ${response.status}`;
+    console.warn(`[Email] Resend refused an email (HTTP ${response.status}): ${reason}`);
+    return { status: "Failed", reason };
   } catch (error) {
     return { status: "Failed", reason: error instanceof Error ? error.message : `Unknown error during ${BRAND.programmeShortName} email delivery` };
   }
@@ -7897,8 +7909,8 @@ var businessCheckRouter = router({
     const owner = ownerEmail({ contact, summary, result });
     const failed = { status: "Failed" };
     const [officeDelivery, ownerDelivery] = await Promise.all([
-      deliverEmail({ to: BUSINESS_SUPPORT_MAILBOX, subject: office.subject, body: office.body }).catch(() => failed),
-      deliverEmail({ to: check.email, subject: owner.subject, body: owner.body }).catch(() => failed)
+      deliverEmail({ to: BUSINESS_SUPPORT_MAILBOX, subject: office.subject, body: office.body, sender: "business_support" }).catch(() => failed),
+      deliverEmail({ to: check.email, subject: owner.subject, body: owner.body, sender: "business_support" }).catch(() => failed)
     ]);
     await db.update(businessChecks).set({
       ...answerColumns(answers),
@@ -7935,6 +7947,7 @@ var businessCheckRouter = router({
       await db.update(businessChecks).set(input.choice === "call" ? { callRequestedAt: databaseNow(), pipelineStage: advancePipeline(check.pipelineStage, "call_booked") } : { reportRequestedAt: databaseNow() }).where(eq14(businessChecks.id, check.id));
       const what = input.choice === "call" ? "a free discovery call" : "the full business check report";
       await deliverEmail({
+        sender: "business_support",
         to: BUSINESS_SUPPORT_MAILBOX,
         subject: `Business check: ${check.businessName || check.fullName} asked for ${what}`,
         body: [

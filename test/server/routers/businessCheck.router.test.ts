@@ -38,6 +38,12 @@ describe("business check routes", () => {
     expect(source.match(/pipelineStage:/g)).toHaveLength(3);
   });
 
+  it("sends every business check email as IP Factory Business Support, not as the JUMP programme", () => {
+    const calls = source.match(/deliverEmail\(\{[\s\S]*?\}\)/g) ?? [];
+    expect(calls.length).toBe(3);
+    for (const call of calls) expect(call).toContain('sender: "business_support"');
+  });
+
   it("notifies only the Business Support inbox and the owner who took the check", () => {
     const recipients = Array.from(source.matchAll(/to: ([\w.]+)/g)).map((match) => match[1]);
     expect(new Set(recipients)).toEqual(new Set(["BUSINESS_SUPPORT_MAILBOX", "check.email"]));
