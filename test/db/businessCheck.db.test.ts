@@ -34,7 +34,7 @@ vi.mock("@server/calendly", async importOriginal => ({ ...(await importOriginal<
 vi.mock("@server/_core/env", async importOriginal => ({ ENV: { ...(await importOriginal<typeof import("@server/_core/env")>()).ENV, forgeApiKey: "test-key" } }));
 
 import { businessCheckRouter, resetBusinessCheckRateLimitsForTests } from "@server/routers/businessCheck";
-import { JUMP_ADMINISTRATION_MAILBOX } from "@server/email";
+import { BUSINESS_SUPPORT_MAILBOX } from "@server/email";
 import { cleanAnswers, evaluate, founderRead } from "@shared/businessCheck/engine";
 import type { TrpcContext } from "@server/_core/context";
 
@@ -135,7 +135,7 @@ for (const target of targets) {
         expect(row.completedAt).toBeInstanceOf(Date);
         expect(response.result).toEqual(result);
         // One email to the office and one to the owner.
-        expect(mocked.deliverEmail.mock.calls.map(([message]) => message.to).sort()).toEqual([contact.email, JUMP_ADMINISTRATION_MAILBOX].sort());
+        expect(mocked.deliverEmail.mock.calls.map(([message]) => message.to).sort()).toEqual([contact.email, BUSINESS_SUPPORT_MAILBOX].sort());
       });
     });
 
@@ -166,7 +166,7 @@ for (const target of targets) {
         return token;
       }
 
-      it("call sets callRequestedAt only, once, and notifies the programme mailbox", async () => {
+      it("call sets callRequestedAt only, once, and notifies the Business Support inbox", async () => {
         const token = await submitted("next-call@example.test");
         await caller().requestNext({ token, choice: "call", note: "Please phone me." });
         const first = await rowFor(token);
@@ -174,7 +174,7 @@ for (const target of targets) {
         expect(first.pipelineStage).toBe("call_booked");
         expect(first.reportRequestedAt).toBeNull();
         expect(mocked.deliverEmail).toHaveBeenCalledTimes(1);
-        expect(mocked.deliverEmail.mock.calls[0][0].to).toBe(JUMP_ADMINISTRATION_MAILBOX);
+        expect(mocked.deliverEmail.mock.calls[0][0].to).toBe(BUSINESS_SUPPORT_MAILBOX);
 
         await caller().requestNext({ token, choice: "call" });
         expect((await rowFor(token)).callRequestedAt!.getTime()).toBe(first.callRequestedAt!.getTime());

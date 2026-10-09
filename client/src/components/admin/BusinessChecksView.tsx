@@ -39,11 +39,12 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
   if (checks.error) return <p role="alert" className="p-6 text-sm text-rose-900">{checks.error.message}</p>;
   return (
     <div className="space-y-5 p-4 sm:p-6">
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Summary">
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-5" aria-label="Summary">
         <AdminMetricCard label="Total checks" value={rows.length} />
         <AdminMetricCard label="Completed" value={rows.filter(row => row.completedAt).length} />
         <AdminMetricCard label="Call requested" value={rows.filter(row => row.callRequestedAt).length} />
         <AdminMetricCard label="Ready to onboard" value={rows.filter(row => isReadyToOnboard(row.status)).length} />
+        <AdminMetricCard label="Reports requested" value={rows.filter(row => row.reportRequestedAt).length} />
       </dl>
 
       <div role="tablist" aria-label="Pipeline stage" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
@@ -103,7 +104,11 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
                       </>
                     ) : <span className="text-ink-muted">-</span>}
                   </td>
-                  <td className={TD}><StatusBadge status={row.status} /></td>
+                  <td className={TD}>
+                    <StatusBadge status={row.status} />
+                    {/* The ₦100,000 full report is independent of the call, so it is shown beside the stage. */}
+                    {row.reportRequestedAt && <span className="mt-1 block w-fit border border-highlight-ink/30 bg-highlight-ink/5 px-1.5 py-0.5 text-[11px] font-medium text-highlight-ink">Report requested</span>}
+                  </td>
                 </ClickableRow>
               ))}
               {visible.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-sm text-ink-muted">No business checks match.</td></tr>}

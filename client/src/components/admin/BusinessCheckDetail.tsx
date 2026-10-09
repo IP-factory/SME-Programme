@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import type { AdminSectionId } from "@/lib/adminSections";
 import { READINESS_LABELS } from "@shared/businessCheck/engine";
+import { formatNaira, PRICES } from "@shared/businessSupport";
 import { funnelStatus, isReadyToOnboard, stageDisplayName } from "@shared/businessCheck/funnelStatus";
 import { PIPELINE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@shared/businessCheck/pipeline";
 import { AREA_NAMES, type Health } from "@shared/businessCheck/questions";
@@ -108,6 +109,7 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
   const history = [
     { label: check.completedAt ? "Check completed" : "Check started", at: check.completedAt ?? check.createdAt },
     ...(check.callRequestedAt ? [{ label: "Call requested", at: check.callRequestedAt }] : []),
+    ...(check.reportRequestedAt ? [{ label: "Full report requested", at: check.reportRequestedAt }] : []),
     ...(check.callScheduledFor ? [{ label: "Call booked for", at: check.callScheduledFor, withTime: true }] : []),
   ];
 
@@ -126,6 +128,7 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
           <DetailField label="Main area">{mainArea ?? "-"}</DetailField>
           <DetailField label="Readiness">{check.readiness ? READINESS_LABELS[check.readiness] : "-"}</DetailField>
           <DetailField label="Route">{check.route ? ROUTE_LABELS[check.route] ?? check.route : "-"}</DetailField>
+          <DetailField label={`Full report (${formatNaira(PRICES.fullReport)})`}>{check.reportRequestedAt ? `Requested ${formatDate(check.reportRequestedAt)}` : "Not requested"}</DetailField>
         </dl>
       </DetailSection>
 

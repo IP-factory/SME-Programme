@@ -54,3 +54,10 @@ describe("discovery call booking page", () => {
     expect(target.kind).toBe("calendly");
   });
 });
+
+describe("Business Support inbox", () => {
+  it("sends business check notifications to info@ipfactory.co, separate from the JUMP programme mailbox", () => {
+    expect(BRAND.businessSupportMailbox).toBe("info@ipfactory.co");
+    expect(BRAND.businessSupportMailbox).not.toBe(BRAND.administrationMailbox);
+  });
+});

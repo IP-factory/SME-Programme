@@ -228,10 +228,10 @@ describe("Business Checks table", () => {
   });
 
   it("shows restrained summary counts from the data already loaded", () => {
-    api.checks = [check(), check({ id: 2, fullName: "B", callRequestedAt: null, pipelineStage: "qualified_lead" }), check({ id: 3, fullName: "C", pipelineStage: "opportunity" }), check({ id: 4, fullName: "D", completedAt: null, callRequestedAt: null, pipelineStage: "lead" })];
+    api.checks = [check(), check({ id: 2, fullName: "B", callRequestedAt: null, pipelineStage: "qualified_lead", reportRequestedAt: new Date("2026-10-06T10:00:00Z") }), check({ id: 3, fullName: "C", pipelineStage: "opportunity" }), check({ id: 4, fullName: "D", completedAt: null, callRequestedAt: null, pipelineStage: "lead" })];
     renderConsole();
     const counts = Object.fromEntries(Array.from(screen.getByLabelText("Summary").children).map(item => [item.querySelector("dt")!.textContent, item.querySelector("dd")!.textContent]));
-    expect(counts).toEqual({ "Total checks": "4", Completed: "3", "Call requested": "2", "Ready to onboard": "1" });
+    expect(counts).toEqual({ "Total checks": "4", Completed: "3", "Call requested": "2", "Ready to onboard": "1", "Reports requested": "1" });
   });
 
   it("searches and filters, and keeps them when a record is opened and closed", () => {
@@ -627,5 +627,31 @@ describe("the commercial pipeline in Business Checks", () => {
     expect(items[3]).toMatch(/^Booked on Calendly for 6 Oct 2026.*Team ·/);
     expect(drawer().getByText("This business has been won, so its stage is final.")).toBeTruthy();
     expect(drawer().queryByLabelText("Note (optional)")).toBeNull();
+  });
+});
+
+describe("full report requests in Business Checks", () => {
+  it("marks a lead who asked for the ₦100,000 report in the list, beside their stage", () => {
+    api.checks = [check({ reportRequestedAt: new Date("2026-10-06T10:00:00Z") }), check({ id: 2, fullName: "Bola Quiet", businessName: "Bola Bakes", email: "bola@example.test" })];
+    renderConsole();
+    expect(within(rowOf("Ada Okafor")).getByText("Report requested")).toBeTruthy();
+    expect(within(rowOf("Bola Quiet")).queryByText("Report requested")).toBeNull();
+  });
+
+  it("shows when the report was requested in the record and its funnel", () => {
+    api.details[1] = detailFor({ reportRequestedAt: new Date("2026-10-06T10:00:00Z") });
+    renderConsole();
+    openRow("Ada Okafor");
+    expect(drawer().getByText("Full report (₦100,000)")).toBeTruthy();
+    expect(drawer().getByText("Requested 6 Oct 2026")).toBeTruthy();
+    const funnel = drawer().getByRole("heading", { name: "Funnel" }).closest("section")!;
+    expect(funnel.textContent).toContain("Full report requested");
+  });
+
+  it("says the report was not requested when it was not", () => {
+    api.details[1] = detailFor({ reportRequestedAt: null });
+    renderConsole();
+    openRow("Ada Okafor");
+    expect(drawer().getByText("Not requested")).toBeTruthy();
   });
 });

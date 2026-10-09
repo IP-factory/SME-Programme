@@ -68,6 +68,8 @@ export const BRAND = {
   programmeMailbox: "jump@emmanueltarfa.com",
   /** Receives the monitoring copy of operational email and administrative notices. */
   administrationMailbox: "admin@emmanueltarfa.com",
+  /** IP Factory Business Support inbox: business check notifications (finished checks, call and report requests). */
+  businessSupportMailbox: "info@ipfactory.co",
 
   /**
    * Brand colours for email HTML and PDFs, which cannot read CSS variables.

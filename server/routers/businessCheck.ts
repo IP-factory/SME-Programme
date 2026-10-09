@@ -10,7 +10,7 @@ import { stageOf, type Answers } from "../../shared/businessCheck/questions";
 import { officeEmail, ownerEmail, summariseCheck, type CheckContact, type CheckSummary } from "../businessCheck";
 import { getDb } from "../db";
 import { databaseNow } from "../dbHelpers";
-import { deliverEmail, JUMP_ADMINISTRATION_MAILBOX } from "../email";
+import { BUSINESS_SUPPORT_MAILBOX, deliverEmail } from "../email";
 import { ENV } from "../_core/env";
 import { bookedCallTime, CALENDLY_EVENT_URI, findBookedCall } from "../calendly";
 import { recordAudit } from "../audit";
@@ -158,7 +158,7 @@ export const businessCheckRouter = router({
     // A delivery problem never blocks the check: the result is saved either way and the page says whether email went out.
     const failed = { status: "Failed" as const };
     const [officeDelivery, ownerDelivery] = await Promise.all([
-      deliverEmail({ to: JUMP_ADMINISTRATION_MAILBOX, subject: office.subject, body: office.body }).catch(() => failed),
+      deliverEmail({ to: BUSINESS_SUPPORT_MAILBOX, subject: office.subject, body: office.body }).catch(() => failed),
       deliverEmail({ to: check.email, subject: owner.subject, body: owner.body }).catch(() => failed),
     ]);
 
@@ -214,7 +214,7 @@ export const businessCheckRouter = router({
           .where(eq(businessChecks.id, check.id));
         const what = input.choice === "call" ? "a free discovery call" : "the full business check report";
         await deliverEmail({
-          to: JUMP_ADMINISTRATION_MAILBOX,
+          to: BUSINESS_SUPPORT_MAILBOX,
           subject: `Business check: ${check.businessName || check.fullName} asked for ${what}`,
           body: [
             `${check.fullName} asked for ${what}.`,

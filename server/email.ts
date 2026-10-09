@@ -5,6 +5,8 @@ import { BRAND } from "../shared/brand";
 export const JUMP_PROGRAMME_MAILBOX = BRAND.programmeMailbox;
 export const JUMP_PROGRAMME_SENDER = `${BRAND.senderDisplayName} <${JUMP_PROGRAMME_MAILBOX}>`;
 export const JUMP_ADMINISTRATION_MAILBOX = BRAND.administrationMailbox;
+/** Where IP Factory Business Support is told about business checks. Separate from the JUMP programme mailbox. */
+export const BUSINESS_SUPPORT_MAILBOX = BRAND.businessSupportMailbox;
 /** A single audited copy of each operational JUMP email is retained in the programme administration mailbox. */
 export const JUMP_MONITORING_BCC: string[] = [JUMP_ADMINISTRATION_MAILBOX];
 

@@ -38,8 +38,8 @@ describe("business check routes", () => {
     expect(source.match(/pipelineStage:/g)).toHaveLength(3);
   });
 
-  it("notifies only the administration mailbox and the owner who took the check", () => {
+  it("notifies only the Business Support inbox and the owner who took the check", () => {
     const recipients = Array.from(source.matchAll(/to: ([\w.]+)/g)).map((match) => match[1]);
-    expect(new Set(recipients)).toEqual(new Set(["JUMP_ADMINISTRATION_MAILBOX", "check.email"]));
+    expect(new Set(recipients)).toEqual(new Set(["BUSINESS_SUPPORT_MAILBOX", "check.email"]));
   });
 });

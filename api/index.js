@@ -65,6 +65,8 @@ var init_brand = __esm({
       programmeMailbox: "jump@emmanueltarfa.com",
       /** Receives the monitoring copy of operational email and administrative notices. */
       administrationMailbox: "admin@emmanueltarfa.com",
+      /** IP Factory Business Support inbox: business check notifications (finished checks, call and report requests). */
+      businessSupportMailbox: "info@ipfactory.co",
       /**
        * Brand colours for email HTML and PDFs, which cannot read CSS variables.
        * Must match --color-brand / --color-brand-deep in client/src/index.css (enforced by brand.test.ts).
@@ -1397,6 +1399,7 @@ init_brand();
 var JUMP_PROGRAMME_MAILBOX = BRAND.programmeMailbox;
 var JUMP_PROGRAMME_SENDER = `${BRAND.senderDisplayName} <${JUMP_PROGRAMME_MAILBOX}>`;
 var JUMP_ADMINISTRATION_MAILBOX = BRAND.administrationMailbox;
+var BUSINESS_SUPPORT_MAILBOX = BRAND.businessSupportMailbox;
 var JUMP_MONITORING_BCC = [JUMP_ADMINISTRATION_MAILBOX];
 function normalizeEmailHeaderValue(value) {
   return value.replace(/\\u003c/gi, "<").replace(/\\u003e/gi, ">");
@@ -7894,7 +7897,7 @@ var businessCheckRouter = router({
     const owner = ownerEmail({ contact, summary, result });
     const failed = { status: "Failed" };
     const [officeDelivery, ownerDelivery] = await Promise.all([
-      deliverEmail({ to: JUMP_ADMINISTRATION_MAILBOX, subject: office.subject, body: office.body }).catch(() => failed),
+      deliverEmail({ to: BUSINESS_SUPPORT_MAILBOX, subject: office.subject, body: office.body }).catch(() => failed),
       deliverEmail({ to: check.email, subject: owner.subject, body: owner.body }).catch(() => failed)
     ]);
     await db.update(businessChecks).set({
@@ -7932,7 +7935,7 @@ var businessCheckRouter = router({
       await db.update(businessChecks).set(input.choice === "call" ? { callRequestedAt: databaseNow(), pipelineStage: advancePipeline(check.pipelineStage, "call_booked") } : { reportRequestedAt: databaseNow() }).where(eq14(businessChecks.id, check.id));
       const what = input.choice === "call" ? "a free discovery call" : "the full business check report";
       await deliverEmail({
-        to: JUMP_ADMINISTRATION_MAILBOX,
+        to: BUSINESS_SUPPORT_MAILBOX,
         subject: `Business check: ${check.businessName || check.fullName} asked for ${what}`,
         body: [
           `${check.fullName} asked for ${what}.`,
