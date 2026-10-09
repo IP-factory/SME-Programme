@@ -13,7 +13,8 @@ vi.mock("@server/_core/llm", () => ({
 }));
 vi.mock("@server/_core/env", () => ({ ENV: { forgeApiKey: "test-key" } }));
 
-const { summariseCheck, describeAnswers, ownerEmail } = await import("@server/businessCheck");
+const { summariseCheck, describeAnswers, ownerEmail, officeEmail } = await import("@server/businessCheck");
+const { buildBusinessSupportEmailHtml } = await import("@server/emailTemplates");
 
 function complete(answers: Answers) {
   const filled = { ...answers };
@@ -94,5 +95,23 @@ describe("business check summary", () => {
     // Calls are booked in the booking app, not arranged by replying.
     expect(email.body).not.toMatch(/Reply to this email and we will find a time/);
     expect(email.body).toContain("Book it from your result page");
+  });
+
+  it("lays out the owner and office emails as IP Factory email, with no JUMP branding", () => {
+    const result = evaluate(answers);
+    const summary = { ...result.summary, offerings: [] };
+    const owner = buildBusinessSupportEmailHtml(ownerEmail({ contact, result, summary }).body);
+    expect(owner).toContain("The Shift");
+    expect(owner).toContain("by IP Factory");
+    expect(owner).toContain("Dear Ada,");
+    expect(owner).toMatch(/text-transform:uppercase;[^>]*>WHAT WE FOUND</);
+    expect(owner).toContain("&#8226;");
+    expect(owner).toContain("₦100,000");
+    const office = buildBusinessSupportEmailHtml(officeEmail({ contact, answers, summary, source: "Rules", result }).body);
+    expect(office).toMatch(/>Email<\/td><td[^>]*>ada@example\.com</);
+    expect(office).toMatch(/>Answers</);
+    for (const html of [owner, office]) {
+      expect(html).not.toMatch(/JUMP|Genius Track|Emmanuel Tarfa/);
+    }
   });
 });

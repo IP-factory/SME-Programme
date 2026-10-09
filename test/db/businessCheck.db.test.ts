@@ -211,7 +211,7 @@ for (const target of targets) {
         expect(row).toMatchObject({ pipelineStage: "call_booked" });
         expect(row.callScheduledFor.getTime()).toBe(when.getTime());
         expect(row.callRequestedAt).toBeInstanceOf(Date);
-        expect(mocked.deliverEmail.mock.calls[0][0].body).toContain("Booked on Calendly for: 2026-10-14T09:00:00.000Z");
+        expect(mocked.deliverEmail.mock.calls[0][0].body).toContain("Booked on Calendly for: Wed, 14 Oct 2026, 10:00 am (Lagos time)");
         const events = await db.select().from(schema.adminAccessAuditEvents).where(eq(schema.adminAccessAuditEvents.action, "business_check_call_booked"));
         expect(events.some((event: { details: string }) => event.details.includes(`"businessCheckId":${row.id}`) && event.details.includes("2026-10-14T09:00:00.000Z"))).toBe(true);
       });

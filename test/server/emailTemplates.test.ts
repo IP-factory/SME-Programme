@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDuplicatePathwayClarificationEmail, buildEngagementBriefInvitationEmail, buildInformationSessionInvitationEmail, buildRegistrationConfirmationEmail } from "@server/emailTemplates";
+import { buildBusinessSupportEmailHtml, buildDuplicatePathwayClarificationEmail, buildEngagementBriefInvitationEmail, buildInformationSessionInvitationEmail, buildRegistrationConfirmationEmail } from "@server/emailTemplates";
 
 describe("registration confirmation presentation", () => {
   it("includes the screenshot-support guidance in both the plain-text and branded HTML variants", () => {
@@ -105,5 +105,58 @@ describe("Information Session invitation presentation", () => {
     expect(email.html).toContain("https://meet.google.com/abc-defg-hij");
     expect(email.html).toContain("JUMP 2026 community");
     expect(email.html).toContain("A personal invitation from Emmanuel Tarfa");
+  });
+});
+
+describe("business support email layout", () => {
+  const body = [
+    "Dear Ada,",
+    "",
+    "Thank you for taking the IP Factory business check. Here is your summary.",
+    "",
+    "WHAT WE FOUND",
+    "Sales are steady but cash is tight.",
+    "",
+    "YOUR BUSINESS OUTLINE",
+    "• Strategy: clear",
+    "• Money: stuck",
+    "",
+    "NEXT STEP",
+    "Book the free call.",
+    "Pick a time here: https://calendly.com/example/discovery.",
+    "",
+    "Name: Ada <script>alert(1)</script>",
+    "Business: Example Stores",
+    "",
+    "Read more at https://example.com/shop?a=1&b=2.",
+    "Here is the point: one line on its own stays a sentence.",
+    "",
+    "Bad link: javascript:alert(1)",
+  ].join("\n");
+  const html = buildBusinessSupportEmailHtml(body);
+
+  it("brands the email The Shift, by IP Factory, with the greeting and a preview line", () => {
+    expect(html).toContain(">The Shift<");
+    expect(html).toContain(">by IP Factory<");
+    expect(html).toContain("mailto:info@ipfactory.co");
+    expect(html).toContain("<title>Thank you for taking the IP Factory business check. Here is your summary.</title>");
+    expect(html).toMatch(/Georgia[^>]*>Dear Ada,<\/p>/);
+    expect(html).not.toMatch(/JUMP|Genius Track|Emmanuel Tarfa/);
+  });
+
+  it("turns capitals into headings, bullets into a list and a lone address line into a button", () => {
+    expect(html).toMatch(/text-transform:uppercase;[^>]*>WHAT WE FOUND<\/div>/);
+    expect(html).toMatch(/&#8226;<\/td><td[^>]*>Strategy: clear<\/td>/);
+    expect(html).toMatch(/<a href="https:\/\/calendly\.com\/example\/discovery"[^>]*>Pick a time<\/a>/);
+  });
+
+  it("puts runs of label lines in a table, escapes what people typed and links only web addresses", () => {
+    expect(html).toMatch(/>Name<\/td><td[^>]*>Ada &lt;script&gt;alert\(1\)&lt;\/script&gt;<\/td>/);
+    expect(html).toContain('<a href="https://example.com/shop?a=1&amp;b=2"');
+    expect(html).toContain("b=2</a>.");
+    expect(html).not.toContain("<script>");
+    expect(html).toMatch(/>Business<\/td><td[^>]*>Example Stores<\/td>/);
+    expect(html).toContain("b=2</a>.<br />Here is the point: one line on its own stays a sentence.</p>");
+    expect(html).not.toContain('href="javascript:');
   });
 });

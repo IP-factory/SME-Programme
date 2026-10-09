@@ -1212,6 +1212,70 @@ function buildPlainTextEmailHtml(body) {
     paragraphs: greeting ? blocks.slice(1) : blocks
   });
 }
+var URL_IN_TEXT = /(https?:\/\/[^\s<>"]+[^\s<>".,;:!?)])/;
+var SECTION_HEADING = /^(?:[A-Z][A-Z0-9 &'’,-]{2,40}|[^:]{1,60}:)$/;
+var DETAIL_LINE = /^([A-Z][^:.?!]{0,39}):\s+(.+)$/;
+var LINK_LINE = /^([^:]{1,60}):\s*(https?:\/\/\S+?)[.,;!?)]*$/;
+var BULLET_LINE = /^[•*-]\s+/;
+function linkify(text2) {
+  return text2.split(URL_IN_TEXT).map((part, index2) => {
+    if (index2 % 2 === 0) return escapeHtml(part);
+    const href = safeHref(part);
+    return href ? `<a href="${href}" target="_blank" style="color:${BRAND.colorBrand};text-decoration:underline;">${escapeHtml(part)}</a>` : escapeHtml(part);
+  }).join("");
+}
+function buildBusinessSupportEmailHtml(body) {
+  const text2 = "font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:25px;color:#344154;word-break:normal;overflow-wrap:break-word;";
+  const blocks = body.trim().split(/\n\s*\n/).filter(Boolean);
+  const greeting = blocks[0] && /^dear\s+/i.test(blocks[0]) ? blocks.shift() : "";
+  const title = blocks[0]?.split("\n")[0] ?? BRAND.productName;
+  const renderBlock = (block) => {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    const html = [];
+    let index2 = 0;
+    while (index2 < lines.length) {
+      const line = lines[index2];
+      const link = line.match(LINK_LINE);
+      if (link && safeHref(link[2])) {
+        html.push(`<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;"><tr><td bgcolor="${BRAND.colorBrand}" style="border-radius:7px;"><a href="${safeHref(link[2])}" target="_blank" style="display:inline-block;padding:13px 20px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:7px;">${escapeHtml(link[1].replace(/\s+here$/i, ""))}</a></td></tr></table>`);
+        index2 += 1;
+        continue;
+      }
+      if (SECTION_HEADING.test(line) && !BULLET_LINE.test(line)) {
+        html.push(`<div style="margin:6px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:17px;letter-spacing:1.2px;text-transform:uppercase;color:${BRAND.colorBrand};font-weight:700;">${escapeHtml(line.replace(/:$/, ""))}</div>`);
+        index2 += 1;
+        continue;
+      }
+      if (BULLET_LINE.test(line)) {
+        const items = [];
+        while (index2 < lines.length && BULLET_LINE.test(lines[index2])) items.push(lines[index2++].replace(BULLET_LINE, ""));
+        html.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;">${items.map((item) => `<tr><td valign="top" style="width:18px;padding:0 0 6px;${text2}color:${BRAND.colorBrand};">&#8226;</td><td style="padding:0 0 6px;${text2}">${linkify(item)}</td></tr>`).join("")}</table>`);
+        continue;
+      }
+      let end = index2;
+      while (end < lines.length && DETAIL_LINE.test(lines[end]) && !LINK_LINE.test(lines[end])) end += 1;
+      if (end - index2 >= 2) {
+        const rows = lines.slice(index2, end).map((detail) => detail.match(DETAIL_LINE));
+        html.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;background:#F6F9FB;border:1px solid #D8E2EC;border-radius:8px;">${rows.map(([, label, value]) => `<tr><td valign="top" style="padding:9px 12px;width:34%;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#4A5E73;font-weight:700;border-bottom:1px solid #E1E8EF;">${escapeHtml(label)}</td><td style="padding:9px 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#18212D;border-bottom:1px solid #E1E8EF;word-break:normal;overflow-wrap:break-word;">${linkify(value)}</td></tr>`).join("")}</table>`);
+        index2 = end;
+        continue;
+      }
+      const paragraph = [];
+      while (index2 < lines.length) {
+        const next = lines[index2];
+        const startsDetails = DETAIL_LINE.test(next) && index2 + 1 < lines.length && DETAIL_LINE.test(lines[index2 + 1]);
+        if (paragraph.length && (LINK_LINE.test(next) || SECTION_HEADING.test(next) || BULLET_LINE.test(next) || startsDetails)) break;
+        paragraph.push(linkify(next));
+        index2 += 1;
+      }
+      html.push(`<p style="margin:0 0 18px;${text2}">${paragraph.join("<br />")}</p>`);
+    }
+    return html.join("");
+  };
+  const greetingHtml = greeting ? `<p style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:18px;line-height:28px;color:#18212D;">${linkify(greeting)}</p>` : "";
+  const content = blocks.map(renderBlock).join("");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${escapeHtml(title)}</title></head><body style="margin:0;padding:0;background:#F3F6FA;"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;line-height:1px;font-size:1px;">${escapeHtml(title)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#F3F6FA;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;border-collapse:collapse;background:#FFFFFF;border-radius:12px;overflow:hidden;"><tr><td style="padding:22px 28px;background:${BRAND.colorBrandDeep};"><div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:30px;font-weight:700;letter-spacing:.2px;color:#FFFFFF;">${escapeHtml(BRAND.productName)}</div><div style="margin-top:4px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;letter-spacing:1.15px;text-transform:uppercase;color:#DCE9F4;">by ${escapeHtml(BRAND.organisationName)}</div></td></tr><tr><td style="padding:28px 28px 12px;">${greetingHtml}${content}</td></tr><tr><td style="padding:18px 28px 22px;background:#F6F9FB;border-top:1px solid #E1E8EF;"><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#5C7183;">${escapeHtml(BRAND.productEndorsement)} &nbsp;|&nbsp; <a href="mailto:${BRAND.businessSupportMailbox}" style="color:#5C7183;">${BRAND.businessSupportMailbox}</a></p></td></tr></table></td></tr></table></body></html>`;
+}
 function buildRegistrationConfirmationEmail(input) {
   const firstName = input.fullName.trim().split(/\s+/)[0] || input.fullName;
   const subject = `${BRAND.programmeName} Registration Received \u2014 ${input.packageName} Package`;
@@ -1426,7 +1490,7 @@ function resendRequestBody(input) {
     bcc: input.bcc ? Array.isArray(input.bcc) ? input.bcc : [input.bcc] : void 0,
     subject: input.subject,
     text: input.body,
-    html: input.html || buildPlainTextEmailHtml(input.body),
+    html: input.html || (businessSupport ? buildBusinessSupportEmailHtml(input.body) : buildPlainTextEmailHtml(input.body)),
     reply_to: businessSupport ? BUSINESS_SUPPORT_MAILBOX : getJumpProgrammeReplyTo(),
     attachments: [
       ...(input.attachments || []).map((attachment) => ({
@@ -7861,6 +7925,7 @@ function contactOf(check, answers) {
   const { businessName, description } = businessDetails(answers);
   return { fullName: check.fullName, email: check.email, whatsapp: check.whatsapp || void 0, heardFrom: check.heardFrom || void 0, businessName: businessName || void 0, description: description || void 0 };
 }
+var lagosTime = (date) => new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(date);
 var businessCheckRouter = router({
   /** The details screen: records the owner as a lead before the first question. */
   start: publicProcedure.input(businessCheckStartInput).mutation(async ({ input, ctx }) => {
@@ -7957,9 +8022,9 @@ var businessCheckRouter = router({
           `WhatsApp: ${check.whatsapp || "Not given"}`,
           `Business: ${check.businessName || "Not given"}`,
           `Note: ${input.note || "None"}`,
-          ...bookedFor ? [`Booked on Calendly for: ${bookedFor.toISOString()}`] : [],
+          ...bookedFor ? [`Booked on Calendly for: ${lagosTime(bookedFor)} (Lagos time)`] : [],
           "",
-          `Business check #${check.id}, completed ${check.completedAt.toISOString()}.`
+          `Business check #${check.id}, completed ${lagosTime(check.completedAt)} (Lagos time).`
         ].join("\n")
       });
     }

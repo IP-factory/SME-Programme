@@ -32,10 +32,23 @@ describe("the Resend request", () => {
     expect(body.html).toContain("Hello");
   });
 
+  it("lays out business check email as The Shift, by IP Factory, not as JUMP", () => {
+    const body = resendRequestBody({ to: "info@ipfactory.co", subject: "Business check", body: "Ada Example asked for the full business check report.\n\nEmail: ada@example.com\nBusiness: Example Stores", sender: "business_support" });
+    expect(body.html).toContain("The Shift");
+    expect(body.html).toContain("by IP Factory");
+    expect(body.html).toContain("info@ipfactory.co");
+    expect(body.html).not.toMatch(/JUMP|Genius Track|Emmanuel Tarfa/);
+  });
+
+  it("keeps an HTML version the caller wrote", () => {
+    expect(resendRequestBody({ to: "ada@example.com", subject: "Hi", body: "Hello", html: "<p>Own</p>", sender: "business_support" }).html).toBe("<p>Own</p>");
+  });
+
   it("keeps JUMP programme email on the JUMP mailbox whatever EMAIL_FROM says", () => {
     ENV.emailFrom = "IP Factory <onboarding@resend.dev>";
     const body = resendRequestBody({ to: "participant@example.com", subject: "JUMP", body: "Hello" });
     expect(body.from).toBe(JUMP_PROGRAMME_SENDER);
     expect(body.reply_to).toBe(JUMP_PROGRAMME_MAILBOX);
+    expect(body.html).toContain("JUMP 2026");
   });
 });

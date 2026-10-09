@@ -1,5 +1,5 @@
 import { ENV } from "./_core/env";
-import { buildPlainTextEmailHtml } from "./emailTemplates";
+import { buildBusinessSupportEmailHtml, buildPlainTextEmailHtml } from "./emailTemplates";
 import { BRAND } from "../shared/brand";
 
 export const JUMP_PROGRAMME_MAILBOX = BRAND.programmeMailbox;
@@ -89,7 +89,7 @@ export function resendRequestBody(input: {
     bcc: input.bcc ? (Array.isArray(input.bcc) ? input.bcc : [input.bcc]) : undefined,
     subject: input.subject,
     text: input.body,
-    html: input.html || buildPlainTextEmailHtml(input.body),
+    html: input.html || (businessSupport ? buildBusinessSupportEmailHtml(input.body) : buildPlainTextEmailHtml(input.body)),
     reply_to: businessSupport ? BUSINESS_SUPPORT_MAILBOX : getJumpProgrammeReplyTo(),
     attachments: [
       ...(input.attachments || []).map((attachment) => ({

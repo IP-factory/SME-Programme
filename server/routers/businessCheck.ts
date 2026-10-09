@@ -102,6 +102,10 @@ function contactOf(check: BusinessCheck, answers: Answers): CheckContact {
   return { fullName: check.fullName, email: check.email, whatsapp: check.whatsapp || undefined, heardFrom: check.heardFrom || undefined, businessName: businessName || undefined, description: description || undefined };
 }
 
+/** A date and time as the team reads it in the office email, e.g. "Wed, 14 Oct 2026, 10:00 am". */
+const lagosTime = (date: Date) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(date);
+
 export const businessCheckRouter = router({
   /** The details screen: records the owner as a lead before the first question. */
   start: publicProcedure.input(businessCheckStartInput).mutation(async ({ input, ctx }) => {
@@ -224,9 +228,9 @@ export const businessCheckRouter = router({
             `WhatsApp: ${check.whatsapp || "Not given"}`,
             `Business: ${check.businessName || "Not given"}`,
             `Note: ${input.note || "None"}`,
-            ...(bookedFor ? [`Booked on Calendly for: ${bookedFor.toISOString()}`] : []),
+            ...(bookedFor ? [`Booked on Calendly for: ${lagosTime(bookedFor)} (Lagos time)`] : []),
             "",
-            `Business check #${check.id}, completed ${check.completedAt.toISOString()}.`,
+            `Business check #${check.id}, completed ${lagosTime(check.completedAt)} (Lagos time).`,
           ].join("\n"),
         });
       }

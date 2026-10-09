@@ -73,6 +73,84 @@ export function buildPlainTextEmailHtml(body: string) {
   });
 }
 
+const URL_IN_TEXT = /(https?:\/\/[^\s<>"]+[^\s<>".,;:!?)])/;
+const SECTION_HEADING = /^(?:[A-Z][A-Z0-9 &'’,-]{2,40}|[^:]{1,60}:)$/;
+const DETAIL_LINE = /^([A-Z][^:.?!]{0,39}):\s+(.+)$/;
+const LINK_LINE = /^([^:]{1,60}):\s*(https?:\/\/\S+?)[.,;!?)]*$/;
+const BULLET_LINE = /^[•*-]\s+/;
+
+/** Escapes text and turns any web address in it into a link. */
+function linkify(text: string) {
+  return text.split(URL_IN_TEXT).map((part, index) => {
+    if (index % 2 === 0) return escapeHtml(part);
+    const href = safeHref(part);
+    return href ? `<a href="${href}" target="_blank" style="color:${BRAND.colorBrand};text-decoration:underline;">${escapeHtml(part)}</a>` : escapeHtml(part);
+  }).join("");
+}
+
+/**
+ * The HTML for IP Factory's business support email (business check summaries, office notices, call and report
+ * requests). It is built from the plain-text body, so the text and HTML versions always say the same thing:
+ * a "Dear …," opening becomes the greeting, CAPITALS or "Heading:" lines become section headings, runs of
+ * "Label: value" lines a details table, "• " lines a list, and a lone "Label: https://…" line a button.
+ * Branded The Shift, by IP Factory; JUMP email keeps buildPlainTextEmailHtml.
+ */
+export function buildBusinessSupportEmailHtml(body: string) {
+  const text = "font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:25px;color:#344154;word-break:normal;overflow-wrap:break-word;";
+  const blocks = body.trim().split(/\n\s*\n/).filter(Boolean);
+  const greeting = blocks[0] && /^dear\s+/i.test(blocks[0]) ? blocks.shift()! : "";
+  const title = blocks[0]?.split("\n")[0] ?? BRAND.productName;
+
+  const renderBlock = (block: string) => {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    const html: string[] = [];
+    let index = 0;
+    while (index < lines.length) {
+      const line = lines[index];
+      const link = line.match(LINK_LINE);
+      if (link && safeHref(link[2])) {
+        html.push(`<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;"><tr><td bgcolor="${BRAND.colorBrand}" style="border-radius:7px;"><a href="${safeHref(link[2])}" target="_blank" style="display:inline-block;padding:13px 20px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:7px;">${escapeHtml(link[1].replace(/\s+here$/i, ""))}</a></td></tr></table>`);
+        index += 1;
+        continue;
+      }
+      if (SECTION_HEADING.test(line) && !BULLET_LINE.test(line)) {
+        html.push(`<div style="margin:6px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:17px;letter-spacing:1.2px;text-transform:uppercase;color:${BRAND.colorBrand};font-weight:700;">${escapeHtml(line.replace(/:$/, ""))}</div>`);
+        index += 1;
+        continue;
+      }
+      if (BULLET_LINE.test(line)) {
+        const items: string[] = [];
+        while (index < lines.length && BULLET_LINE.test(lines[index])) items.push(lines[index++].replace(BULLET_LINE, ""));
+        html.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;">${items.map((item) => `<tr><td valign="top" style="width:18px;padding:0 0 6px;${text}color:${BRAND.colorBrand};">&#8226;</td><td style="padding:0 0 6px;${text}">${linkify(item)}</td></tr>`).join("")}</table>`);
+        continue;
+      }
+      // Two or more "Label: value" lines in a row read as a details table; one on its own stays a sentence.
+      let end = index;
+      while (end < lines.length && DETAIL_LINE.test(lines[end]) && !LINK_LINE.test(lines[end])) end += 1;
+      if (end - index >= 2) {
+        const rows = lines.slice(index, end).map((detail) => detail.match(DETAIL_LINE)!);
+        html.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;background:#F6F9FB;border:1px solid #D8E2EC;border-radius:8px;">${rows.map(([, label, value]) => `<tr><td valign="top" style="padding:9px 12px;width:34%;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#4A5E73;font-weight:700;border-bottom:1px solid #E1E8EF;">${escapeHtml(label)}</td><td style="padding:9px 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#18212D;border-bottom:1px solid #E1E8EF;word-break:normal;overflow-wrap:break-word;">${linkify(value)}</td></tr>`).join("")}</table>`);
+        index = end;
+        continue;
+      }
+      const paragraph: string[] = [];
+      while (index < lines.length) {
+        const next = lines[index];
+        const startsDetails = DETAIL_LINE.test(next) && index + 1 < lines.length && DETAIL_LINE.test(lines[index + 1]);
+        if (paragraph.length && (LINK_LINE.test(next) || SECTION_HEADING.test(next) || BULLET_LINE.test(next) || startsDetails)) break;
+        paragraph.push(linkify(next));
+        index += 1;
+      }
+      html.push(`<p style="margin:0 0 18px;${text}">${paragraph.join("<br />")}</p>`);
+    }
+    return html.join("");
+  };
+
+  const greetingHtml = greeting ? `<p style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:18px;line-height:28px;color:#18212D;">${linkify(greeting)}</p>` : "";
+  const content = blocks.map(renderBlock).join("");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${escapeHtml(title)}</title></head><body style="margin:0;padding:0;background:#F3F6FA;"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;line-height:1px;font-size:1px;">${escapeHtml(title)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#F3F6FA;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;border-collapse:collapse;background:#FFFFFF;border-radius:12px;overflow:hidden;"><tr><td style="padding:22px 28px;background:${BRAND.colorBrandDeep};"><div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:30px;font-weight:700;letter-spacing:.2px;color:#FFFFFF;">${escapeHtml(BRAND.productName)}</div><div style="margin-top:4px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;letter-spacing:1.15px;text-transform:uppercase;color:#DCE9F4;">by ${escapeHtml(BRAND.organisationName)}</div></td></tr><tr><td style="padding:28px 28px 12px;">${greetingHtml}${content}</td></tr><tr><td style="padding:18px 28px 22px;background:#F6F9FB;border-top:1px solid #E1E8EF;"><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#5C7183;">${escapeHtml(BRAND.productEndorsement)} &nbsp;|&nbsp; <a href="mailto:${BRAND.businessSupportMailbox}" style="color:#5C7183;">${BRAND.businessSupportMailbox}</a></p></td></tr></table></td></tr></table></body></html>`;
+}
+
 export function buildRegistrationConfirmationEmail(input: {
   fullName: string;
   businessName: string;
