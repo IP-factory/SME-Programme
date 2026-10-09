@@ -13,6 +13,18 @@ describe("booking the free discovery call", () => {
     expect(Object.fromEntries(embed.searchParams)).toMatchObject({ name: "Ada Example", email: "ada@example.com", embed_domain: "ipfactory.co", embed_type: "Inline" });
   });
 
+  it("also gives a plain link to the same Calendly page with the details filled in, for when the embed is blocked", () => {
+    const target = bookingTarget("https://calendly.com/ipfactory-info/ipf-free-20-minute-discovery-call", { name: "Ada Example", email: "ada@example.com", host: "ipf-sme.vercel.app" });
+    if (target.kind !== "calendly") throw new Error("expected a Calendly target");
+    const open = new URL(target.openUrl);
+    expect(open.origin + open.pathname).toBe("https://calendly.com/ipfactory-info/ipf-free-20-minute-discovery-call");
+    expect(open.searchParams.get("name")).toBe("Ada Example");
+    expect(open.searchParams.get("email")).toBe("ada@example.com");
+    // Embed settings belong to the inline calendar only.
+    expect(open.searchParams.has("embed_type")).toBe(false);
+    expect(open.searchParams.has("embed_domain")).toBe(false);
+  });
+
   it("opens any other https booking page (Microsoft Bookings, Google, Cal.com) as a link", () => {
     expect(bookingTarget("https://outlook.office365.com/book/IPFactory@example.com/")).toEqual({ kind: "link", pageUrl: "https://outlook.office365.com/book/IPFactory@example.com/" });
   });

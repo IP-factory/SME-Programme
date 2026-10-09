@@ -5,7 +5,8 @@
  * Cal.com…) opens in a new tab.
  */
 export type BookingTarget =
-  | { kind: "calendly"; embedUrl: string; pageUrl: string }
+  /** `openUrl`: the same page for a new tab, with the owner's details filled in, for when the embed is blocked. */
+  | { kind: "calendly"; embedUrl: string; pageUrl: string; openUrl: string }
   | { kind: "link"; pageUrl: string }
   | { kind: "none" };
 
@@ -23,13 +24,16 @@ export function bookingTarget(url: string | undefined, prefill: { name?: string;
   const pageUrl = parsed.toString();
   if (parsed.hostname !== "calendly.com" && !parsed.hostname.endsWith(".calendly.com")) return { kind: "link", pageUrl };
 
+  const open = new URL(pageUrl);
+  if (prefill.name) open.searchParams.set("name", prefill.name);
+  if (prefill.email) open.searchParams.set("email", prefill.email);
   const embed = new URL(pageUrl);
   if (prefill.host) embed.searchParams.set("embed_domain", prefill.host);
   embed.searchParams.set("embed_type", "Inline");
   embed.searchParams.set("hide_gdpr_banner", "1");
   if (prefill.name) embed.searchParams.set("name", prefill.name);
   if (prefill.email) embed.searchParams.set("email", prefill.email);
-  return { kind: "calendly", embedUrl: embed.toString(), pageUrl };
+  return { kind: "calendly", embedUrl: embed.toString(), pageUrl, openUrl: open.toString() };
 }
 
 /** True for Calendly's message when the owner has picked a time in the embedded calendar. */

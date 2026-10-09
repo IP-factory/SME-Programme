@@ -297,6 +297,24 @@ describe("business check page", { timeout: 20_000 }, () => {
     expect(await screen.findByText("Booked. The confirmation is on its way to ada@example.com.")).toBeTruthy();
   });
 
+  it("offers the same calendar in a new tab when the embedded one is blocked, and records the request without claiming a booking", async () => {
+    resultFor("https://calendly.com/ip-factory/discovery-call");
+    fireEvent.click(screen.getByRole("button", { name: /book my free call/i }));
+    const link = (await screen.findByRole("link", { name: "Calendar not showing? Open it in a new tab" })) as HTMLAnchorElement;
+    const href = new URL(link.href);
+    expect(href.origin + href.pathname).toBe("https://calendly.com/ip-factory/discovery-call");
+    expect(href.searchParams.get("name")).toBe("Ada Example");
+    expect(href.searchParams.get("email")).toBe("ada@example.com");
+    expect(link.target).toBe("_blank");
+    expect(link.rel).toContain("noopener");
+    expect(api.calls.requestNext).toEqual([]);
+
+    fireEvent.click(link);
+    expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "call" }]);
+    expect(await screen.findByText("We've opened the calendar in a new tab. Pick a time there and Calendly will email your confirmation to ada@example.com.")).toBeTruthy();
+    expect(screen.queryByText(/^Booked\./)).toBeNull();
+  });
+
   describe("result page, honest about email and about the call", () => {
     const answers = { p_stage: "operating", p_name: "Ada Foods", p_type: "maker", p_age: "2to5", p_staff: "6to10", p_revenue: "3to5m", f_instinct: "S", f_seen: "S", f_team: "solo", f_tough: "nobody", f_hours: "lt2", s7_status: "tight_guess" };
     const responseWith = (extra: Record<string, unknown>) => ({ token: TOKEN, result: evaluate(answers), summary: { found: "Found.", think: "Think.", next: "Next.", offerings: [] }, summarySource: "Rules", discoveryCallUrl: "", ...extra });

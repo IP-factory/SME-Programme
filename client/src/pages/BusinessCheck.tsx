@@ -709,6 +709,8 @@ function Result({ response, contact, answers, businessName, onRestart }: { respo
   const narrative = founder.instinct ? describeFounder(answers, founder) : undefined;
   const [requested, setRequested] = useState<{ call?: boolean; report?: boolean }>({});
   const [calendarOpen, setCalendarOpen] = useState(false);
+  /** The owner opened Calendly in a new tab (the embedded calendar was blocked or not showing). */
+  const [openedInTab, setOpenedInTab] = useState(false);
   const requestNext = trpc.businessCheck.requestNext.useMutation({
     onSuccess: (data) => setRequested((current) => ({ ...current, [data.choice]: true })),
   });
@@ -858,7 +860,11 @@ function Result({ response, contact, answers, businessName, onRestart }: { respo
                 {requested.call ? (
                   <motion.p key="booked" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="mt-6 flex items-start gap-3 border border-highlight/40 p-4 text-sm leading-relaxed">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-highlight" />
-                    {booking.kind === "none" ? "Thank you. Your request has been sent to the IPF team. We'll email you to agree a time." : `Booked. The confirmation is on its way to ${contact.email}.`}
+                    {booking.kind === "none"
+                      ? "Thank you. Your request has been sent to the IPF team. We'll email you to agree a time."
+                      : openedInTab
+                        ? `We've opened the calendar in a new tab. Pick a time there and Calendly will email your confirmation to ${contact.email}.`
+                        : `Booked. The confirmation is on its way to ${contact.email}.`}
                   </motion.p>
                 ) : (
                   <motion.button key="book" type="button" onClick={bookCall} disabled={requestNext.isPending} exit={{ opacity: 0, scale: 0.96 }} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} className="group mt-6 inline-flex h-14 w-full items-center justify-center bg-highlight px-8 text-sm font-semibold uppercase tracking-widest text-brand-deep shadow-[0_18px_40px_-18px_rgba(54,183,224,0.9)] transition-colors hover:bg-highlight-hover disabled:opacity-60">
@@ -898,7 +904,13 @@ function Result({ response, contact, answers, businessName, onRestart }: { respo
         <AnimatePresence>
           {booking.kind === "calendly" && calendarOpen && !requested.call && (
             <motion.div key="calendar" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.45, ease: EASE }} className="mt-4 overflow-hidden border border-line bg-paper-raised">
-              <p className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">Choose a time for your free call</p>
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-line px-5 py-3">
+                <p className="text-sm font-semibold text-ink">Choose a time for your free call</p>
+                {/* Some browsers, blockers and networks stop embedded calendars; the same calendar opens in a new tab. */}
+                <a href={booking.openUrl} target="_blank" rel="noopener noreferrer" onClick={() => { setOpenedInTab(true); recordCall(); }} className="text-xs font-semibold text-brand underline underline-offset-2 hover:text-brand-deep">
+                  Calendar not showing? Open it in a new tab
+                </a>
+              </div>
               <iframe title="Book your free call" src={booking.embedUrl} className="h-[720px] w-full" />
             </motion.div>
           )}
