@@ -8,6 +8,8 @@ import { recordAudit } from "./audit";
 import { findBookedCall, isCalendlyConfigured } from "./calendly";
 import type { CheckSummary } from "./businessCheck";
 import { latestInvitationStatuses } from "./clientOnboarding";
+import { isMissingPaymentTable, paymentRequestsFor, paymentStatusesByCheck } from "./payments";
+import type { PaymentItem } from "../shared/payments";
 import { getDb } from "./db";
 
 async function requireDatabase() {
@@ -66,7 +68,8 @@ export async function listBusinessChecks(db: Database) {
     db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc(businessChecks.createdAt)).limit(500),
     latestInvitationStatuses(db),
   ]);
-  return (await syncCalendlyBookings(db, rows)).map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+  const payments = await paymentStatusesByCheck(db);
+  return (await syncCalendlyBookings(db, rows)).map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null, payments: payments.get(row.id) ?? {} }));
 }
 
 /** Business checks whose owner asked for the free discovery call, newest request first. */
@@ -75,7 +78,8 @@ export async function listDiscoveryCalls(db: Database) {
     db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull(businessChecks.callRequestedAt)).orderBy(desc(businessChecks.callRequestedAt)).limit(500),
     latestInvitationStatuses(db),
   ]);
-  return (await syncCalendlyBookings(db, rows)).map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+  const payments = await paymentStatusesByCheck(db);
+  return (await syncCalendlyBookings(db, rows)).map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null, payments: payments.get(row.id) ?? {} }));
 }
 
 const parseJson = <T>(text: string | null): T | null => {
@@ -86,6 +90,19 @@ const parseJson = <T>(text: string | null): T | null => {
     return null;
   }
 };
+
+/** A business check's payment requests for the record drawer; `null` when the payment table is not there yet (0006). */
+async function paymentsOf(db: Pick<Database, "select">, businessCheckId: number) {
+  try {
+    return (await paymentRequestsFor(db, [businessCheckId])).map(({ id, item, amountNaira, reference, status, requestedAt, deliveryStatus, proofReceivedAt, confirmedAt, note }) => (
+      { id, item, amountNaira, reference, status, requestedAt, deliveryStatus, proofReceivedAt, confirmedAt, note }
+    ));
+  } catch (error) {
+    if (!isMissingPaymentTable(error)) throw error;
+    console.error("[Payments] The payment_requests table is missing: apply migration 0006 with pnpm db:migrate.");
+    return null;
+  }
+}
 
 /**
  * One business check in full, for the record drawer: the saved result and summary exactly as they were stored when the
@@ -102,11 +119,12 @@ export async function getBusinessCheckDetail(db: Pick<Database, "select">, busin
   const { resultJson, summaryJson, ...fields } = row;
   const result = parseJson<Pick<CheckResult, "outline" | "primaryArea" | "founder">>(resultJson);
   const summary = parseJson<CheckSummary>(summaryJson);
-  const [invitations, stageHistory] = await Promise.all([latestInvitationStatuses(db), stageHistoryFor(db, row.id)]);
+  const [invitations, stageHistory, payments] = await Promise.all([latestInvitationStatuses(db), stageHistoryFor(db, row.id), paymentsOf(db, row.id)]);
   return {
     ...fields,
     invitationStatus: invitations.get(row.id) ?? null,
     stageHistory,
+    payments,
     summary: summary ? { found: summary.found, think: summary.think, next: summary.next, offerings: summary.offerings ?? [] } : null,
     outline: result?.outline ?? null,
     primaryAreaNumber: result?.primaryArea?.area ?? row.primaryArea ?? null,
@@ -114,7 +132,7 @@ export async function getBusinessCheckDetail(db: Pick<Database, "select">, busin
 }
 
 /** Audit actions that move a business check or record something about its call, shown as its history. */
-const HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled", "business_check_call_booked"] as const;
+const HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled", "business_check_call_booked", "payment_details_sent", "payment_proof_received", "payment_confirmed"] as const;
 
 /** What the team has done to one business check, newest first, with who did it. Read from the audit log. */
 async function stageHistoryFor(db: Pick<Database, "select">, businessCheckId: number) {
@@ -126,8 +144,8 @@ async function stageHistoryFor(db: Pick<Database, "select">, businessCheckId: nu
     .orderBy(desc(adminAccessAuditEvents.createdAt), desc(adminAccessAuditEvents.id))
     .limit(100);
   return events.map(event => {
-    const details = parseJson<{ from?: PipelineStage; to?: PipelineStage; note?: string; scheduledFor?: string }>(event.details) ?? {};
-    return { id: event.id, action: event.action as (typeof HISTORY_ACTIONS)[number], from: details.from ?? null, to: details.to ?? null, note: details.note ?? null, scheduledFor: details.scheduledFor ?? null, by: event.by ?? null, at: event.at };
+    const details = parseJson<{ from?: PipelineStage; to?: PipelineStage; note?: string; scheduledFor?: string; item?: PaymentItem; reference?: string }>(event.details) ?? {};
+    return { id: event.id, action: event.action as (typeof HISTORY_ACTIONS)[number], from: details.from ?? null, to: details.to ?? null, note: details.note ?? null, scheduledFor: details.scheduledFor ?? null, item: details.item ?? null, reference: details.reference ?? null, by: event.by ?? null, at: event.at };
   });
 }
 

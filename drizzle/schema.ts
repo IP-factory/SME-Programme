@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { type AnyPgColumn, index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { PIPELINE_STAGES } from "../shared/businessCheck/pipeline";
+import { PAYMENT_ITEMS, PAYMENT_STATUSES } from "../shared/payments";
 
 /**
  * Users provisioned through Manus OAuth. The live database is authoritative;
@@ -700,3 +701,38 @@ export type ClientOnboardingInvitation = typeof clientOnboardingInvitations.$inf
 
 export type BusinessCheck = typeof businessChecks.$inferSelect;
 export type InsertBusinessCheck = typeof businessChecks.$inferInsert;
+
+export const paymentRequestsItemEnum = pgEnum("payment_requests_item", PAYMENT_ITEMS);
+export const paymentRequestsStatusEnum = pgEnum("payment_requests_status", PAYMENT_STATUSES);
+export const paymentRequestsDeliveryStatusEnum = pgEnum("payment_requests_delivery_status", ["Sent", "Failed", "Simulated"]);
+
+/**
+ * A payment asked of a business check's owner, until online payment exists: payment details are emailed, the owner
+ * pays by bank transfer and replies with proof, and the team confirms the money arrived (shared/payments.ts).
+ * One row per business check and item; sending the details again updates it. A confirmed payment is never reopened.
+ */
+export const paymentRequests = pgTable("payment_requests", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  businessCheckId: integer("businessCheckId").notNull().references(() => businessChecks.id),
+  item: paymentRequestsItemEnum("item").notNull(),
+  /** Whole naira, from shared/businessSupport.ts PRICES when the details were sent. */
+  amountNaira: integer("amountNaira").notNull(),
+  /** What the owner puts on the transfer (paymentReference). */
+  reference: varchar("reference", { length: 32 }).notNull().unique(),
+  status: paymentRequestsStatusEnum("status").default("requested").notNull(),
+  /** Null when the details went out automatically (the owner asked for the full report). */
+  requestedByUserId: integer("requestedByUserId").references(() => users.id),
+  requestedAt: timestamp("requestedAt", { withTimezone: true }).defaultNow().notNull(),
+  deliveryStatus: paymentRequestsDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
+  proofReceivedAt: timestamp("proofReceivedAt", { withTimezone: true }),
+  confirmedAt: timestamp("confirmedAt", { withTimezone: true }),
+  confirmedByUserId: integer("confirmedByUserId").references(() => users.id),
+  /** The team's note when confirming, e.g. the bank's transaction reference. */
+  note: varchar("note", { length: 500 }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
+}, table => [
+  uniqueIndex("payment_requests_one_per_check_item").on(table.businessCheckId, table.item),
+]);
+
+export type PaymentRequest = typeof paymentRequests.$inferSelect;

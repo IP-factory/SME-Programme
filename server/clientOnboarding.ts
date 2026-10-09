@@ -89,9 +89,9 @@ export function buildOnboardingEmail(input: { fullName: string; businessName: st
  * Issues a single-use onboarding invitation for a business check (a prospect). The raw token exists only in the
  * returned URL, which goes to the authorised admin and the client's email: it is never stored or logged.
  *
- * NOTE: there is no canonical persisted "discovery call = fit" or "payment confirmed" field yet, so neither is
- * enforced here, and none is faked. The caller is an authorised administrator, which is the control until those
- * funnel fields exist (see docs/authentication.md).
+ * NOTE: there is no canonical persisted "discovery call = fit" field, so it is not enforced here, and none is faked. The
+ * caller is an authorised administrator (see docs/authentication.md). A confirmed Current State payment
+ * (server/payments.ts, payment_requests) calls this automatically; an administrator can still invite by hand.
  */
 export async function createOnboardingInvitation(input: { businessCheckId: number; actorUserId: number }) {
   const db = await requireDatabase();

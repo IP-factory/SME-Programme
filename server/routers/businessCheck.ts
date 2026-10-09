@@ -11,6 +11,7 @@ import { officeEmail, ownerEmail, summariseCheck, type CheckContact, type CheckS
 import { getDb } from "../db";
 import { databaseNow } from "../dbHelpers";
 import { BUSINESS_SUPPORT_MAILBOX, deliverEmail } from "../email";
+import { requestPayment } from "../payments";
 import { ENV } from "../_core/env";
 import { bookedCallTime, CALENDLY_EVENT_URI, findBookedCall } from "../calendly";
 import { recordAudit } from "../audit";
@@ -217,6 +218,18 @@ export const businessCheckRouter = router({
             : { reportRequestedAt: databaseNow() })
           .where(eq(businessChecks.id, check.id));
         const what = input.choice === "call" ? "a free discovery call" : "the full business check report";
+        // The owner is emailed the report's payment details straight away; the office notice says whether that worked.
+        let payment = "";
+        if (input.choice === "report") {
+          try {
+            const sent = await requestPayment(db, { businessCheckId: check.id, item: "full_report", actorUserId: null });
+            payment = `Payment details sent: ${sent.reference}${sent.deliveryStatus === "Failed" ? " (the email failed: send them again from admin)" : ""}`;
+          } catch (error) {
+            const paid = error instanceof TRPCError && error.code === "CONFLICT";
+            if (!paid) console.error("[BusinessCheck] Could not send the report payment details:", error instanceof Error ? error.message : error);
+            payment = paid ? "Payment: already paid" : "Payment details: NOT SENT. Send them from the admin console.";
+          }
+        }
         await deliverEmail({
           sender: "business_support",
           to: BUSINESS_SUPPORT_MAILBOX,
@@ -228,6 +241,7 @@ export const businessCheckRouter = router({
             `WhatsApp: ${check.whatsapp || "Not given"}`,
             `Business: ${check.businessName || "Not given"}`,
             `Note: ${input.note || "None"}`,
+            ...(payment ? [payment] : []),
             ...(bookedFor ? [`Booked on Calendly for: ${lagosTime(bookedFor)} (Lagos time)`] : []),
             "",
             `Business check #${check.id}, completed ${lagosTime(check.completedAt)} (Lagos time).`,

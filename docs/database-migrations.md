@@ -14,6 +14,7 @@ run `pnpm db:verify` (read-only, needs `MIGRATION_DATABASE_URL`). It reports PAS
 | `0003_client_onboarding_invitations` | applied (confirmed by `db:verify`) | `client_onboarding_invitations` (token hash, status, expiry, links to the business check, issuer, accepted user and business); 2 enum types (49 total); partial unique index (one pending invitation per business check) |
 | `0004_platform_roles_and_active_workspace` | applied (confirmed by `db:verify`) | `user_platform_roles` (userId, role, grantedByUserId; unique per user and role; 7-value role enum, 50 enums total); `user_sessions.activeBusinessId` (nullable, set null if the business is deleted) |
 | `0005_business_check_call_scheduled` | **NOT YET APPLIED** | `business_checks.callScheduledFor` (nullable timestamptz): the time an administrator agreed the discovery call for. `ALTER TABLE "business_checks" ADD COLUMN "callScheduledFor" timestamp with time zone;` |
+| `0006_payment_requests` | **NOT YET APPLIED** | `payment_requests` (one row per business check and item: full report or Current State; amount, transfer reference, status requested / proof received / confirmed, who sent and confirmed it); 3 enum types (53 total); 3 foreign keys (15 total); unique index per check and item. Additive: one new table, nothing existing changes. |
 
 After `0003`, `pnpm db:verify` passed 27/27 (35 tables, 49 enums). After `0004` it expects 36 tables, 50 enums and 12 foreign keys.
 Until `0004` is applied, `db:verify` fails and workspace switching, platform roles and the new account context cannot work against
@@ -23,3 +24,8 @@ and one nullable column, so it cannot fail on existing data. **Apply it before d
 **`0005` and deployment order.** The new column is part of the `business_checks` schema, so every query on that table (including
 the public Free Business Check) reads it. Apply `0005` **before** deploying code that includes it, or the public Business Check
 will fail until it is applied. It is a single nullable column and cannot fail on existing data.
+
+**`0006` and deployment order.** Payments live in their own table, so the business check, the admin lists and sign-in keep
+working if code reaches production before `0006` is applied: the admin record then says "Payments are not set up in the
+database yet (migration 0006)", the hosting log says `[Payments] The payment_requests table is missing`, and a report
+request still reaches info@ipfactory.co with "Payment details: NOT SENT". Apply `0006` before or straight after deploying.

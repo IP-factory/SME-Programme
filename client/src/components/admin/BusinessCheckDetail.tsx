@@ -12,6 +12,8 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 import { CopyButton, DetailField, DetailSection, StatusBadge } from "./AdminPrimitives";
 import { formatDate, formatDateTime, ROUTE_LABELS, whatsappLink } from "./format";
+import { PaymentsPanel } from "./Payments";
+import { PAYMENT_ITEM_DETAILS } from "@shared/payments";
 
 const HEALTH: Record<Health, { label: string; className: string }> = {
   clear: { label: "Clear", className: "border-emerald-200 bg-emerald-50 text-emerald-900" },
@@ -47,6 +49,7 @@ export function ContactLines({ email, whatsapp }: { email: string; whatsapp: str
  * recommendation is created here, and the owner's raw answers are not shown.
  */
 const stageName = (stage: string | null) => (stage && stage in PIPELINE_LABELS ? stageDisplayName(stage as PipelineStage) : stage ?? "-");
+const PAYMENT_HISTORY = { payment_details_sent: "Payment details sent", payment_proof_received: "Proof of payment received", payment_confirmed: "Payment confirmed" } as const;
 /** "lead" is where every check starts, so the team never moves a check back to it. */
 const MOVABLE_STAGES = PIPELINE_STAGES.filter((stage): stage is Exclude<PipelineStage, "lead"> => stage !== "lead");
 
@@ -178,6 +181,10 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
         </ol>
       </DetailSection>
 
+      <DetailSection title="Payments">
+        <PaymentsPanel businessCheckId={check.id} payments={check.payments} />
+      </DetailSection>
+
       <DetailSection title="Move to">
         <MoveStage businessCheckId={check.id} current={check.pipelineStage} />
       </DetailSection>
@@ -188,13 +195,18 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
             {check.stageHistory.map(event => (
               <li key={event.id} className="border-l-2 border-brand-line pl-3">
                 <p className="text-ink">
-                  {event.action === "business_check_call_booked"
+                  {event.action === "payment_details_sent" || event.action === "payment_proof_received" || event.action === "payment_confirmed"
+                    ? <>
+                        {PAYMENT_HISTORY[event.action]}{event.item ? `: ${PAYMENT_ITEM_DETAILS[event.item].name}` : ""}{event.reference ? ` (${event.reference})` : ""}
+                        {event.to && <span className="text-ink-muted"> · moved to {stageName(event.to)}</span>}
+                      </>
+                    : event.action === "business_check_call_booked"
                     ? <>Booked on Calendly{event.scheduledFor ? ` for ${formatDateTime(event.scheduledFor)}` : ""}</>
                     : event.action === "business_check_call_scheduled"
                     ? <>Call time recorded{event.scheduledFor ? ` for ${formatDateTime(event.scheduledFor)}` : ""}</>
                     : <><span className="font-medium">{stageName(event.to)}</span> <span className="text-ink-muted">from {stageName(event.from)}</span></>}
                 </p>
-                <p className="text-xs text-ink-muted">{event.by ?? "Team"} · {formatDateTime(event.at)}</p>
+                <p className="text-xs text-ink-muted">{event.by ?? (event.action === "payment_details_sent" ? "Sent automatically" : "Team")} · {formatDateTime(event.at)}</p>
                 {event.note && <p className="mt-0.5 text-[13px] text-ink">{event.note}</p>}
               </li>
             ))}

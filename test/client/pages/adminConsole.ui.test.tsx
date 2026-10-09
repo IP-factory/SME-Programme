@@ -16,7 +16,7 @@ const hoisted = vi.hoisted(() => {
     details: {} as Record<number, unknown>,
     metrics: { businessChecks: 3, users: 2, portalUsers: 1, businesses: 1, memberships: 1, pendingInvitations: 0, platformRoleAssignments: 0 },
     error: undefined as { message: string } | undefined,
-    mutations: { schedule: [] as unknown[], outcome: [] as unknown[], stage: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[] },
+    mutations: { schedule: [] as unknown[], outcome: [] as unknown[], stage: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[], requestPayment: [] as unknown[], proof: [] as unknown[], confirmPayment: [] as unknown[] },
     inviteResult: { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 } as Record<string, unknown>,
   };
   const query = (key: "checks" | "calls" | "clients" | "candidates" | "invitations" | "metrics") => () => ({ data: api[key], isLoading: false, error: api.error });
@@ -46,6 +46,9 @@ vi.mock("@/lib/trpc", () => ({
       scheduleCall: { useMutation: hoisted.mutation("schedule") },
       recordOutcome: { useMutation: hoisted.mutation("outcome") },
       setStage: { useMutation: hoisted.mutation("stage", () => ({ success: true, pipelineStage: "won", changed: true })) },
+      requestPayment: { useMutation: hoisted.mutation("requestPayment", () => ({ reference: "TS-CS-000001", deliveryStatus: "Simulated" })) },
+      markProofReceived: { useMutation: hoisted.mutation("proof") },
+      confirmPayment: { useMutation: hoisted.mutation("confirmPayment", () => ({ success: true, changed: true, invitation: "sent" })) },
     },
     onboarding: {
       candidates: { useQuery: hoisted.query("candidates") },
@@ -65,7 +68,7 @@ const SUPER = {
 };
 const check = (over: Record<string, unknown> = {}) => ({
   id: 1, fullName: "Ada Okafor", businessName: "Ada Foods", email: "ada@example.test", whatsapp: "+234 800 000 0001", stage: "operating", route: "programme", readiness: "intermediate", primaryArea: 7,
-  pipelineStage: "call_booked", callRequestedAt: new Date("2026-10-05T10:00:00Z"), callScheduledFor: null, reportRequestedAt: null, completedAt: new Date("2026-10-05T09:00:00Z"), createdAt: new Date("2026-10-05T08:00:00Z"), invitationStatus: null, ...over,
+  pipelineStage: "call_booked", callRequestedAt: new Date("2026-10-05T10:00:00Z"), callScheduledFor: null, reportRequestedAt: null, completedAt: new Date("2026-10-05T09:00:00Z"), createdAt: new Date("2026-10-05T08:00:00Z"), invitationStatus: null, payments: {}, ...over,
 });
 const detailFor = (over: Record<string, unknown> = {}) => ({
   ...check(), heardFrom: null,
@@ -85,6 +88,7 @@ const detailFor = (over: Record<string, unknown> = {}) => ({
   ],
   primaryAreaNumber: 7,
   stageHistory: [],
+  payments: [],
   ...over,
 });
 const renderConsole = (access: Record<string, unknown> = SUPER, onSection?: (id: string) => void) => {
@@ -106,7 +110,7 @@ beforeEach(() => {
   api.invitations = [];
   api.details = { 1: detailFor(), 2: detailFor({ id: 2, fullName: "Bola Quiet", businessName: "Bola Bakes", email: "bola@example.test", whatsapp: null, pipelineStage: "qualified_lead", callRequestedAt: null }) };
   api.error = undefined;
-  api.mutations = { schedule: [], outcome: [], stage: [], invite: [], revoke: [] };
+  api.mutations = { schedule: [], outcome: [], stage: [], invite: [], revoke: [], requestPayment: [], proof: [], confirmPayment: [] };
   api.inviteResult = { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 };
 });
 afterEach(cleanup);
@@ -653,5 +657,71 @@ describe("full report requests in Business Checks", () => {
     renderConsole();
     openRow("Ada Okafor");
     expect(drawer().getByText("Not requested")).toBeTruthy();
+  });
+});
+
+describe("payments in Business Checks", () => {
+  const payment = (over: Record<string, unknown> = {}) => ({
+    id: 7, item: "current_state", amountNaira: 500_000, reference: "TS-CS-000001", status: "requested", requestedAt: new Date("2026-10-08T10:00:00Z"),
+    deliveryStatus: "Simulated", proofReceivedAt: null, confirmedAt: null, note: null, ...over,
+  });
+  const payments = () => within(drawer().getByRole("heading", { name: "Payments" }).closest("section")!);
+
+  it("shows where each payment stands beside the stage in the list", () => {
+    api.checks = [
+      check({ reportRequestedAt: new Date("2026-10-06T10:00:00Z"), payments: { full_report: "confirmed", current_state: "proof_received" } }),
+      check({ id: 2, fullName: "Bola Quiet", businessName: "Bola Bakes", email: "bola@example.test", payments: { full_report: "requested" } }),
+    ];
+    renderConsole();
+    expect(within(rowOf("Ada Okafor")).getByText("Report paid")).toBeTruthy();
+    expect(within(rowOf("Ada Okafor")).getByText("Current State: proof received")).toBeTruthy();
+    expect(within(rowOf("Bola Quiet")).getByText("Report: awaiting payment")).toBeTruthy();
+    expect(within(rowOf("Bola Quiet")).queryByText("Report requested")).toBeNull();
+  });
+
+  it("sends Current State payment details from the record", () => {
+    renderConsole();
+    openRow("Ada Okafor");
+    expect(payments().getByText("Your full business check report")).toBeTruthy();
+    expect(payments().getByText("₦500,000")).toBeTruthy();
+    expect(payments().getAllByText("Payment details not sent.")).toHaveLength(2);
+    const currentState = within(payments().getByRole("listitem", { name: "Current State" }));
+    fireEvent.click(currentState.getByRole("button", { name: "Send payment details" }));
+    expect(api.mutations.requestPayment).toEqual([{ businessCheckId: 1, item: "current_state" }]);
+  });
+
+  it("notes proof, and confirms only after saying what confirming does", () => {
+    api.details[1] = detailFor({ payments: [payment()] });
+    renderConsole();
+    openRow("Ada Okafor");
+    const currentState = within(payments().getByRole("listitem", { name: "Current State" }));
+    expect(currentState.getByText("Awaiting payment")).toBeTruthy();
+    expect(currentState.getByText("TS-CS-000001")).toBeTruthy();
+    fireEvent.click(currentState.getByRole("button", { name: "Proof received" }));
+    expect(api.mutations.proof).toEqual([{ paymentRequestId: 7 }]);
+
+    fireEvent.click(currentState.getByRole("button", { name: "Confirm payment" }));
+    expect(api.mutations.confirmPayment).toEqual([]);
+    expect(currentState.getByText(/the business moves to Won and they get a link to set up their client account, where Current State starts/)).toBeTruthy();
+    fireEvent.change(currentState.getByLabelText("Note (optional)"), { target: { value: " GTB ref 123 " } });
+    fireEvent.click(currentState.getByRole("button", { name: "Yes, the money is in" }));
+    expect(api.mutations.confirmPayment).toEqual([{ paymentRequestId: 7, note: "GTB ref 123" }]);
+  });
+
+  it("shows a paid item as final, with no actions", () => {
+    api.details[1] = detailFor({ payments: [payment({ status: "confirmed", confirmedAt: new Date("2026-10-09T10:00:00Z"), note: "GTB ref 123" })] });
+    renderConsole();
+    openRow("Ada Okafor");
+    const currentState = within(payments().getByRole("listitem", { name: "Current State" }));
+    expect(currentState.getByText("Paid")).toBeTruthy();
+    expect(currentState.getByText("Paid, confirmed 9 Oct 2026")).toBeTruthy();
+    expect(currentState.queryByRole("button")).toBeNull();
+  });
+
+  it("says when the payment table is not in the database yet", () => {
+    api.details[1] = detailFor({ payments: null });
+    renderConsole();
+    openRow("Ada Okafor");
+    expect(payments().getByText("Payments are not set up in the database yet (migration 0006).")).toBeTruthy();
   });
 });

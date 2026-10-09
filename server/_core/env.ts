@@ -34,6 +34,13 @@ export const ENV = {
   googleRefreshToken: process.env.GOOGLE_REFRESH_TOKEN ?? "",
   jumpGmailRefreshToken: process.env.JUMP_GMAIL_REFRESH_TOKEN ?? "",
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID ?? "primary",
+  /**
+   * The account business owners pay into by bank transfer until online payment is ready (server/payments.ts). Until all
+   * three are set, payment email shows placeholder test details and says in capitals that they are not real.
+   */
+  paymentBankName: process.env.PAYMENT_BANK_NAME?.trim() ?? "",
+  paymentAccountName: process.env.PAYMENT_ACCOUNT_NAME?.trim() ?? "",
+  paymentAccountNumber: process.env.PAYMENT_ACCOUNT_NUMBER?.trim() ?? "",
   paystackPublicKey: process.env.PAYSTACK_PUBLIC_KEY ?? "",
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
   /** Canonical public origin (scheme + host) used for emailed links and CSRF checks in production. */

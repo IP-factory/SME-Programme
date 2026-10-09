@@ -6,6 +6,7 @@ import { PIPELINE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@shared/bu
 import { AREA_NAMES } from "@shared/businessCheck/questions";
 import React, { useMemo, useState } from "react";
 import { AdminMetricCard, ClickableRow, ProspectCell, RecordDrawer, RowButton, StatusBadge, TD, TH } from "./AdminPrimitives";
+import { PaymentChips } from "./Payments";
 import BusinessCheckDetail from "./BusinessCheckDetail";
 import { formatDate, readinessShort } from "./format";
 
@@ -107,7 +108,7 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
                   <td className={TD}>
                     <StatusBadge status={row.status} />
                     {/* The ₦100,000 full report is independent of the call, so it is shown beside the stage. */}
-                    {row.reportRequestedAt && <span className="mt-1 block w-fit border border-highlight-ink/30 bg-highlight-ink/5 px-1.5 py-0.5 text-[11px] font-medium text-highlight-ink">Report requested</span>}
+                    <PaymentChips payments={row.payments} reportRequestedAt={row.reportRequestedAt} />
                   </td>
                 </ClickableRow>
               ))}
