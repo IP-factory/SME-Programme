@@ -7,6 +7,7 @@ import { TRPCClientError, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
 import type { AppRouter } from "../../../server/routers";
 import { deriveDiagnostic, type DiagnosticInput } from "../../../server/diagnostic";
+import { BRAND } from "@shared/brand";
 import { evaluate } from "@shared/businessCheck/engine";
 import type { Answers } from "@shared/businessCheck/questions";
 
@@ -39,7 +40,8 @@ const responders: Record<string, Responder> = {
       result,
       summary: { ...result.summary, offerings: result.offerings.map((offering) => ({ id: offering.id, name: offering.name, why: offering.summary })) },
       summarySource: "Rules",
-      discoveryCallUrl: "",
+      // The real booking page, so the preview shows the same Calendly calendar as the live site.
+      discoveryCallUrl: BRAND.discoveryCallUrl,
     };
   },
   "businessCheck.requestNext": (input) => ({ success: true, choice: (input as { choice: string }).choice }),

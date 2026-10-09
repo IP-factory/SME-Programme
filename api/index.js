@@ -34,10 +34,11 @@ var init_brand = __esm({
       /** External page for the free business check, if it runs elsewhere. Empty: the on-site form opens. */
       applyUrl: "",
       /**
-       * Booking page for the free 20-minute discovery call (Calendly or similar). Empty: the business
-       * check records the request and the office books the call by email or WhatsApp.
+       * Booking page for the free 20-minute discovery call: IP Factory's Calendly event, embedded on the
+       * business check result with the owner's name and email filled in. DISCOVERY_CALL_URL in the
+       * hosting settings overrides it. Empty would mean the check records a request and the team emails.
        */
-      discoveryCallUrl: "",
+      discoveryCallUrl: "https://calendly.com/ipfactory-info/ipf-free-20-minute-discovery-call",
       /**
        * Logo files in client/public/brand (ipf-gradient, the Option 1 stacked logo). Use as supplied:
        * never recolour or stretch. The white version goes on dark panels only.

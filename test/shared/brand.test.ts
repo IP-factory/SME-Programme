@@ -1,3 +1,4 @@
+import { bookingTarget } from "@shared/booking";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BRAND } from "@shared/brand";
@@ -43,5 +44,13 @@ describe("product name", () => {
       expect(read(file), file).not.toMatch(/\b(your|a|an|the)\s+\{BRAND\.productName\}/i);
     }
     expect(read("client/src/pages/Home.tsx") + read("client/src/components/home/HomeSections.tsx")).not.toContain("Operating Partner");
+  });
+});
+
+describe("discovery call booking page", () => {
+  it("is IP Factory's Calendly event, so the result page embeds the calendar", () => {
+    expect(BRAND.discoveryCallUrl).toBe("https://calendly.com/ipfactory-info/ipf-free-20-minute-discovery-call");
+    const target = bookingTarget(BRAND.discoveryCallUrl, { name: "Ada Example", email: "ada@example.com" });
+    expect(target.kind).toBe("calendly");
   });
 });

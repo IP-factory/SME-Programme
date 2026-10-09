@@ -24,7 +24,8 @@ afterEach(() => {
 describe("discovery call booking page", () => {
   it("reads the booking page from DISCOVERY_CALL_URL, trimmed, and is empty when unset", async () => {
     expect((await loadWith({ DISCOVERY_CALL_URL: " https://calendly.com/ip-factory/discovery-call " })).ENV.discoveryCallUrl).toBe("https://calendly.com/ip-factory/discovery-call");
-    expect((await loadWith({})).ENV.discoveryCallUrl).toBe("");
+    // Without the setting, the site uses IP Factory's Calendly event from shared/brand.ts.
+    expect((await loadWith({})).ENV.discoveryCallUrl).toBe("https://calendly.com/ipfactory-info/ipf-free-20-minute-discovery-call");
   });
 });
 
