@@ -12,7 +12,7 @@ import { getDb } from "../db";
 import { databaseNow } from "../dbHelpers";
 import { deliverEmail, JUMP_ADMINISTRATION_MAILBOX } from "../email";
 import { ENV } from "../_core/env";
-import { bookedCallTime, CALENDLY_EVENT_URI } from "../calendly";
+import { bookedCallTime, CALENDLY_EVENT_URI, findBookedCall } from "../calendly";
 import { recordAudit } from "../audit";
 import { publicProcedure, router } from "../_core/trpc";
 
@@ -193,7 +193,10 @@ export const businessCheckRouter = router({
       if (!check.completedAt) throw new TRPCError({ code: "BAD_REQUEST", message: "Kindly finish the business check first." });
 
       // A Calendly booking: record when the call is, so the admin console shows it as booked.
-      const bookedFor = input.choice === "call" && input.calendlyEventUri ? await bookedCallTime(input.calendlyEventUri, check.email) : null;
+      // If the booking itself cannot be read, look for the owner's booking by email instead.
+      const bookedFor = input.choice === "call" && input.calendlyEventUri
+        ? (await bookedCallTime(input.calendlyEventUri, check.email)) ?? (await findBookedCall(check.email))
+        : null;
       if (bookedFor) {
         await db.update(businessChecks)
           // The stage moves with the call request below, as for any call request.

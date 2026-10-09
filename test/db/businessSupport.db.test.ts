@@ -3,7 +3,7 @@
  * Real application code and the real request context on PostgreSQL (PGlite on every run, plus TEST_DATABASE_URL via
  * `pnpm test:db`). Email and the language model are stubbed.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, count, eq, sql } from "drizzle-orm";
 import * as schema from "../../drizzle/schema";
 import { createPgliteHarness, createRemoteHarness, type DbHarness } from "./harness";
@@ -13,7 +13,7 @@ const holder = vi.hoisted(() => {
   process.env.DATABASE_URL = "postgresql://contract:contract@localhost:5432/contract";
   return { current: null as unknown as Record<string, unknown> };
 });
-const mocked = vi.hoisted(() => ({ deliverEmail: vi.fn() }));
+const mocked = vi.hoisted(() => ({ deliverEmail: vi.fn(), calendlyOn: false, findBookedCall: vi.fn() }));
 
 vi.mock("pg", () => ({ default: { Pool: class { on() { return this; } } } }));
 vi.mock("drizzle-orm/node-postgres", () => ({
@@ -27,6 +27,12 @@ vi.mock("drizzle-orm/node-postgres", () => ({
 }));
 vi.mock("@server/email", async importOriginal => ({ ...(await importOriginal<typeof import("@server/email")>()), deliverEmail: mocked.deliverEmail }));
 vi.mock("@server/_core/llm", () => ({ invokeLLM: () => Promise.reject(new Error("offline")) }));
+// Calendly is a third-party API: the lookup is stubbed here; its own rules are tested in test/server/calendly.test.ts.
+vi.mock("@server/calendly", async importOriginal => ({
+  ...(await importOriginal<typeof import("@server/calendly")>()),
+  isCalendlyConfigured: () => mocked.calendlyOn,
+  findBookedCall: mocked.findBookedCall,
+}));
 vi.mock("@server/_core/env", async importOriginal => ({ ENV: { ...(await importOriginal<typeof import("@server/_core/env")>()).ENV, forgeApiKey: "test-key" } }));
 
 import { appRouter } from "@server/routers";
@@ -349,6 +355,56 @@ for (const target of targets) {
           await expect((await b.call()).businessSupport.setStage({ businessCheckId: id, stage: "won" })).rejects.toMatchObject({ code: "FORBIDDEN" });
         }
         expect((await rowFor(check.token)).pipelineStage).toBe("qualified_lead");
+      });
+    });
+
+    describe("filling in times from Calendly", () => {
+      async function waitingCall(label: string) {
+        const check = await finishedCheck(label);
+        await requestCall(check.visitor, check.token);
+        return { ...check, id: (await rowFor(check.token)).id as number };
+      }
+      beforeEach(() => {
+        mocked.calendlyOn = true;
+        mocked.findBookedCall.mockReset();
+        mocked.findBookedCall.mockResolvedValue(null);
+      });
+      afterEach(() => {
+        mocked.calendlyOn = false;
+      });
+
+      it("finds the booking for a call that has no time yet when admin opens, saves it once, and shows it as booked", async () => {
+        const call = await waitingCall("calendly-sync");
+        const when = new Date("2026-10-14T09:00:00Z");
+        mocked.findBookedCall.mockImplementation(async (email: string) => (email === call.email ? when : null));
+        const listed = (await (await superAdmin.call()).businessSupport.checks()).find(row => row.id === call.id)!;
+        expect(listed.callScheduledFor).toEqual(when);
+        expect((await rowFor(call.token)).callScheduledFor.getTime()).toBe(when.getTime());
+        const events = await db.select().from(schema.adminAccessAuditEvents).where(eq(schema.adminAccessAuditEvents.action, "business_check_call_booked"));
+        expect(events.some((event: { details: string }) => event.details.includes(`"businessCheckId":${call.id}`) && event.details.includes("calendly_lookup"))).toBe(true);
+
+        // Once saved, it is not looked up again.
+        mocked.findBookedCall.mockClear();
+        await (await superAdmin.call()).businessSupport.discoveryCalls();
+        expect(mocked.findBookedCall).not.toHaveBeenCalledWith(call.email);
+      });
+
+      it("leaves calls alone that already have a time, have moved past the call stage, or have no booking", async () => {
+        const moved = await waitingCall("calendly-moved");
+        await (await superAdmin.call()).businessSupport.recordOutcome({ businessCheckId: moved.id, outcome: "fit" });
+        const unbooked = await waitingCall("calendly-none");
+        await (await superAdmin.call()).businessSupport.checks();
+        expect(mocked.findBookedCall).not.toHaveBeenCalledWith(moved.email);
+        expect(mocked.findBookedCall).toHaveBeenCalledWith(unbooked.email);
+        expect((await rowFor(unbooked.token)).callScheduledFor).toBeNull();
+      });
+
+      it("does nothing without the Calendly token", async () => {
+        mocked.calendlyOn = false;
+        const call = await waitingCall("calendly-off");
+        await (await superAdmin.call()).businessSupport.checks();
+        expect(mocked.findBookedCall).not.toHaveBeenCalled();
+        expect((await rowFor(call.token)).callScheduledFor).toBeNull();
       });
     });
 

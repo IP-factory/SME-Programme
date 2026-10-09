@@ -1,10 +1,11 @@
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { adminAccessAuditEvents, businessChecks, businessMemberships, businesses, users } from "../drizzle/schema";
 import { advancePipeline, PIPELINE_STAGES, type PipelineStage } from "../shared/businessCheck/pipeline";
 import type { CheckResult } from "../shared/businessCheck/engine";
 import type { Database } from "./accountAuth";
 import { recordAudit } from "./audit";
+import { findBookedCall, isCalendlyConfigured } from "./calendly";
 import type { CheckSummary } from "./businessCheck";
 import { latestInvitationStatuses } from "./clientOnboarding";
 import { getDb } from "./db";
@@ -34,22 +35,47 @@ const CHECK_COLUMNS = {
   createdAt: businessChecks.createdAt,
 } as const;
 
+/** How many waiting calls are looked up in Calendly per page load, so the admin console stays quick. */
+const CALENDLY_SYNC_LIMIT = 10;
+
+type ListedCheck = { id: number; email: string; pipelineStage: PipelineStage; callRequestedAt: Date | null; callScheduledFor: Date | null };
+
+/**
+ * Fills in the time of calls that were asked for but have no time yet, from IP Factory's Calendly account (bookings
+ * made before CALENDLY_API_TOKEN was set, or in a new tab). Only checks still at the call stage are looked up; each
+ * found time is saved, so it is looked up once. Without the token this does nothing.
+ */
+async function syncCalendlyBookings<T extends ListedCheck>(db: Database, rows: T[]): Promise<T[]> {
+  if (!isCalendlyConfigured()) return rows;
+  const waiting = rows.filter(row => row.callRequestedAt && !row.callScheduledFor && row.pipelineStage === "call_booked").slice(0, CALENDLY_SYNC_LIMIT);
+  if (!waiting.length) return rows;
+  const found = new Map<number, Date>();
+  await Promise.all(waiting.map(async row => {
+    const time = await findBookedCall(row.email);
+    if (!time) return;
+    await db.update(businessChecks).set({ callScheduledFor: time }).where(and(eq(businessChecks.id, row.id), isNull(businessChecks.callScheduledFor)));
+    await recordAudit(db, { action: "business_check_call_booked", targetEmail: row.email, details: { businessCheckId: row.id, scheduledFor: time.toISOString(), source: "calendly_lookup" } });
+    found.set(row.id, time);
+  }));
+  return rows.map(row => (found.has(row.id) ? { ...row, callScheduledFor: found.get(row.id)! } : row));
+}
+
 /** Every business check: leads who only left their details, and finished checks. These are prospects, not clients. */
-export async function listBusinessChecks(db: Pick<Database, "select">) {
+export async function listBusinessChecks(db: Database) {
   const [rows, invitations] = await Promise.all([
     db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc(businessChecks.createdAt)).limit(500),
     latestInvitationStatuses(db),
   ]);
-  return rows.map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+  return (await syncCalendlyBookings(db, rows)).map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
 }
 
 /** Business checks whose owner asked for the free discovery call, newest request first. */
-export async function listDiscoveryCalls(db: Pick<Database, "select">) {
+export async function listDiscoveryCalls(db: Database) {
   const [rows, invitations] = await Promise.all([
     db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull(businessChecks.callRequestedAt)).orderBy(desc(businessChecks.callRequestedAt)).limit(500),
     latestInvitationStatuses(db),
   ]);
-  return rows.map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+  return (await syncCalendlyBookings(db, rows)).map(row => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
 }
 
 const parseJson = <T>(text: string | null): T | null => {

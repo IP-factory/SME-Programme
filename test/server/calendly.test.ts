@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const env = vi.hoisted(() => ({ calendlyApiToken: "test-calendly-token" }));
 vi.mock("@server/_core/env", () => ({ ENV: env }));
 
-import { bookedCallTime, CALENDLY_EVENT_URI } from "@server/calendly";
+import { bookedCallTime, CALENDLY_EVENT_URI, findBookedCall, resetCalendlyForTests } from "@server/calendly";
 
 const EVENT = "https://api.calendly.com/scheduled_events/ABCDEF12-3456-7890";
 const START = "2026-10-14T09:00:00.000000Z";
@@ -54,5 +54,56 @@ describe("reading a Calendly booking", () => {
     for (const bad of ["https://calendly.com/ipfactory-info/x", "https://api.calendly.com/scheduled_events/../users/me", "http://api.calendly.com/scheduled_events/ABCDEF12", `${EVENT}?x=1`]) {
       expect(CALENDLY_EVENT_URI.test(bad), bad).toBe(false);
     }
+  });
+});
+
+describe("finding a booking by the owner's email", () => {
+  const ORG = "https://api.calendly.com/organizations/ORG12345";
+  const NOW = new Date("2026-10-10T12:00:00Z");
+  function replies(events: unknown[], { meOk = true, eventsOk = true } = {}) {
+    return vi.fn(async (url: string) => {
+      if (url.endsWith("/users/me")) return { ok: meOk, status: meOk ? 200 : 401, json: async () => ({ resource: { current_organization: ORG } }) };
+      return { ok: eventsOk, status: eventsOk ? 200 : 500, json: async () => ({ collection: events }) };
+    });
+  }
+  beforeEach(() => {
+    env.calendlyApiToken = "test-calendly-token";
+    resetCalendlyForTests();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("picks the next upcoming active booking, asking only for that email in IP Factory's organisation", async () => {
+    const fetchMock = replies([
+      { start_time: "2026-10-20T09:00:00Z", status: "active" },
+      { start_time: "2026-10-14T09:00:00Z", status: "active" },
+      { start_time: "2026-10-01T09:00:00Z", status: "active" },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await findBookedCall(" Ada@Example.com ", NOW)).toEqual(new Date("2026-10-14T09:00:00Z"));
+    const query = new URL(fetchMock.mock.calls[1][0] as string).searchParams;
+    expect(query.get("organization")).toBe(ORG);
+    expect(query.get("invitee_email")).toBe("ada@example.com");
+    expect(query.get("status")).toBe("active");
+  });
+
+  it("falls back to the most recent past booking, and returns nothing when there is none", async () => {
+    vi.stubGlobal("fetch", replies([{ start_time: "2026-10-01T09:00:00Z", status: "active" }, { start_time: "2026-10-05T09:00:00Z", status: "active" }]));
+    expect(await findBookedCall("ada@example.com", NOW)).toEqual(new Date("2026-10-05T09:00:00Z"));
+    vi.stubGlobal("fetch", replies([{ start_time: "2026-10-14T09:00:00Z", status: "canceled" }]));
+    expect(await findBookedCall("ada@example.com", NOW)).toBeNull();
+  });
+
+  it("logs why a lookup failed without the token or the email, and does nothing without a token", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", replies([], { meOk: false }));
+    expect(await findBookedCall("ada@example.com", NOW)).toBeNull();
+    expect(warn).toHaveBeenCalledWith("[Calendly] /users/me returned 401");
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/test-calendly-token|ada@example\.com/);
+    warn.mockRestore();
+    env.calendlyApiToken = "";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await findBookedCall("ada@example.com", NOW)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

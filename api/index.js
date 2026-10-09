@@ -7748,8 +7748,36 @@ function isCalendlyConfigured() {
 }
 async function calendly(path) {
   const response = await fetch(`${API}${path}`, { headers: { authorization: `Bearer ${ENV.calendlyApiToken}`, accept: "application/json" }, signal: AbortSignal.timeout(5e3) });
-  if (!response.ok) return null;
+  if (!response.ok) {
+    console.warn(`[Calendly] ${path.split("?")[0].replace(/[A-Za-z0-9-]{8,}/g, "\u2026")} returned ${response.status}`);
+    return null;
+  }
   return await response.json();
+}
+var organisation = null;
+function organisationUri() {
+  organisation ??= calendly("/users/me").then((me) => {
+    const uri = me?.resource?.current_organization ?? null;
+    if (!uri) organisation = null;
+    return uri;
+  });
+  return organisation;
+}
+async function findBookedCall(inviteeEmail, now = /* @__PURE__ */ new Date()) {
+  if (!isCalendlyConfigured()) return null;
+  try {
+    const org = await organisationUri();
+    if (!org) return null;
+    const query = new URLSearchParams({ organization: org, invitee_email: inviteeEmail.trim().toLowerCase(), status: "active", sort: "start_time:desc", count: "20" });
+    const events = await calendly(`/scheduled_events?${query}`);
+    const times = (events?.collection ?? []).filter((event) => event.status === "active" && event.start_time).map((event) => new Date(event.start_time)).filter((time) => !Number.isNaN(time.getTime()));
+    const upcoming = times.filter((time) => time >= now).sort((a, b) => a.getTime() - b.getTime());
+    const past = times.filter((time) => time < now).sort((a, b) => b.getTime() - a.getTime());
+    return upcoming[0] ?? past[0] ?? null;
+  } catch (error) {
+    console.warn("[Calendly] Could not look up bookings:", error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 async function bookedCallTime(eventUri, inviteeEmail) {
   if (!isCalendlyConfigured() || !CALENDLY_EVENT_URI.test(eventUri)) return null;
@@ -7894,7 +7922,7 @@ var businessCheckRouter = router({
     const db = await database("record your request");
     const check = await findCheck(db, input.token);
     if (!check.completedAt) throw new TRPCError12({ code: "BAD_REQUEST", message: "Kindly finish the business check first." });
-    const bookedFor = input.choice === "call" && input.calendlyEventUri ? await bookedCallTime(input.calendlyEventUri, check.email) : null;
+    const bookedFor = input.choice === "call" && input.calendlyEventUri ? await bookedCallTime(input.calendlyEventUri, check.email) ?? await findBookedCall(check.email) : null;
     if (bookedFor) {
       await db.update(businessChecks).set({ callScheduledFor: bookedFor }).where(eq14(businessChecks.id, check.id));
       await recordAudit(db, { action: "business_check_call_booked", targetEmail: check.email, details: { businessCheckId: check.id, scheduledFor: bookedFor.toISOString(), source: "calendly" } });
@@ -8198,7 +8226,7 @@ var platformRolesRouter = router({
 import { z as z19 } from "zod";
 
 // server/businessSupportAdmin.ts
-import { and as and12, desc as desc9, eq as eq16, inArray as inArray4, isNotNull as isNotNull2, sql as sql6 } from "drizzle-orm";
+import { and as and12, desc as desc9, eq as eq16, inArray as inArray4, isNotNull as isNotNull2, isNull as isNull6, sql as sql6 } from "drizzle-orm";
 import { TRPCError as TRPCError15 } from "@trpc/server";
 async function requireDatabase2() {
   const db = await getDb();
@@ -8222,19 +8250,34 @@ var CHECK_COLUMNS = {
   completedAt: businessChecks.completedAt,
   createdAt: businessChecks.createdAt
 };
+var CALENDLY_SYNC_LIMIT = 10;
+async function syncCalendlyBookings(db, rows) {
+  if (!isCalendlyConfigured()) return rows;
+  const waiting = rows.filter((row) => row.callRequestedAt && !row.callScheduledFor && row.pipelineStage === "call_booked").slice(0, CALENDLY_SYNC_LIMIT);
+  if (!waiting.length) return rows;
+  const found = /* @__PURE__ */ new Map();
+  await Promise.all(waiting.map(async (row) => {
+    const time = await findBookedCall(row.email);
+    if (!time) return;
+    await db.update(businessChecks).set({ callScheduledFor: time }).where(and12(eq16(businessChecks.id, row.id), isNull6(businessChecks.callScheduledFor)));
+    await recordAudit(db, { action: "business_check_call_booked", targetEmail: row.email, details: { businessCheckId: row.id, scheduledFor: time.toISOString(), source: "calendly_lookup" } });
+    found.set(row.id, time);
+  }));
+  return rows.map((row) => found.has(row.id) ? { ...row, callScheduledFor: found.get(row.id) } : row);
+}
 async function listBusinessChecks(db) {
   const [rows, invitations] = await Promise.all([
     db.select(CHECK_COLUMNS).from(businessChecks).orderBy(desc9(businessChecks.createdAt)).limit(500),
     latestInvitationStatuses(db)
   ]);
-  return rows.map((row) => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+  return (await syncCalendlyBookings(db, rows)).map((row) => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
 }
 async function listDiscoveryCalls(db) {
   const [rows, invitations] = await Promise.all([
     db.select(CHECK_COLUMNS).from(businessChecks).where(isNotNull2(businessChecks.callRequestedAt)).orderBy(desc9(businessChecks.callRequestedAt)).limit(500),
     latestInvitationStatuses(db)
   ]);
-  return rows.map((row) => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
+  return (await syncCalendlyBookings(db, rows)).map((row) => ({ ...row, invitationStatus: invitations.get(row.id) ?? null }));
 }
 var parseJson = (text2) => {
   if (!text2) return null;
