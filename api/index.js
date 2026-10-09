@@ -91,7 +91,13 @@ var init_brand = __esm({
         "brand-line": "#D3DEEA",
         "line": "#DDE3E8",
         "paper": "#F7F9FA",
-        "paper-raised": "#FFFFFF"
+        "paper-raised": "#FFFFFF",
+        "health-clear": "#2E7D4F",
+        "health-clear-tint": "#E7F3EC",
+        "health-watch": "#B26A00",
+        "health-watch-tint": "#FBF0DD",
+        "health-stuck": "#B42318",
+        "health-stuck-tint": "#FCE9E7"
       }
     };
   }

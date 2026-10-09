@@ -1,0 +1,928 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the full report > is deterministic: the same answers give the same report, word for word 1`] = `
+{
+  "appendix": [
+    {
+      "rows": [
+        {
+          "answer": "I run my business full-time",
+          "question": "Which best describes you today?",
+        },
+        {
+          "answer": "Adunni Fabrics",
+          "question": "What is the business called?",
+        },
+        {
+          "answer": "2 to 5 years",
+          "question": "How long has the business been trading?",
+        },
+        {
+          "answer": "We buy and sell things: retail, distribution, imports",
+          "question": "How does the business make money?",
+        },
+        {
+          "answer": "Retail",
+          "question": "Which sector is it in?",
+        },
+        {
+          "answer": "1 to 2",
+          "question": "How many people work in it, including contract staff?",
+        },
+        {
+          "answer": "₦1 million to ₦3 million",
+          "question": "In a typical month, how much comes in? (Revenue, not profit.)",
+        },
+        {
+          "answer": "Flat, stuck at the same level",
+          "question": "Over the last 12 months, revenue has been…",
+        },
+        {
+          "answer": "Get people talking and rally them around a solution",
+          "question": "When something goes wrong in the business, what do you do first?",
+        },
+        {
+          "answer": "Persuasive and full of energy",
+          "question": "Which would the people who work with you most likely say about you?",
+        },
+        {
+          "answer": "A co-founder or business partner",
+          "question": "Who carries the business with you?",
+        },
+        {
+          "answer": "Short courses or workshops",
+          "question": "What business training have you had?",
+        },
+        {
+          "answer": "Tell the difference between profit and cash",
+          "question": "Which of these can you do confidently today?",
+        },
+        {
+          "answer": "2 to 4",
+          "question": "How many hours a week can you give to working on the business, not just in it?",
+        },
+        {
+          "answer": "I'm busy every day, but I'm not sure where this is going",
+          "question": "Which is closest to the truth about where the business is going?",
+        },
+        {
+          "answer": "Partners or family members want different things",
+          "question": "What does that look like day to day?",
+        },
+        {
+          "answer": "I know my customers, but little about competitors or the wider market",
+          "question": "How well do you know your market?",
+        },
+        {
+          "answer": "Understanding competitors' prices and offers",
+          "question": "Which would help you most?",
+        },
+        {
+          "answer": "People like what we do, but they don't buy enough of it",
+          "question": "Which is closest?",
+        },
+        {
+          "answer": "Customers don't see why we're better",
+          "question": "Where does the offer fall short?",
+        },
+        {
+          "answer": "Money comes in, but the business still doesn't make money",
+          "question": "Which is closest?",
+        },
+        {
+          "answer": "One or two customers make up most of our revenue",
+          "question": "Which sounds most like you?",
+        },
+        {
+          "answer": "I don't know how to get customers consistently",
+          "question": "How do new customers come in?",
+        },
+        {
+          "answer": "People enquire but don't buy",
+          "question": "Where do sales break down?",
+        },
+        {
+          "answer": "Nothing moves unless I'm there",
+          "question": "Which is closest?",
+        },
+        {
+          "answer": "Staff wait for me to decide everything",
+          "question": "What hurts most?",
+        },
+        {
+          "answer": "Cash is always tight and my prices are guesses",
+          "question": "Which is closest?",
+        },
+        {
+          "answer": "I don't know my true cost per product or service",
+          "question": "What is the biggest money worry?",
+        },
+        {
+          "answer": "One tax visit, one resignation or one bad month could end this",
+          "question": "Which is closest?",
+        },
+        {
+          "answer": "Losing a key person",
+          "question": "What worries you most?",
+        },
+      ],
+      "title": "Your business check",
+    },
+    {
+      "rows": [
+        {
+          "answer": "A shop in Balogun Market, Lagos, and orders on WhatsApp",
+          "question": "Where do you sell from?",
+        },
+        {
+          "answer": "A registered business name (CAC)",
+          "question": "How is the business registered?",
+        },
+        {
+          "answer": "Ankara fabric (6 yards) (₦18,000); Lace fabric (5 yards) (₦65,000); Aso-oke sets",
+          "question": "Your top three products or services, and the price of each.",
+        },
+        {
+          "answer": "Tailors in Surulere who buy every week for their clients' events",
+          "question": "Describe your best customer in one line.",
+        },
+        {
+          "answer": "Mama Bisi Fabrics; Two online sellers on Instagram",
+          "question": "Name up to three competitors.",
+        },
+        {
+          "answer": "Lower than theirs",
+          "question": "Are your prices higher, about the same or lower than theirs?",
+        },
+        {
+          "answer": "Lace fabric (5 yards)",
+          "question": "Which of your products or services earns you the most?",
+        },
+        {
+          "answer": "₦50 to ₦75",
+          "question": "Out of every ₦100 a customer pays you, how much goes on materials, stock or the direct labour to deliver it?",
+        },
+        {
+          "answer": "A fifth to a half",
+          "question": "How much of your sales come from your three biggest customers?",
+        },
+        {
+          "answer": "Word of mouth; Walk-ins to a shop or office; Social media (Instagram, TikTok, Facebook, WhatsApp status)",
+          "question": "Where do new customers come from?",
+        },
+        {
+          "answer": "50 to 200; 3 of every 10 buy",
+          "question": "About how many people ask about buying in a month, and how many of every 10 buy?",
+        },
+        {
+          "answer": "Most come back, but not often",
+          "question": "Do customers come back?",
+        },
+        {
+          "answer": "Me (buying, pricing and the big customers), one shop attendant, my sister on WhatsApp orders",
+          "question": "Who does what? List the roles, including yours.",
+        },
+        {
+          "answer": "WhatsApp for orders or the team; Paper records",
+          "question": "Which tools do you use to run the business?",
+        },
+        {
+          "answer": "In: ₦2,400,000; costs: ₦2,150,000; biggest cost: Stock or materials",
+          "question": "Last month: how much came in, and what did running the business cost?",
+        },
+        {
+          "answer": "Cash: ₦500,000 to ₦2 million; owed to you: Less than ₦1 million; loans: None",
+          "question": "Cash in the bank today, money customers owe you, and any loans.",
+        },
+        {
+          "answer": "Open a second shop in Yaba and reach ₦4 million a month",
+          "question": "What would make the next 12 months a success?",
+        },
+      ],
+      "title": "Your Report Intake",
+    },
+  ],
+  "businessName": "Adunni Fabrics",
+  "date": "9 October 2026",
+  "descriptor": "A retail business that buys and sells goods, trading for two to five years",
+  "method": "Built by The Shift's fixed rules from the business check you took and the Report Intake you completed. The same answers always give the same report. It reflects what you told us on 9 October 2026. It is not an audit, a valuation, or financial, legal or tax advice.",
+  "onePage": {
+    "fixFirst": {
+      "area": "Financials",
+      "finding": "Cash is always tight and prices are guesses, so the business runs without a dashboard.",
+    },
+    "keyNumbers": [
+      {
+        "label": "Last month in",
+        "note": "Revenue, not profit",
+        "value": "₦2,400,000",
+      },
+      {
+        "label": "Left after costs",
+        "note": "10% of revenue",
+        "value": "₦250,000",
+      },
+      {
+        "label": "Gross margin",
+        "note": "Left from each sale after direct costs",
+        "value": "25% to 50%",
+      },
+      {
+        "label": "Cash cover",
+        "note": "Weeks of costs your cash would pay",
+        "value": "1 to 5 weeks",
+      },
+    ],
+    "moves": [
+      {
+        "area": "Financials",
+        "month": "Month 1",
+        "move": "Work out the full cost of each main product: materials, labour and a share of overheads.",
+        "thisWeek": "Add up what it cost to make or deliver your best seller last month, and divide by the units sold.",
+        "watch": "Weeks of costs covered by cash in the bank",
+      },
+      {
+        "area": "Business model",
+        "month": "Month 2",
+        "move": "Set a limit on the share of sales from your biggest customer, and win new customers to bring it down.",
+        "thisWeek": "Work out what share of last month's sales came from your biggest customer.",
+        "watch": "Gross margin, product by product",
+      },
+      {
+        "area": "Market entry and sales",
+        "month": "Month 3",
+        "move": "Follow up every enquiry within a day, and record why the people who do not buy say no.",
+        "thisWeek": "Call back the last ten people who enquired and did not buy, and ask why.",
+        "watch": "New customers a month, by channel",
+      },
+    ],
+    "position": "Adunni Fabrics buys and sells goods and has traded for two to five years. Of the 9 areas we looked at, 2 need watching and 7 are stuck.",
+    "tally": {
+      "clear": 0,
+      "stuck": 7,
+      "watch": 2,
+    },
+    "watch": "Weeks of costs covered by cash in the bank",
+  },
+  "ownerName": "Adunni Example",
+  "parts": [
+    {
+      "blocks": [
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "Business",
+              "value": "Adunni Fabrics",
+            },
+            {
+              "label": "Where it sells",
+              "value": "A shop in Balogun Market, Lagos, and orders on WhatsApp",
+            },
+            {
+              "label": "Registration",
+              "value": "A registered business name (CAC)",
+            },
+            {
+              "label": "Sector",
+              "value": "Retail",
+            },
+            {
+              "label": "Trading for",
+              "value": "2 to 5 years",
+            },
+            {
+              "label": "People",
+              "value": "1 to 2",
+            },
+            {
+              "label": "A typical month",
+              "value": "₦1 million to ₦3 million",
+            },
+            {
+              "label": "Last month",
+              "value": "₦2,400,000 came in",
+            },
+            {
+              "label": "Last 12 months",
+              "value": "Flat, stuck at the same level",
+            },
+          ],
+        },
+        {
+          "columns": [
+            "What you sell",
+            "Price",
+            "",
+          ],
+          "kind": "table",
+          "rows": [
+            [
+              "Ankara fabric (6 yards)",
+              "₦18,000",
+              "",
+            ],
+            [
+              "Lace fabric (5 yards)",
+              "₦65,000",
+              "Top earner",
+            ],
+            [
+              "Aso-oke sets",
+              "Varies",
+              "",
+            ],
+          ],
+          "widths": [
+            0.6,
+            0.25,
+            0.15,
+          ],
+        },
+        {
+          "kind": "heading",
+          "text": "You and your team",
+        },
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "Founder readiness",
+              "value": "Intermediate: ready, with gaps to close",
+            },
+            {
+              "label": "Under pressure",
+              "value": "Influencer. You sell, persuade and rally people.",
+            },
+            {
+              "label": "Others see you as",
+              "value": "Influencer",
+            },
+            {
+              "label": "Watch for",
+              "value": "Follow-through and the numbers can slip.",
+            },
+            {
+              "label": "Who carries it with you",
+              "value": "You and a co-founder or partner",
+            },
+            {
+              "label": "Time on the business",
+              "value": "2 to 4 hours a week",
+            },
+            {
+              "label": "Money skills",
+              "value": "You can tell profit from cash.",
+            },
+          ],
+        },
+      ],
+      "finding": "Adunni Fabrics buys and sells goods and has traded for two to five years. Revenue has been flat for the last 12 months.",
+      "health": "watch",
+      "method": "Business overview",
+      "number": 1,
+      "title": "Your business today",
+    },
+    {
+      "blocks": [
+        {
+          "area": "Strategic intent",
+          "good": "You can say in two sentences where the business will be in three years. You have three priorities for this year, and most of your week goes on them.",
+          "health": "stuck",
+          "kind": "reading",
+          "meaning": [
+            "Without an agreed destination, every request feels urgent and the business drifts towards whatever shouts loudest. The business has motion but no direction.",
+            "When partners or family want different things, decisions stall and staff get mixed messages.",
+          ],
+          "move": "Agree one written goal for the year with your partners, and who decides what.",
+          "shows": [
+            "Your goal for the next 12 months: “Open a second shop in Yaba and reach ₦4 million a month.”",
+            "Day to day: partners or family members want different things.",
+          ],
+          "theirWords": "“I'm busy every day, but I'm not sure where this is going”",
+          "thisWeek": "Book two hours with your partners to answer one question: where must the business be in 12 months?",
+          "watch": "Hours a week spent on your three priorities",
+        },
+      ],
+      "finding": "You are busy every day without a clear destination, so effort spreads thin.",
+      "health": "stuck",
+      "method": "Strategic intent",
+      "number": 2,
+      "title": "Where it is going",
+    },
+    {
+      "blocks": [
+        {
+          "area": "Market and industry",
+          "good": "You can describe your best customers, what they pay and why they choose you, and name the two or three competitors they compare you with.",
+          "health": "watch",
+          "kind": "reading",
+          "meaning": [
+            "Knowing customers without knowing competitors leaves you blind on price and position. You cannot tell whether you win on value or only on price.",
+            "Without knowing competitors' prices and offers, your price is a guess and your pitch cannot say why you are better.",
+          ],
+          "move": "Map your three closest competitors: what they sell, at what price, and what customers say about them.",
+          "shows": [
+            "Your best customer: Tailors in Surulere who buy every week for their clients' events.",
+            "Competitors you named: Mama Bisi Fabrics and Two online sellers on Instagram.",
+            "Your prices against theirs: lower than theirs.",
+            "What would help most: understanding competitors' prices and offers.",
+          ],
+          "theirWords": "“I know my customers, but little about competitors or the wider market”",
+          "thisWeek": "Visit, call or browse three competitors as a customer would, and note their prices.",
+          "watch": "Share of sales from your target customer group",
+        },
+        {
+          "columns": [
+            "Your position at a glance",
+            "",
+          ],
+          "kind": "table",
+          "rows": [
+            [
+              "Strengths",
+              "You can name your competitors. A founder who leads as an influencer.",
+            ],
+            [
+              "Weaknesses",
+              "Strategic intent is stuck. Service and offering is stuck. Business model is stuck. Market entry and sales is stuck.",
+            ],
+            [
+              "Opportunities",
+              "Turning more enquiries into sales. More repeat business from existing customers. Room to move prices closer to competitors.",
+            ],
+            [
+              "Threats",
+              "A bad month with little cash to absorb it.",
+            ],
+          ],
+          "widths": [
+            0.24,
+            0.76,
+          ],
+        },
+      ],
+      "finding": "You know your customers, but not the competitors and market around them.",
+      "health": "watch",
+      "method": "Market and industry assessment",
+      "number": 3,
+      "title": "Your market",
+    },
+    {
+      "blocks": [
+        {
+          "items": [
+            {
+              "label": "Gross margin",
+              "note": "Left from each sale after direct costs",
+              "value": "25% to 50%",
+            },
+            {
+              "label": "Top three customers",
+              "note": "Share of your sales",
+              "value": "A fifth to a half",
+            },
+            {
+              "label": "Your prices",
+              "note": "Against competitors",
+              "value": "Lower than theirs",
+            },
+          ],
+          "kind": "metrics",
+        },
+        {
+          "area": "Service and offering",
+          "good": "Customers understand what you sell, why it is better for them and what it costs. Your range is focused on what sells.",
+          "health": "stuck",
+          "kind": "reading",
+          "meaning": [
+            "Liking is not buying. When interest does not turn into sales, the offer usually lacks a clear promise, a reason to buy now, or a price that matches the value people see.",
+            "If customers cannot see why you are better, they compare on price, and the cheapest seller wins.",
+          ],
+          "move": "Write one sentence that says why a customer should choose you, and use it everywhere you sell.",
+          "shows": [
+            "What you sell: Ankara fabric (6 yards), Lace fabric (5 yards) and Aso-oke sets.",
+            "Your top earner: Lace fabric (5 yards).",
+            "Where the offer falls short: customers don't see why we're better.",
+          ],
+          "theirWords": "“People like what we do, but they don't buy enough of it”",
+          "thisWeek": "Ask five good customers why they buy from you, and write down their exact words.",
+          "watch": "Average sale value, and how many enquiries become sales",
+        },
+        {
+          "area": "Business model",
+          "good": "You know which products and customers make money. Your margins cover your costs with room to spare, and no single customer can sink you.",
+          "health": "stuck",
+          "kind": "reading",
+          "meaning": [
+            "Revenue that does not turn into profit means the business model leaks: prices are too low, costs too high, or some products and customers lose money.",
+            "When one or two customers make up most of your revenue, they control your prices and your survival.",
+            "You price below competitors on a thin margin, so you may be buying sales rather than earning them.",
+          ],
+          "move": "Set a limit on the share of sales from your biggest customer, and win new customers to bring it down.",
+          "shows": [
+            "Gross margin, from your answer: 25% to 50% (₦50 to ₦75 of every ₦100 goes on direct costs).",
+            "Sales from your three biggest customers: a fifth to a half.",
+            "Your prices against competitors: lower than theirs.",
+            "What sounds most like you: one or two customers make up most of our revenue.",
+          ],
+          "theirWords": "“Money comes in, but the business still doesn't make money”",
+          "thisWeek": "Work out what share of last month's sales came from your biggest customer.",
+          "watch": "Gross margin, product by product",
+        },
+        {
+          "kind": "heading",
+          "text": "Your business model on one page",
+        },
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "Best customer",
+              "value": "Tailors in Surulere who buy every week for their clients' events.",
+            },
+            {
+              "label": "What they buy",
+              "value": "Ankara fabric (6 yards), Lace fabric (5 yards) and Aso-oke sets.",
+            },
+            {
+              "label": "How they find you",
+              "value": "Word of mouth, walk-ins to a shop or office and social media (Instagram, TikTok, Facebook, WhatsApp status).",
+            },
+            {
+              "label": "How you earn",
+              "value": "Buys and sells goods, keeping about 25% to 50% of each sale after direct costs.",
+            },
+            {
+              "label": "Biggest cost",
+              "value": "Stock or materials",
+            },
+            {
+              "label": "Who runs it",
+              "value": "Me (buying, pricing and the big customers), one shop attendant, my sister on WhatsApp orders.",
+            },
+          ],
+        },
+      ],
+      "finding": "Money comes in, but the business still does not make money.",
+      "health": "stuck",
+      "method": "Service description and business model",
+      "number": 4,
+      "title": "What you sell and how it makes money",
+    },
+    {
+      "blocks": [
+        {
+          "items": [
+            {
+              "label": "Enquiries a month",
+              "note": "People who ask about buying",
+              "value": "50 to 200",
+            },
+            {
+              "label": "Buy, of every 10",
+              "note": "Your conversion rate",
+              "value": "3",
+            },
+            {
+              "label": "New customers a month",
+              "note": "Worked out from the two",
+              "value": "15 to 60",
+            },
+          ],
+          "kind": "metrics",
+        },
+        {
+          "area": "Market entry and sales",
+          "good": "New customers arrive steadily from two or three channels you understand, and you know where each one came from.",
+          "health": "stuck",
+          "kind": "reading",
+          "meaning": [
+            "Inconsistent sales usually mean there is no system: no regular activity that brings in enquiries, and no follow-up that turns them into sales.",
+            "People enquire but do not buy, so the interest is there. The gap is in the offer, the price or the follow-up.",
+          ],
+          "move": "Follow up every enquiry within a day, and record why the people who do not buy say no.",
+          "shows": [
+            "Where new customers come from: word of mouth, walk-ins to a shop or office and social media (Instagram, TikTok, Facebook, WhatsApp status).",
+            "Enquiries a month: 50 to 200. Of every 10, 3 buy.",
+            "Do customers come back: most come back, but not often.",
+            "Where sales break down: people enquire but don't buy.",
+          ],
+          "theirWords": "“I don't know how to get customers consistently”",
+          "thisWeek": "Call back the last ten people who enquired and did not buy, and ask why.",
+          "watch": "New customers a month, by channel",
+        },
+      ],
+      "finding": "Customers do not arrive consistently, so sales rise and fall without warning.",
+      "health": "stuck",
+      "method": "Go-to-market",
+      "number": 5,
+      "title": "How customers find you and buy",
+    },
+    {
+      "blocks": [
+        {
+          "area": "Operations and people",
+          "good": "The business runs for a week without you. Roles are clear, the main processes are written down and the same mistakes do not repeat.",
+          "health": "stuck",
+          "kind": "reading",
+          "meaning": [
+            "When everything runs through the owner, the business cannot grow and a week off costs you sales. This is the most common ceiling for a growing business.",
+            "When staff wait for you to decide everything, you become the bottleneck.",
+          ],
+          "move": "Decide which decisions staff can make alone, up to what amount, and tell them.",
+          "shows": [
+            "Who does what: Me (buying, pricing and the big customers), one shop attendant, my sister on WhatsApp orders.",
+            "Tools: WhatsApp for orders or the team and paper records.",
+            "Time you give to working on the business, not in it: 2 to 4 hours a week.",
+            "What hurts most: staff wait for me to decide everything.",
+          ],
+          "theirWords": "“Nothing moves unless I'm there”",
+          "thisWeek": "List the decisions you made last week that someone else could have made.",
+          "watch": "Hours a week the business runs without you",
+        },
+      ],
+      "finding": "Nothing moves unless you are there, so the business is capped at your hours.",
+      "health": "stuck",
+      "method": "Operational plan",
+      "number": 6,
+      "title": "How the business runs",
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            "Risk",
+            "Likelihood",
+            "Impact",
+            "First control",
+          ],
+          "kind": "table",
+          "rows": [
+            [
+              "Cash runs out in a bad month",
+              "High",
+              "High",
+              "A 13-week cash forecast, updated every Monday.",
+            ],
+            [
+              "Losing a big customer",
+              "Medium",
+              "High",
+              "Written agreements with the top customers, and a target for new ones.",
+            ],
+            [
+              "The business stops without you or a key person",
+              "Medium",
+              "High",
+              "Write down the key tasks and train a second person on each.",
+            ],
+          ],
+          "widths": [
+            0.3,
+            0.14,
+            0.12,
+            0.44,
+          ],
+        },
+        {
+          "area": "Risk and compliance",
+          "good": "Registrations and taxes are up to date, you know your top risks, and each has a control or cover in place.",
+          "health": "stuck",
+          "kind": "reading",
+          "meaning": [
+            "A business this exposed can be stopped by a single event. The first job is to list the risks that could do it and put a basic control on each.",
+            "Losing a key person can stop the business when what they know is only in their head.",
+          ],
+          "move": "Write down what each key person knows and does, and train a second person on the most important parts.",
+          "shows": [
+            "Registration: a registered business name (CAC).",
+            "What worries you most: losing a key person.",
+          ],
+          "theirWords": "“One tax visit, one resignation or one bad month could end this”",
+          "thisWeek": "Ask your key person to write down the steps of the one task only they can do.",
+          "watch": "Top risks with a control in place",
+        },
+      ],
+      "finding": "One tax visit, one resignation or one bad month could end the business.",
+      "health": "stuck",
+      "method": "Risk assessment",
+      "number": 7,
+      "title": "What could go wrong",
+    },
+    {
+      "blocks": [
+        {
+          "items": [
+            {
+              "label": "Last month in",
+              "note": "Revenue, not profit",
+              "value": "₦2,400,000",
+            },
+            {
+              "label": "Left after costs",
+              "note": "10% of revenue",
+              "value": "₦250,000",
+            },
+            {
+              "label": "Cash cover",
+              "note": "Weeks of costs your cash would pay",
+              "value": "1 to 5 weeks",
+            },
+          ],
+          "kind": "metrics",
+        },
+        {
+          "area": "Financials",
+          "good": "You know your margin on every product and your cash for the next 13 weeks, and you decide with numbers rather than feel.",
+          "health": "stuck",
+          "kind": "reading",
+          "meaning": [
+            "Tight cash and guessed prices usually go together: prices that do not cover costs drain cash month after month.",
+            "Without your true cost per product, you cannot know whether a sale makes or loses money.",
+          ],
+          "move": "Work out the full cost of each main product: materials, labour and a share of overheads.",
+          "shows": [
+            "Last month in: ₦2,400,000. Costs: ₦2,150,000. Biggest cost: stock or materials.",
+            "Cash in the bank: ₦500,000 to ₦2 million. Owed to you: less than ₦1 million. Loans: none.",
+            "Your biggest money worry: I don't know my true cost per product or service.",
+          ],
+          "theirWords": "“Cash is always tight and my prices are guesses”",
+          "thisWeek": "Add up what it cost to make or deliver your best seller last month, and divide by the units sold.",
+          "watch": "Weeks of costs covered by cash in the bank",
+        },
+      ],
+      "finding": "Cash is always tight and prices are guesses, so the business runs without a dashboard.",
+      "health": "stuck",
+      "method": "Financial analysis",
+      "number": 8,
+      "title": "The numbers",
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            "Area",
+            "Where you are",
+            "Finding",
+          ],
+          "kind": "table",
+          "rows": [
+            [
+              "Founder readiness",
+              "Watch",
+              "Intermediate: ready, with gaps to close",
+            ],
+            [
+              "Strategic intent",
+              "Stuck",
+              "You are busy every day without a clear destination, so effort spreads thin.",
+            ],
+            [
+              "Market and industry",
+              "Watch",
+              "You know your customers, but not the competitors and market around them.",
+            ],
+            [
+              "Service and offering",
+              "Stuck",
+              "People like what you do, but not enough of them buy it.",
+            ],
+            [
+              "Business model",
+              "Stuck",
+              "Money comes in, but the business still does not make money.",
+            ],
+            [
+              "Market entry and sales",
+              "Stuck",
+              "Customers do not arrive consistently, so sales rise and fall without warning.",
+            ],
+            [
+              "Operations and people",
+              "Stuck",
+              "Nothing moves unless you are there, so the business is capped at your hours.",
+            ],
+            [
+              "Financials",
+              "Stuck",
+              "Cash is always tight and prices are guesses, so the business runs without a dashboard.",
+            ],
+            [
+              "Risk and compliance",
+              "Stuck",
+              "One tax visit, one resignation or one bad month could end the business.",
+            ],
+          ],
+          "widths": [
+            0.26,
+            0.14,
+            0.6,
+          ],
+        },
+        {
+          "kind": "paragraph",
+          "text": "Financials, Business model, Market entry and sales, Service and offering, Operations and people, Strategic intent and Risk and compliance are stuck. Market and industry needs watching. These are rarely separate problems. Money and business-model problems usually sit underneath sales, offer and people problems, so the plan starts where the root is, not where the pain is loudest.",
+        },
+        {
+          "kind": "callout",
+          "text": "It isn't yet clear what is really wrong, or what good would look like. So the first job is to see the problem clearly, with numbers, before spending on a fix.",
+          "title": "The kind of gap: clarity",
+        },
+      ],
+      "finding": "The place to start is financials: cash is always tight and prices are guesses, so the business runs without a dashboard.",
+      "health": "stuck",
+      "method": "Synthesis",
+      "number": 9,
+      "title": "The diagnosis",
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            "When",
+            "Move",
+            "This week",
+            "Number to watch",
+          ],
+          "kind": "table",
+          "rows": [
+            [
+              "Month 1",
+              "Work out the full cost of each main product: materials, labour and a share of overheads.",
+              "Add up what it cost to make or deliver your best seller last month, and divide by the units sold.",
+              "Weeks of costs covered by cash in the bank",
+            ],
+            [
+              "Month 2",
+              "Set a limit on the share of sales from your biggest customer, and win new customers to bring it down.",
+              "Work out what share of last month's sales came from your biggest customer.",
+              "Gross margin, product by product",
+            ],
+            [
+              "Month 3",
+              "Follow up every enquiry within a day, and record why the people who do not buy say no.",
+              "Call back the last ten people who enquired and did not buy, and ask why.",
+              "New customers a month, by channel",
+            ],
+          ],
+          "widths": [
+            0.13,
+            0.37,
+            0.3,
+            0.2,
+          ],
+        },
+        {
+          "kind": "paragraph",
+          "text": "Your goal for the year, in your words: “Open a second shop in Yaba and reach ₦4 million a month.” Check each month whether these moves are bringing it closer, and drop anything that is not.",
+        },
+      ],
+      "finding": "Three moves over 90 days, starting with financials.",
+      "method": "Recommendation",
+      "number": 10,
+      "title": "What to fix first: your 90-day plan",
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            "Service",
+            "What it does",
+          ],
+          "kind": "table",
+          "rows": [
+            [
+              "Embedded Performance Support",
+              "Ongoing support across several priorities when the business lacks the capacity to drive them alone.",
+            ],
+            [
+              "Business Model & Commercial Strategy",
+              "Fix who you serve, what you sell, how you price it and how the business makes money.",
+            ],
+            [
+              "Financial Performance & Decision Support",
+              "Know your margins, unit costs and cash, and use them to decide.",
+            ],
+          ],
+          "widths": [
+            0.38,
+            0.62,
+          ],
+        },
+        {
+          "kind": "callout",
+          "text": "Two weeks and two calls to see where your business really stands and name the one problem to fix first. Three working days to get set up, then we start. It starts with a free 20-minute call, where we tell you honestly whether we can help.",
+          "title": "Current State · ₦500,000",
+        },
+      ],
+      "finding": "If you want support with the plan, these are the services that fit what you told us.",
+      "method": "Services that fit",
+      "number": 11,
+      "title": "How we can help",
+    },
+  ],
+  "reference": "TS-R-000012",
+  "version": 1,
+}
+`;
