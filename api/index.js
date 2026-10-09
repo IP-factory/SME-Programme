@@ -8120,16 +8120,18 @@ async function identityConflict(db, email) {
 function buildOnboardingEmail(input) {
   const name = input.fullName.split(" ")[0] || "there";
   return {
-    subject: `Set up your ${BRAND.programmeShortName} client account`,
+    subject: `Set up your client account on ${BRAND.productName}`,
     body: [
-      `Hello ${name},`,
+      `Dear ${name},`,
       "",
-      `Welcome. Use the secure link below to create your account${input.businessName ? ` for ${input.businessName}` : ""}.`,
+      `Welcome to ${BRAND.productEndorsement}. Use the secure link below to create your client account${input.businessName ? ` for ${input.businessName}` : ""}.`,
       "It works once and expires in seven days.",
       "",
-      input.url,
+      `Create your account: ${input.url}`,
       "",
-      "If you were not expecting this, you can ignore this email."
+      "If you were not expecting this, you can ignore this email.",
+      "",
+      BRAND.organisationName
     ].join("\n")
   };
 }
@@ -8157,7 +8159,7 @@ async function createOnboardingInvitation(input) {
   });
   const invitationUrl = `${getTrustedApplicationOrigin()}/onboarding/${encodeURIComponent(token)}`;
   const message = buildOnboardingEmail({ fullName: check.fullName, businessName: check.businessName ?? "", url: invitationUrl });
-  const delivery = await deliverEmail({ to: email, subject: message.subject, body: message.body });
+  const delivery = await deliverEmail({ to: email, subject: message.subject, body: message.body, sender: "business_support" });
   await db.update(clientOnboardingInvitations).set({
     deliveryStatus: delivery.status,
     deliveryMessageId: delivery.status === "Sent" ? delivery.providerMessageId || null : null
