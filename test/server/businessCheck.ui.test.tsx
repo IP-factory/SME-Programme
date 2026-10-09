@@ -292,8 +292,10 @@ describe("business check page", { timeout: 20_000 }, () => {
 
     window.dispatchEvent(new MessageEvent("message", { origin: "https://evil.example", data: { event: "calendly.event_scheduled" } }));
     expect(api.calls.requestNext).toEqual([]);
-    window.dispatchEvent(new MessageEvent("message", { origin: "https://calendly.com", data: { event: "calendly.event_scheduled" } }));
-    await waitFor(() => expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "call" }]));
+    // Calendly's message names the booking; the server reads its time from Calendly.
+    const uri = "https://api.calendly.com/scheduled_events/ABCDEF12-3456-7890";
+    window.dispatchEvent(new MessageEvent("message", { origin: "https://calendly.com", data: { event: "calendly.event_scheduled", payload: { event: { uri }, invitee: { uri: `${uri}/invitees/X` } } } }));
+    await waitFor(() => expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "call", calendlyEventUri: uri }]));
     expect(await screen.findByText("Booked. The confirmation is on its way to ada@example.com.")).toBeTruthy();
   });
 

@@ -202,14 +202,14 @@ describe("Business Checks table", () => {
     expect(within(row).getByText("Lead")).toBeTruthy();
   });
 
-  it("shows a call request as 'Call requested', never 'Call booked'", () => {
+  it("shows a call with no time yet as 'Call requested', and as 'Call booked' only once its time is known", () => {
     renderConsole();
     expect(within(rowOf("Ada Okafor")).getByText("Call requested")).toBeTruthy();
-    expect(document.body.textContent).not.toMatch(/Call booked/i);
+    expect(within(rowOf("Ada Okafor")).queryByText("Call booked")).toBeNull();
     cleanup();
     api.checks = [check({ callScheduledFor: new Date("2026-10-08T13:00:00Z") })];
     renderConsole();
-    expect(within(rowOf("Ada Okafor")).getByText("Call scheduled")).toBeTruthy();
+    expect(within(rowOf("Ada Okafor")).getByText("Call booked")).toBeTruthy();
   });
 
   it("labels each stage in plain words", () => {
@@ -240,9 +240,10 @@ describe("Business Checks table", () => {
     expect(screen.queryByText("Ada Okafor")).toBeNull();
     expect(screen.getByText("Bola Quiet")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Search business checks"), { target: { value: "" } });
-    fireEvent.click(screen.getByLabelText("Call requested only"));
+    // The stage tabs replace the old "Call requested only" checkbox.
+    expect(screen.queryByLabelText("Call requested only")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Call booked 1" }));
     expect(screen.queryByText("Bola Quiet")).toBeNull();
-    fireEvent.click(screen.getByLabelText("Call requested only"));
     fireEvent.click(screen.getByRole("tab", { name: "Qualified lead 1" }));
     expect(screen.queryByText("Ada Okafor")).toBeNull();
     expect(screen.getByText("Bola Quiet")).toBeTruthy();
@@ -317,8 +318,7 @@ describe("Business Check record drawer", () => {
     renderConsole();
     openRow("Ada Okafor");
     const funnel = drawer().getByRole("heading", { name: "Funnel" }).closest("section")!;
-    for (const text of ["Check completed", "Call requested", "Call scheduled for", "5 Oct 2026", "Current stage", "Call scheduled"]) expect(funnel.textContent).toContain(text);
-    expect(drawer().queryByText(/Call booked/)).toBeNull();
+    for (const text of ["Check completed", "Call requested", "Call booked for", "5 Oct 2026", "Current stage", "Call booked"]) expect(funnel.textContent).toContain(text);
   });
 
   it("offers only the action that fits: a requested call leads to Discovery Calls", () => {
@@ -371,7 +371,7 @@ describe("Discovery Calls table", () => {
     open();
     expect(headers()).toEqual(["Prospect", "Business", "Requested", "Scheduled For", "Status"]);
     const row = rowOf("Ada Okafor");
-    for (const text of ["ada@example.test", "Ada Foods", "5 Oct 2026", "Not scheduled", "Call requested"]) expect(row.textContent).toContain(text);
+    for (const text of ["ada@example.test", "Ada Foods", "5 Oct 2026", "No time yet", "Call requested"]) expect(row.textContent).toContain(text);
   });
 
   it("keeps scheduling and outcome controls out of the table", () => {
@@ -389,20 +389,20 @@ describe("Discovery Calls table", () => {
     const row = rowOf("Ada Okafor");
     expect(row.textContent).toContain("8 Oct 2026");
     expect(row.textContent).toMatch(/\d{1,2}:\d{2} [AP]M/);
-    expect(row.textContent).toContain("Call scheduled");
+    expect(row.textContent).toContain("Call booked");
   });
 
   it("shows restrained summary counts", () => {
     api.calls = [check(), check({ id: 2, fullName: "Two", callScheduledFor: new Date("2026-10-08T13:00:00Z") }), check({ id: 3, fullName: "Three", pipelineStage: "opportunity" }), check({ id: 4, fullName: "Four", pipelineStage: "lost" })];
     open();
     const counts = Object.fromEntries(Array.from(screen.getByLabelText("Summary").children).map(item => [item.querySelector("dt")!.textContent, item.querySelector("dd")!.textContent]));
-    expect(counts).toEqual({ "Call requests": "4", "Not scheduled": "1", Scheduled: "1", Opportunity: "1" });
+    expect(counts).toEqual({ "Call requests": "4", "No time yet": "1", Booked: "1", Opportunity: "1" });
   });
 
   it("searches and filters by status", () => {
     api.calls = [check(), check({ id: 2, fullName: "Bola Quiet", email: "bola@example.test", pipelineStage: "opportunity" }), check({ id: 3, fullName: "Cee Decline", email: "cee@example.test", pipelineStage: "lost" })];
     open();
-    expect(Array.from((screen.getByLabelText("Filter by status") as HTMLSelectElement).options).map(option => option.textContent)).toEqual(["All", "Call requested", "Call scheduled", "Opportunity", "Referred", "Lost"]);
+    expect(Array.from((screen.getByLabelText("Filter by status") as HTMLSelectElement).options).map(option => option.textContent)).toEqual(["All", "Call requested", "Call booked", "Opportunity", "Referred", "Lost"]);
     fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "fit" } });
     expect(screen.queryByText("Ada Okafor")).toBeNull();
     expect(screen.getByText("Bola Quiet")).toBeTruthy();
@@ -584,7 +584,7 @@ describe("the commercial pipeline in Business Checks", () => {
     ];
     renderConsole();
     const names = within(screen.getByRole("tablist", { name: "Pipeline stage" })).getAllByRole("tab").map(tab => tab.textContent);
-    expect(names).toEqual(["All 5", "Lead 1", "Qualified lead 0", "Call requested 0", "Opportunity 1", "Won 2", "Lost 0", "Nurture 1", "Referred 0"]);
+    expect(names).toEqual(["All 5", "Lead 1", "Qualified lead 0", "Call booked 0", "Opportunity 1", "Won 2", "Lost 0", "Nurture 1", "Referred 0"]);
     fireEvent.click(screen.getByRole("tab", { name: "Won 2" }));
     expect(screen.getByText("P Two")).toBeTruthy();
     expect(screen.getByText("P Four")).toBeTruthy();
@@ -614,6 +614,7 @@ describe("the commercial pipeline in Business Checks", () => {
         { id: 3, action: "business_check_stage_changed", from: "opportunity", to: "won", note: "Paid by transfer", scheduledFor: null, by: "Emmanuel Tarfa", at: new Date("2026-10-07T10:00:00Z") },
         { id: 2, action: "business_check_call_outcome", from: "call_booked", to: "opportunity", note: null, scheduledFor: null, by: "Emmanuel Tarfa", at: new Date("2026-10-06T10:00:00Z") },
         { id: 1, action: "business_check_call_scheduled", from: null, to: null, note: null, scheduledFor: "2026-10-06T09:00:00.000Z", by: null, at: new Date("2026-10-05T10:00:00Z") },
+        { id: 0, action: "business_check_call_booked", from: null, to: null, note: null, scheduledFor: "2026-10-06T08:00:00.000Z", by: null, at: new Date("2026-10-05T09:00:00Z") },
       ],
     });
     renderConsole();
@@ -621,8 +622,9 @@ describe("the commercial pipeline in Business Checks", () => {
     const history = drawer().getByRole("list", { name: "Stage history" });
     const items = within(history).getAllByRole("listitem").map(item => item.textContent);
     expect(items[0]).toMatch(/^Won from Opportunity.*Emmanuel Tarfa · 7 Oct 2026.*Paid by transfer$/);
-    expect(items[1]).toMatch(/^Opportunity from Call requested/);
+    expect(items[1]).toMatch(/^Opportunity from Call booked/);
     expect(items[2]).toMatch(/^Call time recorded for 6 Oct 2026.*Team ·/);
+    expect(items[3]).toMatch(/^Booked on Calendly for 6 Oct 2026.*Team ·/);
     expect(drawer().getByText("This business has been won, so its stage is final.")).toBeTruthy();
     expect(drawer().queryByLabelText("Note (optional)")).toBeNull();
   });

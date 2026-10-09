@@ -84,7 +84,7 @@ export default function DiscoveryCallDetail({ row, onOpenSection, onClose }: { r
               if (when) schedule.mutate({ businessCheckId: row.id, scheduledFor: when });
             }}
           >
-            <p className="text-xs text-ink-muted">Agree the time with them by WhatsApp or email, then record it here.</p>
+            <p className="text-xs text-ink-muted">Calendly bookings fill in the time by themselves. For a call agreed another way, record the time here.</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label htmlFor={`call-date-${row.id}`}>Date</Label><Input id={`call-date-${row.id}`} type="date" value={date} onChange={event => setDate(event.target.value)} className="h-9 rounded-none" /></div>
               <div className="space-y-1"><Label htmlFor={`call-time-${row.id}`}>Time</Label><Input id={`call-time-${row.id}`} type="time" value={time} onChange={event => setTime(event.target.value)} className="h-9 rounded-none" /></div>

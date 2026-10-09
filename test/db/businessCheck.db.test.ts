@@ -15,7 +15,7 @@ const holder = vi.hoisted(() => {
   process.env.DATABASE_URL = "postgresql://contract:contract@localhost:5432/contract";
   return { current: null as unknown as Record<string, unknown> };
 });
-const mocked = vi.hoisted(() => ({ deliverEmail: vi.fn() }));
+const mocked = vi.hoisted(() => ({ deliverEmail: vi.fn(), bookedCallTime: vi.fn() }));
 
 vi.mock("pg", () => ({ default: { Pool: class { on() { return this; } } } }));
 vi.mock("drizzle-orm/node-postgres", () => ({
@@ -29,6 +29,8 @@ vi.mock("drizzle-orm/node-postgres", () => ({
 }));
 vi.mock("@server/email", async importOriginal => ({ ...(await importOriginal<typeof import("@server/email")>()), deliverEmail: mocked.deliverEmail }));
 vi.mock("@server/_core/llm", () => ({ invokeLLM: () => Promise.reject(new Error("offline")) }));
+// Calendly is a third-party API: the booking lookup is stubbed; its own rules are tested in test/server/calendly.test.ts.
+vi.mock("@server/calendly", async importOriginal => ({ ...(await importOriginal<typeof import("@server/calendly")>()), bookedCallTime: mocked.bookedCallTime }));
 vi.mock("@server/_core/env", async importOriginal => ({ ENV: { ...(await importOriginal<typeof import("@server/_core/env")>()).ENV, forgeApiKey: "test-key" } }));
 
 import { businessCheckRouter, resetBusinessCheckRateLimitsForTests } from "@server/routers/businessCheck";
@@ -196,6 +198,32 @@ for (const target of targets) {
       it("refuses a request before the check is finished", async () => {
         const token = await started("next-early@example.test");
         await expect(caller().requestNext({ token, choice: "call" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      });
+
+      it("records the call time from a Calendly booking, so the admin console shows it as booked, and audits it", async () => {
+        const token = await submitted("next-calendly@example.test");
+        const when = new Date("2026-10-14T09:00:00Z");
+        mocked.bookedCallTime.mockResolvedValueOnce(when);
+        const uri = "https://api.calendly.com/scheduled_events/ABCDEF12-3456-7890";
+        await caller().requestNext({ token, choice: "call", calendlyEventUri: uri });
+        const row = await rowFor(token);
+        expect(mocked.bookedCallTime).toHaveBeenCalledWith(uri, "next-calendly@example.test");
+        expect(row).toMatchObject({ pipelineStage: "call_booked" });
+        expect(row.callScheduledFor.getTime()).toBe(when.getTime());
+        expect(row.callRequestedAt).toBeInstanceOf(Date);
+        expect(mocked.deliverEmail.mock.calls[0][0].body).toContain("Booked on Calendly for: 2026-10-14T09:00:00.000Z");
+        const events = await db.select().from(schema.adminAccessAuditEvents).where(eq(schema.adminAccessAuditEvents.action, "business_check_call_booked"));
+        expect(events.some((event: { details: string }) => event.details.includes(`"businessCheckId":${row.id}`) && event.details.includes("2026-10-14T09:00:00.000Z"))).toBe(true);
+      });
+
+      it("keeps a call as requested when Calendly cannot confirm the booking, and refuses an address that is not a Calendly booking", async () => {
+        const token = await submitted("next-unconfirmed@example.test");
+        mocked.bookedCallTime.mockResolvedValueOnce(null);
+        await caller().requestNext({ token, choice: "call", calendlyEventUri: "https://api.calendly.com/scheduled_events/ABCDEF12-3456-7890" });
+        const row = await rowFor(token);
+        expect(row.callScheduledFor).toBeNull();
+        expect(row.callRequestedAt).toBeInstanceOf(Date);
+        await expect(caller().requestNext({ token, choice: "call", calendlyEventUri: "https://evil.example/booking" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
       });
 
       it("never moves a stage the team has set", async () => {

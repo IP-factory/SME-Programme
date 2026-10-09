@@ -17,7 +17,6 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
   const checks = trpc.businessSupport.checks.useQuery(undefined, { retry: false });
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState<PipelineStage | "all">("all");
-  const [callOnly, setCallOnly] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
 
   const rows = useMemo(() => (checks.data ?? []).map(row => ({ ...row, status: funnelStatus(row) })), [checks.data]);
@@ -25,11 +24,10 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
     const needle = search.trim().toLowerCase();
     return rows.filter(row => {
       if (stage !== "all" && row.pipelineStage !== stage) return false;
-      if (callOnly && !row.callRequestedAt) return false;
       if (!needle) return true;
       return [row.fullName, row.businessName, row.email, row.whatsapp].some(value => value?.toLowerCase().includes(needle));
     });
-  }, [rows, search, stage, callOnly]);
+  }, [rows, search, stage]);
   const opened = rows.find(row => row.id === openId) ?? null;
   /** How many checks sit in each stored pipeline stage: the whole funnel at a glance. */
   const stageCounts = useMemo(() => {
@@ -69,7 +67,6 @@ export default function BusinessChecksView({ onOpenSection }: { onOpenSection: (
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Input aria-label="Search business checks" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name, business, email or WhatsApp" className="h-9 rounded-none sm:max-w-xs" />
-        <label className="flex items-center gap-2 text-sm text-ink-muted"><input type="checkbox" checked={callOnly} onChange={event => setCallOnly(event.target.checked)} /> Call requested only</label>
         <span className="text-xs text-ink-muted sm:ml-auto">{visible.length} of {rows.length}</span>
       </div>
 

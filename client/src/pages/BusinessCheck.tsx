@@ -26,7 +26,7 @@ import {
 } from "@shared/businessCheck/engine";
 import { AREA_NAMES, GAP_LABELS, SECTIONS, stageOf, type Answers, type Health, type Question, type SectionId } from "@shared/businessCheck/questions";
 import { FULL_REPORT, formatNaira, PRICES, PROMISE } from "@shared/businessSupport";
-import { bookingTarget, isCalendlyBooking } from "@shared/booking";
+import { bookingTarget, calendlyEventUri, isCalendlyBooking } from "@shared/booking";
 import { describeFounder, STRENGTH_LABELS, type Strength } from "@shared/businessCheck/founderNarrative";
 import { cleanNationalNumber, DEFAULT_COUNTRY, phoneProblem, toInternational } from "@shared/phone";
 import PhoneField from "@/components/PhoneField";
@@ -716,15 +716,15 @@ function Result({ response, contact, answers, businessName, onRestart }: { respo
   });
   const tally = (["stuck", "watch", "clear"] as const).map((health) => ({ health, count: result.outline.filter((row) => row.health === health).length }));
   const booking = bookingTarget(response.discoveryCallUrl, { name: contact.fullName, email: contact.email, host: window.location.host });
-  const recordCall = () => {
-    if (!requested.call && !requestNext.isPending) requestNext.mutate({ token: response.token, choice: "call" });
+  const recordCall = (eventUri?: string) => {
+    if (!requested.call && !requestNext.isPending) requestNext.mutate({ token: response.token, choice: "call", ...(eventUri ? { calendlyEventUri: eventUri } : {}) });
   };
 
   // Calendly tells the page when a time has been booked; that is when the call counts as booked.
   useEffect(() => {
     if (booking.kind !== "calendly") return undefined;
     const listener = (event: MessageEvent) => {
-      if (isCalendlyBooking(event)) recordCall();
+      if (isCalendlyBooking(event)) recordCall(calendlyEventUri(event.data));
     };
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);

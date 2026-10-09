@@ -35,8 +35,8 @@ export default function DiscoveryCallsView({ onOpenSection }: { onOpenSection: (
     <div className="space-y-5 p-4 sm:p-6">
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Summary">
         <AdminMetricCard label="Call requests" value={rows.length} />
-        <AdminMetricCard label="Not scheduled" value={rows.filter(row => row.status === "call_requested").length} />
-        <AdminMetricCard label="Scheduled" value={rows.filter(row => row.callScheduledFor).length} />
+        <AdminMetricCard label="No time yet" value={rows.filter(row => row.status === "call_requested").length} />
+        <AdminMetricCard label="Booked" value={rows.filter(row => row.callScheduledFor).length} />
         <AdminMetricCard label="Opportunity" value={rows.filter(row => row.status === "fit").length} />
       </dl>
 
@@ -72,7 +72,7 @@ export default function DiscoveryCallsView({ onOpenSection }: { onOpenSection: (
                   <td className={`${TD} hidden truncate md:table-cell`}>{row.businessName ?? <span className="text-ink-muted">-</span>}</td>
                   <td className={`${TD} hidden md:table-cell`}>{formatDate(row.callRequestedAt)}</td>
                   <td className={`${TD} hidden sm:table-cell`}>
-                    {row.callScheduledFor ? (<><span className="block">{formatDate(row.callScheduledFor)}</span><span className="block text-xs text-ink-muted">{formatTime(row.callScheduledFor)}</span></>) : <span className="text-ink-muted">Not scheduled</span>}
+                    {row.callScheduledFor ? (<><span className="block">{formatDate(row.callScheduledFor)}</span><span className="block text-xs text-ink-muted">{formatTime(row.callScheduledFor)}</span></>) : <span className="text-ink-muted">No time yet</span>}
                   </td>
                   <td className={TD}><StatusBadge status={row.status} /></td>
                 </ClickableRow>

@@ -174,8 +174,8 @@ recorded call time with who did it and when, read from the audit log (`business_
 with call outcomes. Stage names in the console come from `stageDisplayName` (`shared/businessCheck/funnelStatus.ts`).
 
 **Status wording** (`shared/businessCheck/funnelStatus.ts`) is display only: the stored stage is unchanged. The stored stage
-`call_booked` means the owner only REQUESTED a call, so it reads "Call requested" (or "Call scheduled" once a time is
-recorded). Every other label is the owner's agreed pipeline name: Lead (check not finished), Qualified lead (check
+`call_booked` reads "Call requested" until the call's time is known, then "Call booked": the time comes from a Calendly
+booking (read on the server with `CALENDLY_API_TOKEN`) or is recorded by an administrator. Every other label is the owner's agreed pipeline name: Lead (check not finished), Qualified lead (check
 finished), Opportunity = `opportunity` (call outcome "fit"), Referred, Lost = `lost` (call outcome "decline"), Nurture, Won;
 an invitation that is out reads "Onboarding" and an accepted one "Onboarded".
 

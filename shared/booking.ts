@@ -41,3 +41,9 @@ export function isCalendlyBooking(event: { origin: string; data: unknown }) {
   const data = event.data as { event?: unknown } | null;
   return event.origin === CALENDLY_ORIGIN && typeof data === "object" && data !== null && data.event === "calendly.event_scheduled";
 }
+
+/** The booking's address in Calendly's API, from Calendly's "event scheduled" message, or undefined. */
+export function calendlyEventUri(data: unknown): string | undefined {
+  const uri = (data as { payload?: { event?: { uri?: unknown } } } | null)?.payload?.event?.uri;
+  return typeof uri === "string" && uri.startsWith("https://api.calendly.com/scheduled_events/") ? uri : undefined;
+}

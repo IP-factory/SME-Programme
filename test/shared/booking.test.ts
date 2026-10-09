@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { bookingTarget, isCalendlyBooking } from "@shared/booking";
+import { bookingTarget, isCalendlyBooking, calendlyEventUri } from "@shared/booking";
 
 describe("booking the free discovery call", () => {
   it("embeds a Calendly link with the owner's name and email filled in", () => {
@@ -45,5 +45,15 @@ describe("booking the free discovery call", () => {
     const vercel = readFileSync(resolve(process.cwd(), "vercel.json"), "utf8");
     const server = readFileSync(resolve(process.cwd(), "server/security.ts"), "utf8");
     for (const policy of [vercel, server]) expect(policy).toMatch(/frame-src [^;"]*https:\/\/calendly\.com/);
+  });
+});
+
+describe("calendlyEventUri", () => {
+  it("reads the booking's address from Calendly's message, and nothing else", () => {
+    const uri = "https://api.calendly.com/scheduled_events/ABCDEF12-3456-7890";
+    expect(calendlyEventUri({ event: "calendly.event_scheduled", payload: { event: { uri }, invitee: { uri: `${uri}/invitees/X` } } })).toBe(uri);
+    expect(calendlyEventUri({ event: "calendly.event_scheduled" })).toBeUndefined();
+    expect(calendlyEventUri({ payload: { event: { uri: "https://evil.example/x" } } })).toBeUndefined();
+    expect(calendlyEventUri(null)).toBeUndefined();
   });
 });

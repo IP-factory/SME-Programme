@@ -26,6 +26,8 @@ export const ENV = {
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   /** Booking page for the free discovery call (Calendly, Microsoft Bookings…). Falls back to BRAND.discoveryCallUrl. */
   discoveryCallUrl: process.env.DISCOVERY_CALL_URL?.trim() || BRAND.discoveryCallUrl,
+  /** Calendly personal access token (secret): lets the server read a booking's time for the admin console. Optional. */
+  calendlyApiToken: process.env.CALENDLY_API_TOKEN?.trim() ?? "",
   emailFrom: process.env.EMAIL_FROM ?? `${BRAND.senderDisplayName} <${BRAND.administrationMailbox}>`,
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",

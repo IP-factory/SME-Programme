@@ -11,7 +11,7 @@ describe("funnelStatus: the plain words the admin console uses", () => {
     [{ pipelineStage: "lead", completedAt: done }, "completed", "Qualified lead"],
     [{ pipelineStage: "qualified_lead", completedAt: done }, "completed", "Qualified lead"],
     [{ pipelineStage: "call_booked", completedAt: done }, "call_requested", "Call requested"],
-    [{ pipelineStage: "call_booked", completedAt: done, callScheduledFor: scheduled }, "call_scheduled", "Call scheduled"],
+    [{ pipelineStage: "call_booked", completedAt: done, callScheduledFor: scheduled }, "call_scheduled", "Call booked"],
     [{ pipelineStage: "opportunity", completedAt: done }, "fit", "Opportunity"],
     [{ pipelineStage: "referred", completedAt: done }, "referred", "Referred"],
     [{ pipelineStage: "lost", completedAt: done }, "declined", "Lost"],
@@ -22,10 +22,10 @@ describe("funnelStatus: the plain words the admin console uses", () => {
     expect(funnelStatusLabel(key)).toBe(label);
   });
 
-  it("shows a call REQUEST as 'Call requested', never 'Call booked': nothing is booked until a time is recorded", () => {
-    const stored = funnelStatus({ pipelineStage: "call_booked", completedAt: done });
-    expect(funnelStatusLabel(stored)).toBe("Call requested");
-    expect(Object.values(FUNNEL_STATUS_LABELS).map(entry => entry.label)).not.toContain("Call booked");
+  it("shows a call as 'Call requested' until its time is known, then 'Call booked'", () => {
+    expect(funnelStatusLabel(funnelStatus({ pipelineStage: "call_booked", completedAt: done }))).toBe("Call requested");
+    expect(funnelStatusLabel(funnelStatus({ pipelineStage: "call_booked", completedAt: done, callScheduledFor: scheduled }))).toBe("Call booked");
+    expect(Object.values(FUNNEL_STATUS_LABELS).filter(entry => entry.label === "Call booked")).toHaveLength(1);
   });
 
   it("puts an onboarding invitation ahead of the call outcome", () => {
@@ -54,7 +54,7 @@ describe("funnelStatus: the plain words the admin console uses", () => {
 });
 
 describe("stageDisplayName: stage names in the admin console", () => {
-  it("uses the agreed pipeline names, except a call that is only requested", () => {
-    expect(PIPELINE_STAGES.map(stageDisplayName)).toEqual(["Lead", "Qualified lead", "Call requested", "Opportunity", "Won", "Lost", "Nurture", "Referred"]);
+  it("uses the agreed pipeline names", () => {
+    expect(PIPELINE_STAGES.map(stageDisplayName)).toEqual(["Lead", "Qualified lead", "Call booked", "Opportunity", "Won", "Lost", "Nurture", "Referred"]);
   });
 });

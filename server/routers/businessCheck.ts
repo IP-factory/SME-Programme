@@ -12,6 +12,8 @@ import { getDb } from "../db";
 import { databaseNow } from "../dbHelpers";
 import { deliverEmail, JUMP_ADMINISTRATION_MAILBOX } from "../email";
 import { ENV } from "../_core/env";
+import { bookedCallTime, CALENDLY_EVENT_URI } from "../calendly";
+import { recordAudit } from "../audit";
 import { publicProcedure, router } from "../_core/trpc";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -178,11 +180,27 @@ export const businessCheckRouter = router({
 
   /** The owner asks for the free call or the full report from the result screen. */
   requestNext: publicProcedure
-    .input(z.object({ token: tokenInput, choice: z.enum(["call", "report"]), note: z.string().trim().max(500).optional() }))
+    .input(z.object({
+      token: tokenInput,
+      choice: z.enum(["call", "report"]),
+      note: z.string().trim().max(500).optional(),
+      /** Sent when Calendly confirms a booking; the time itself is read from Calendly on the server. */
+      calendlyEventUri: z.string().regex(CALENDLY_EVENT_URI).optional(),
+    }))
     .mutation(async ({ input }) => {
       const db = await database("record your request");
       const check = await findCheck(db, input.token);
       if (!check.completedAt) throw new TRPCError({ code: "BAD_REQUEST", message: "Kindly finish the business check first." });
+
+      // A Calendly booking: record when the call is, so the admin console shows it as booked.
+      const bookedFor = input.choice === "call" && input.calendlyEventUri ? await bookedCallTime(input.calendlyEventUri, check.email) : null;
+      if (bookedFor) {
+        await db.update(businessChecks)
+          // The stage moves with the call request below, as for any call request.
+          .set({ callScheduledFor: bookedFor })
+          .where(eq(businessChecks.id, check.id));
+        await recordAudit(db, { action: "business_check_call_booked", targetEmail: check.email, details: { businessCheckId: check.id, scheduledFor: bookedFor.toISOString(), source: "calendly" } });
+      }
 
       const already = input.choice === "call" ? check.callRequestedAt : check.reportRequestedAt;
       if (!already) {
@@ -202,6 +220,7 @@ export const businessCheckRouter = router({
             `WhatsApp: ${check.whatsapp || "Not given"}`,
             `Business: ${check.businessName || "Not given"}`,
             `Note: ${input.note || "None"}`,
+            ...(bookedFor ? [`Booked on Calendly for: ${bookedFor.toISOString()}`] : []),
             "",
             `Business check #${check.id}, completed ${check.completedAt.toISOString()}.`,
           ].join("\n"),

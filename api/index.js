@@ -105,6 +105,8 @@ var init_env = __esm({
       resendApiKey: process.env.RESEND_API_KEY ?? "",
       /** Booking page for the free discovery call (Calendly, Microsoft Bookings…). Falls back to BRAND.discoveryCallUrl. */
       discoveryCallUrl: process.env.DISCOVERY_CALL_URL?.trim() || BRAND.discoveryCallUrl,
+      /** Calendly personal access token (secret): lets the server read a booking's time for the admin console. Optional. */
+      calendlyApiToken: process.env.CALENDLY_API_TOKEN?.trim() ?? "",
       emailFrom: process.env.EMAIL_FROM ?? `${BRAND.senderDisplayName} <${BRAND.administrationMailbox}>`,
       googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
       googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
@@ -7736,6 +7738,37 @@ function officeEmail(input) {
 
 // server/routers/businessCheck.ts
 init_env();
+
+// server/calendly.ts
+init_env();
+var API = "https://api.calendly.com";
+var CALENDLY_EVENT_URI = /^https:\/\/api\.calendly\.com\/scheduled_events\/[A-Za-z0-9-]{8,64}$/;
+function isCalendlyConfigured() {
+  return Boolean(ENV.calendlyApiToken);
+}
+async function calendly(path) {
+  const response = await fetch(`${API}${path}`, { headers: { authorization: `Bearer ${ENV.calendlyApiToken}`, accept: "application/json" }, signal: AbortSignal.timeout(5e3) });
+  if (!response.ok) return null;
+  return await response.json();
+}
+async function bookedCallTime(eventUri, inviteeEmail) {
+  if (!isCalendlyConfigured() || !CALENDLY_EVENT_URI.test(eventUri)) return null;
+  const path = eventUri.slice(API.length);
+  try {
+    const event = await calendly(path);
+    const start = event?.resource?.start_time ? new Date(event.resource.start_time) : null;
+    if (!start || Number.isNaN(start.getTime()) || event?.resource?.status !== "active") return null;
+    const invitees = await calendly(`${path}/invitees?email=${encodeURIComponent(inviteeEmail)}`);
+    const email = inviteeEmail.trim().toLowerCase();
+    const matches = (invitees?.collection ?? []).some((invitee) => invitee.email?.trim().toLowerCase() === email && invitee.status !== "canceled");
+    return matches ? start : null;
+  } catch (error) {
+    console.warn("[Calendly] Could not read the booking:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+// server/routers/businessCheck.ts
 var WINDOW_MS = 15 * 60 * 1e3;
 var limiters = [];
 function rateLimiter(maximum) {
@@ -7851,10 +7884,21 @@ var businessCheckRouter = router({
     return { token: check.publicToken, result, summary, summarySource: source, discoveryCallUrl: ENV.discoveryCallUrl, emailStatus: ownerDelivery.status === "Sent" ? "Sent" : ownerDelivery.status === "Failed" ? "Failed" : "Simulated" };
   }),
   /** The owner asks for the free call or the full report from the result screen. */
-  requestNext: publicProcedure.input(z14.object({ token: tokenInput, choice: z14.enum(["call", "report"]), note: z14.string().trim().max(500).optional() })).mutation(async ({ input }) => {
+  requestNext: publicProcedure.input(z14.object({
+    token: tokenInput,
+    choice: z14.enum(["call", "report"]),
+    note: z14.string().trim().max(500).optional(),
+    /** Sent when Calendly confirms a booking; the time itself is read from Calendly on the server. */
+    calendlyEventUri: z14.string().regex(CALENDLY_EVENT_URI).optional()
+  })).mutation(async ({ input }) => {
     const db = await database("record your request");
     const check = await findCheck(db, input.token);
     if (!check.completedAt) throw new TRPCError12({ code: "BAD_REQUEST", message: "Kindly finish the business check first." });
+    const bookedFor = input.choice === "call" && input.calendlyEventUri ? await bookedCallTime(input.calendlyEventUri, check.email) : null;
+    if (bookedFor) {
+      await db.update(businessChecks).set({ callScheduledFor: bookedFor }).where(eq14(businessChecks.id, check.id));
+      await recordAudit(db, { action: "business_check_call_booked", targetEmail: check.email, details: { businessCheckId: check.id, scheduledFor: bookedFor.toISOString(), source: "calendly" } });
+    }
     const already = input.choice === "call" ? check.callRequestedAt : check.reportRequestedAt;
     if (!already) {
       await db.update(businessChecks).set(input.choice === "call" ? { callRequestedAt: databaseNow(), pipelineStage: advancePipeline(check.pipelineStage, "call_booked") } : { reportRequestedAt: databaseNow() }).where(eq14(businessChecks.id, check.id));
@@ -7869,6 +7913,7 @@ var businessCheckRouter = router({
           `WhatsApp: ${check.whatsapp || "Not given"}`,
           `Business: ${check.businessName || "Not given"}`,
           `Note: ${input.note || "None"}`,
+          ...bookedFor ? [`Booked on Calendly for: ${bookedFor.toISOString()}`] : [],
           "",
           `Business check #${check.id}, completed ${check.completedAt.toISOString()}.`
         ].join("\n")
@@ -8220,7 +8265,7 @@ async function getBusinessCheckDetail(db, businessCheckId) {
     primaryAreaNumber: result?.primaryArea?.area ?? row.primaryArea ?? null
   };
 }
-var HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled"];
+var HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled", "business_check_call_booked"];
 async function stageHistoryFor(db, businessCheckId) {
   const events = await db.select({ id: adminAccessAuditEvents.id, action: adminAccessAuditEvents.action, details: adminAccessAuditEvents.details, at: adminAccessAuditEvents.createdAt, by: users.name }).from(adminAccessAuditEvents).leftJoin(users, eq16(users.id, adminAccessAuditEvents.actorUserId)).where(and12(inArray4(adminAccessAuditEvents.action, [...HISTORY_ACTIONS]), sql6`${adminAccessAuditEvents.details}::jsonb ->> 'businessCheckId' = ${String(businessCheckId)}`)).orderBy(desc9(adminAccessAuditEvents.createdAt), desc9(adminAccessAuditEvents.id)).limit(100);
   return events.map((event) => {

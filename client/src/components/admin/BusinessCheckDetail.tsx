@@ -108,7 +108,7 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
   const history = [
     { label: check.completedAt ? "Check completed" : "Check started", at: check.completedAt ?? check.createdAt },
     ...(check.callRequestedAt ? [{ label: "Call requested", at: check.callRequestedAt }] : []),
-    ...(check.callScheduledFor ? [{ label: "Call scheduled for", at: check.callScheduledFor, withTime: true }] : []),
+    ...(check.callScheduledFor ? [{ label: "Call booked for", at: check.callScheduledFor, withTime: true }] : []),
   ];
 
   return (
@@ -185,7 +185,9 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
             {check.stageHistory.map(event => (
               <li key={event.id} className="border-l-2 border-brand-line pl-3">
                 <p className="text-ink">
-                  {event.action === "business_check_call_scheduled"
+                  {event.action === "business_check_call_booked"
+                    ? <>Booked on Calendly{event.scheduledFor ? ` for ${formatDateTime(event.scheduledFor)}` : ""}</>
+                    : event.action === "business_check_call_scheduled"
                     ? <>Call time recorded{event.scheduledFor ? ` for ${formatDateTime(event.scheduledFor)}` : ""}</>
                     : <><span className="font-medium">{stageName(event.to)}</span> <span className="text-ink-muted">from {stageName(event.from)}</span></>}
                 </p>

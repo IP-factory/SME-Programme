@@ -88,7 +88,7 @@ export async function getBusinessCheckDetail(db: Pick<Database, "select">, busin
 }
 
 /** Audit actions that move a business check or record something about its call, shown as its history. */
-const HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled"] as const;
+const HISTORY_ACTIONS = ["business_check_stage_changed", "business_check_call_outcome", "business_check_call_scheduled", "business_check_call_booked"] as const;
 
 /** What the team has done to one business check, newest first, with who did it. Read from the audit log. */
 async function stageHistoryFor(db: Pick<Database, "select">, businessCheckId: number) {

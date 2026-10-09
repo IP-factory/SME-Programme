@@ -2,9 +2,9 @@ import { PIPELINE_LABELS, type PipelineStage } from "./pipeline";
 
 /**
  * What the admin console calls the state of a business check. This is DISPLAY wording only: the stored pipeline stage
- * (shared/businessCheck/pipeline.ts) is unchanged. In particular the stored stage `call_booked` means the owner only
- * REQUESTED a discovery call (nothing is booked until an administrator records a time), so it is shown as
- * "Call requested", or "Call scheduled" once a time has been recorded.
+ * (shared/businessCheck/pipeline.ts) is unchanged. The stored stage `call_booked` covers both a call that is only
+ * requested and one with a time: it reads "Call booked" once the time is known (a Calendly booking, read on the server,
+ * or a time an administrator recorded), and "Call requested" until then.
  */
 export const FUNNEL_STATUSES = [
   "in_progress",
@@ -31,7 +31,7 @@ export const FUNNEL_STATUS_LABELS: Record<FunnelStatus, { label: string; tone: F
   in_progress: { label: "Lead", tone: "muted" },
   completed: { label: "Qualified lead", tone: "neutral" },
   call_requested: { label: "Call requested", tone: "attention" },
-  call_scheduled: { label: "Call scheduled", tone: "info" },
+  call_scheduled: { label: "Call booked", tone: "info" },
   fit: { label: "Opportunity", tone: "positive" },
   referred: { label: "Referred", tone: "info" },
   declined: { label: "Lost", tone: "negative" },
@@ -71,8 +71,8 @@ export const isReadyToOnboard = (status: FunnelStatus) => status === "fit";
 export const funnelStatusLabel = (status: FunnelStatus) => FUNNEL_STATUS_LABELS[status].label;
 
 /**
- * The name the admin console gives a stored stage (stage tabs, "Move to" buttons, stage history). It is the agreed
- * pipeline name, except `call_booked`, which reads "Call requested" for the reason above: nothing is booked until a time
- * is recorded. Change it here, and only here, once confirmed bookings (e.g. from Calendly) reach the admin console.
+ * The name the admin console gives a stored stage (stage tabs, "Move to" buttons, stage history): the agreed pipeline
+ * name. Calendly bookings now reach the console, so the call stage reads "Call booked"; each row's badge still says
+ * "Call requested" until its time is known.
  */
-export const stageDisplayName = (stage: PipelineStage) => (stage === "call_booked" ? "Call requested" : PIPELINE_LABELS[stage].name);
+export const stageDisplayName = (stage: PipelineStage) => PIPELINE_LABELS[stage].name;
