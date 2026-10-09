@@ -45,9 +45,12 @@ const responders: Record<string, Responder> = {
     };
   },
   "businessCheck.requestNext": (input) => ({ success: true, choice: (input as { choice: string }).choice }),
+  // The report form as an owner sees it after paying; building and emailing the report needs the live site.
+  "fullReport.form": () => ({ status: "awaiting_intake", fullName: "Ada Example", businessName: "Example Stores", email: "ada@example.com", deliveredAt: null }),
 };
 
 const refusals: Record<string, string> = {
+  "fullReport.submit": `Your answers are complete. On the live site your report is built now and emailed to you. ${PREVIEW_NOTICE}`,
   "participant.signIn": `Client sign-in works on the live site. ${PREVIEW_NOTICE}`,
 };
 

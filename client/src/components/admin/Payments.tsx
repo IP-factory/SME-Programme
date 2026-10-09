@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { savePdf } from "@/lib/savePdf";
 import { trpc } from "@/lib/trpc";
 import { formatNaira } from "@shared/businessSupport";
 import { PAYMENT_ITEM_DETAILS, PAYMENT_ITEMS, PAYMENT_STATUS_LABELS, type PaymentItem, type PaymentStatus } from "@shared/payments";
@@ -28,6 +29,41 @@ type Payment = {
   note: string | null;
 };
 
+export type ReportState = { status: "awaiting_intake" | "delivered"; createdAt: Date | string; deliveredAt: Date | string | null; deliveryStatus: "Sent" | "Failed" | "Simulated" } | null;
+
+/** Where the paid full report stands: waiting for the owner's form, or sent (and downloadable). */
+function ReportLine({ businessCheckId, report }: { businessCheckId: number; report: ReportState }) {
+  const utils = trpc.useUtils();
+  const download = trpc.businessSupport.downloadReport.useMutation({
+    onSuccess: result => savePdf(result.fileName, result.pdf),
+    onError: error => toast.error(error.message),
+  });
+  const resend = trpc.businessSupport.resendReportLink.useMutation({
+    onSuccess: result => {
+      if (result.deliveryStatus === "Failed") toast.error("A new link was made, but the email failed. Try again.");
+      else toast.success("A new report form link is on its way to the owner.");
+      void utils.businessSupport.checkDetail.invalidate({ businessCheckId });
+    },
+    onError: error => toast.error(error.message),
+  });
+  if (!report) return <p className="mt-2 text-[13px] text-ink-muted">Report: the form link is sent when the payment is confirmed.</p>;
+  return (
+    <div className="mt-3 space-y-2 border-t border-line-soft pt-3 text-[13px]">
+      {report.status === "delivered" ? (
+        <>
+          <p className="text-ink">Report sent {report.deliveredAt ? formatDate(report.deliveredAt) : ""}{report.deliveryStatus === "Failed" ? " · the email failed" : ""}</p>
+          <Button type="button" variant="outline" size="sm" className="rounded-none text-xs" disabled={download.isPending} onClick={() => download.mutate({ businessCheckId })}>Download the report</Button>
+        </>
+      ) : (
+        <>
+          <p className="text-ink">Report form sent {formatDate(report.createdAt)}. Waiting for the owner's answers; the report goes out the moment they finish.</p>
+          <Button type="button" variant="outline" size="sm" className="rounded-none text-xs" disabled={resend.isPending} onClick={() => resend.mutate({ businessCheckId })}>Send the form link again</Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 const SHORT_NAME: Record<PaymentItem, string> = { full_report: "Report", current_state: "Current State" };
 
 const CHIP: Record<PaymentStatus, string> = {
@@ -53,7 +89,7 @@ const INVITATION_RESULT = {
   has_account: "Payment confirmed. They already have a client account.",
 } as const;
 
-function PaymentRow({ businessCheckId, item, payment }: { businessCheckId: number; item: PaymentItem; payment: Payment | undefined }) {
+function PaymentRow({ businessCheckId, item, payment, report }: { businessCheckId: number; item: PaymentItem; payment: Payment | undefined; report: ReportState }) {
   const utils = trpc.useUtils();
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState("");
@@ -108,6 +144,8 @@ function PaymentRow({ businessCheckId, item, payment }: { businessCheckId: numbe
         </div>
       ) : <p className="mt-1.5 text-[13px] text-ink-muted">Payment details not sent.</p>}
 
+      {item === "full_report" && payment?.status === "confirmed" && <ReportLine businessCheckId={businessCheckId} report={report} />}
+
       {payment?.status !== "confirmed" && !confirming && (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" className="rounded-none text-xs" disabled={busy} onClick={() => send.mutate({ businessCheckId, item })}>
@@ -126,7 +164,7 @@ function PaymentRow({ businessCheckId, item, payment }: { businessCheckId: numbe
         <div className="mt-3 space-y-2 border-t border-line-soft pt-3">
           <p className="text-[13px] text-ink">
             Only confirm once you have seen {formatNaira(payment.amountNaira)} with reference {payment.reference} in the account. The owner is emailed
-            {item === "current_state" ? ", the business moves to Won and they get a link to set up their client account, where Current State starts." : " that their report is being written."}
+            {item === "current_state" ? ", the business moves to Won and they get a link to set up their client account, where Current State starts." : " with a link to a short form; their report is emailed the moment they finish it."}
           </p>
           <div className="space-y-1">
             <Label htmlFor={`payment-note-${payment.id}`} className="text-xs text-ink-muted">Note (optional)</Label>
@@ -143,11 +181,11 @@ function PaymentRow({ businessCheckId, item, payment }: { businessCheckId: numbe
 }
 
 /** Both things an owner can pay for before Current State, in journey order. */
-export function PaymentsPanel({ businessCheckId, payments }: { businessCheckId: number; payments: Payment[] | null }) {
+export function PaymentsPanel({ businessCheckId, payments, report = null }: { businessCheckId: number; payments: Payment[] | null | undefined; report?: ReportState }) {
   if (payments === null) return <p className="text-sm text-ink-muted">Payments are not set up in the database yet (migration 0006).</p>;
   return (
     <ul className="space-y-2.5">
-      {PAYMENT_ITEMS.map(item => <PaymentRow key={item} businessCheckId={businessCheckId} item={item} payment={payments.find(payment => payment.item === item)} />)}
+      {PAYMENT_ITEMS.map(item => <PaymentRow key={item} businessCheckId={businessCheckId} item={item} payment={(payments ?? []).find(payment => payment.item === item)} report={report} />)}
     </ul>
   );
 }

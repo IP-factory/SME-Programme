@@ -13,6 +13,7 @@ import {
   setPipelineStage,
 } from "../businessSupportAdmin";
 import { confirmPayment, markProofReceived, requestPayment } from "../payments";
+import { adminDownloadReport, resendReportLink } from "../fullReport/service";
 import { PAYMENT_ITEMS } from "../../shared/payments";
 import { adminPermissionProcedure, router } from "../_core/trpc";
 
@@ -52,6 +53,14 @@ export const businessSupportRouter = router({
   markProofReceived: payments
     .input(z.object({ paymentRequestId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => markProofReceived(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
+  /** The sent full report, rebuilt from the owner's stored answers, as a PDF. */
+  downloadReport: prospects
+    .input(z.object({ businessCheckId: z.number().int().positive() }))
+    .mutation(async ({ input }) => adminDownloadReport(await businessSupportDb(), input.businessCheckId)),
+  /** Sends the owner a new link to the Report Intake. */
+  resendReportLink: payments
+    .input(z.object({ businessCheckId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => resendReportLink(await businessSupportDb(), { ...input, actorUserId: ctx.user.id })),
   /** The money is in the account. For Current State this wins the business and sends the client account invitation. */
   confirmPayment: payments
     .input(z.object({ paymentRequestId: z.number().int().positive(), note: z.string().trim().max(500).optional() }))

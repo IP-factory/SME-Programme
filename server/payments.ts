@@ -10,6 +10,7 @@ import type { Database } from "./accountAuth";
 import { recordAudit } from "./audit";
 import { createOnboardingInvitation, effectiveInvitationStatus } from "./clientOnboarding";
 import { deliverEmail } from "./email";
+import { issueReportLink } from "./fullReport/service";
 
 /**
  * Payment by bank transfer until online payment (Paystack) is ready: the owner is emailed the amount, the account and a
@@ -56,7 +57,7 @@ export function paymentDetailsEmail(input: { fullName: string; item: PaymentItem
       "AFTER YOU PAY",
       "Reply to this email with your proof of payment: a screenshot of the transfer or your bank's receipt. We will confirm by email once the payment arrives.",
       report
-        ? `Then we write your report and email it to you ${FULL_REPORT.turnaround}.`
+        ? `Then we send you a short form about your business (about ${FULL_REPORT.formMinutes} minutes). Your report is emailed to you the moment you finish it.`
         : `Then your Current State starts. ${CURRENT_STATE.start}`,
       "",
       BRAND.organisationName,
@@ -64,8 +65,8 @@ export function paymentDetailsEmail(input: { fullName: string; item: PaymentItem
   };
 }
 
-/** The email that tells the owner their payment arrived, and what happens next. */
-export function paymentConfirmedEmail(input: { fullName: string; item: PaymentItem; reference: string }) {
+/** The email that tells the owner their payment arrived, and what happens next. The report's comes with its form link. */
+export function paymentConfirmedEmail(input: { fullName: string; item: PaymentItem; reference: string; reportLink?: string | null }) {
   const { amount } = PAYMENT_ITEM_DETAILS[input.item];
   const received = `Thank you. We have received your payment of ${formatNaira(amount)} (reference ${input.reference}).`;
   if (input.item === "full_report") {
@@ -76,7 +77,15 @@ export function paymentConfirmedEmail(input: { fullName: string; item: PaymentIt
         "",
         received,
         "",
-        `We are now writing your full business check report. It will be with you by email ${FULL_REPORT.turnaround}.`,
+        ...(input.reportLink
+          ? [
+              `One step left: answer a short form about your business (about ${FULL_REPORT.formMinutes} minutes). Your report is built from your answers and emailed to you the moment you finish.`,
+              "",
+              `Complete your report form: ${input.reportLink}`,
+              "",
+              "The link is yours alone; please do not share it.",
+            ]
+          : ["Your report has already been sent to you. Reply to this email if you cannot find it."]),
         "",
         BRAND.organisationName,
       ].join("\n"),
@@ -220,7 +229,9 @@ export async function confirmPayment(db: Database, input: { paymentRequestId: nu
     });
   });
 
-  const message = paymentConfirmedEmail({ fullName: check.fullName, item: request.item, reference: request.reference });
+  // The report's form link is issued before the email, so the email can carry it.
+  const reportLink = request.item === "full_report" ? await issueReportLink(db, { businessCheckId: check.id, paymentRequestId: request.id }) : null;
+  const message = paymentConfirmedEmail({ fullName: check.fullName, item: request.item, reference: request.reference, reportLink });
   await deliverEmail({ to: check.email, subject: message.subject, body: message.body, sender: "business_support" }).catch(() => undefined);
 
   let invitation: CurrentStateInvitation | null = null;

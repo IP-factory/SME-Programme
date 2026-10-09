@@ -155,7 +155,7 @@ export const INTAKE_QUESTIONS = [
   { id: "registration", group: "Your business today", prompt: "How is the business registered?" },
   { id: "products", group: "Your business today", prompt: "Your top three products or services, and the price of each.", hint: "Prices in naira. Leave a price blank if it varies." },
   { id: "bestCustomer", group: "Your market", prompt: "Describe your best customer in one line.", hint: "Who they are, where they are and why they buy from you." },
-  { id: "competitors", group: "Your market", prompt: "Name up to three competitors.", hint: "Businesses your customers compare you with. Leave blank if you don't know." },
+  { id: "competitors", group: "Your market", prompt: "Name up to three competitors.", hint: "Businesses your customers compare you with." },
   { id: "pricePosition", group: "Your market", prompt: "Are your prices higher, about the same or lower than theirs?" },
   { id: "topEarner", group: "What you sell", prompt: "Which of your products or services earns you the most?" },
   { id: "costShare", group: "What you sell", prompt: "Out of every ₦100 a customer pays you, how much goes on materials, stock or the direct labour to deliver it?" },

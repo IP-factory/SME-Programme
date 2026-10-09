@@ -62,9 +62,9 @@ export const FULL_REPORT = {
     "What to fix first, in order, with the one number to watch for each",
     "The services that fit your business, and what each step would involve",
   ],
-  delivery: "Written for your business and sent to you by email.",
-  /** How soon after payment is confirmed the report is emailed: a promise made in the payment emails. */
-  turnaround: "within five working days",
+  delivery: "Built from your answers. After payment you answer a short form, and the report is emailed to you the moment you finish.",
+  /** The Report Intake after payment (shared/fullReport/intake.ts): about this long. */
+  formMinutes: 12,
 } as const;
 
 /** What happens once Current State is paid for (the journey copy and the payment confirmation email). */

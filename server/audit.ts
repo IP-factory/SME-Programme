@@ -14,6 +14,8 @@ export const AUDIT_ACTIONS = [
   "payment_details_sent",
   "payment_proof_received",
   "payment_confirmed",
+  "full_report_link_sent",
+  "full_report_delivered",
   "owner_credential_bootstrapped",
   "owner_credential_reset",
   "workspace_switched",

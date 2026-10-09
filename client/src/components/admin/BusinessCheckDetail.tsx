@@ -50,6 +50,7 @@ export function ContactLines({ email, whatsapp }: { email: string; whatsapp: str
  */
 const stageName = (stage: string | null) => (stage && stage in PIPELINE_LABELS ? stageDisplayName(stage as PipelineStage) : stage ?? "-");
 const PAYMENT_HISTORY = { payment_details_sent: "Payment details sent", payment_proof_received: "Proof of payment received", payment_confirmed: "Payment confirmed" } as const;
+const REPORT_HISTORY = { full_report_link_sent: "Report form link sent again", full_report_delivered: "Full report sent" } as const;
 /** "lead" is where every check starts, so the team never moves a check back to it. */
 const MOVABLE_STAGES = PIPELINE_STAGES.filter((stage): stage is Exclude<PipelineStage, "lead"> => stage !== "lead");
 
@@ -182,7 +183,7 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
       </DetailSection>
 
       <DetailSection title="Payments">
-        <PaymentsPanel businessCheckId={check.id} payments={check.payments} />
+        <PaymentsPanel businessCheckId={check.id} payments={check.payments} report={check.report} />
       </DetailSection>
 
       <DetailSection title="Move to">
@@ -200,13 +201,15 @@ export default function BusinessCheckDetail({ businessCheckId, onOpenSection, on
                         {PAYMENT_HISTORY[event.action]}{event.item ? `: ${PAYMENT_ITEM_DETAILS[event.item].name}` : ""}{event.reference ? ` (${event.reference})` : ""}
                         {event.to && <span className="text-ink-muted"> · moved to {stageName(event.to)}</span>}
                       </>
+                    : event.action === "full_report_link_sent" || event.action === "full_report_delivered"
+                    ? <>{REPORT_HISTORY[event.action]}{event.reference ? ` (${event.reference})` : ""}</>
                     : event.action === "business_check_call_booked"
                     ? <>Booked on Calendly{event.scheduledFor ? ` for ${formatDateTime(event.scheduledFor)}` : ""}</>
                     : event.action === "business_check_call_scheduled"
                     ? <>Call time recorded{event.scheduledFor ? ` for ${formatDateTime(event.scheduledFor)}` : ""}</>
                     : <><span className="font-medium">{stageName(event.to)}</span> <span className="text-ink-muted">from {stageName(event.from)}</span></>}
                 </p>
-                <p className="text-xs text-ink-muted">{event.by ?? (event.action === "payment_details_sent" ? "Sent automatically" : "Team")} · {formatDateTime(event.at)}</p>
+                <p className="text-xs text-ink-muted">{event.by ?? (event.action === "payment_details_sent" || event.action === "full_report_delivered" ? "Sent automatically" : "Team")} · {formatDateTime(event.at)}</p>
                 {event.note && <p className="mt-0.5 text-[13px] text-ink">{event.note}</p>}
               </li>
             ))}

@@ -890,7 +890,7 @@ function Result({ response, contact, answers, businessName, onRestart }: { respo
               {requested.report ? (
                 <motion.p key="requested" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="mt-6 flex items-start gap-3 border border-highlight-ink/40 bg-paper p-4 text-sm leading-relaxed text-ink-700">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-highlight-ink" />
-                  Thank you. We'll email the payment details to {contact.email}, and your report follows once payment is confirmed.
+                  Thank you. The payment details are on their way to {contact.email}. Once your payment is confirmed, you answer a short form and your report arrives straight away.
                 </motion.p>
               ) : (
                 <motion.button key="get" type="button" onClick={() => requestNext.mutate({ token: response.token, choice: "report" })} disabled={requestNext.isPending} exit={{ opacity: 0, scale: 0.96 }} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} className="group mt-6 inline-flex h-14 w-full items-center justify-center bg-highlight-ink px-8 text-sm font-semibold uppercase tracking-widest text-paper shadow-[0_18px_40px_-18px_rgba(203,55,86,0.8)] transition-opacity hover:opacity-90 disabled:opacity-60">

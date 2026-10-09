@@ -267,7 +267,7 @@ describe("business check page", { timeout: 20_000 }, () => {
     expect(screen.getByText(/The root cause behind each red and amber/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /get my full report/i }));
     expect(api.calls.requestNext).toEqual([{ token: TOKEN, choice: "report" }]);
-    expect(await screen.findByText(/We'll email the payment details to ada@example.com/)).toBeTruthy();
+    expect(await screen.findByText(/The payment details are on their way to ada@example.com. Once your payment is confirmed, you answer a short form and your report arrives straight away/)).toBeTruthy();
   });
 
   it("without a booking page configured, records the call request and never promises a WhatsApp call-back", async () => {

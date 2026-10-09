@@ -36,6 +36,7 @@ import { resetBusinessCheckRateLimitsForTests } from "@server/routers/businessCh
 import { hashAdminPassword, OWNER_ADMIN_EMAIL } from "@server/adminSecurity";
 import { ACCOUNT_SESSION_COOKIE, type PlatformRole } from "@shared/auth";
 import { cleanAnswers } from "@shared/businessCheck/engine";
+import { sampleIntake } from "../fixtures/reportIntake";
 import type { TrpcContext } from "@server/_core/context";
 
 const REMOTE_TEST_TIMEOUT_MS = 90_000;
@@ -61,7 +62,7 @@ function browser() {
   return { call, jar, token: () => jar.get(ACCOUNT_SESSION_COOKIE) };
 }
 type Browser = ReturnType<typeof browser>;
-type EmailCall = { to: string; subject: string; body: string; sender?: string };
+type EmailCall = { to: string; subject: string; body: string; sender?: string; attachments?: { filename: string; content: Buffer; contentType: string }[] };
 
 const completeAnswers = cleanAnswers(businessCheckProfiles.growingMaker);
 
@@ -157,7 +158,7 @@ for (const target of targets) {
         expect((await paymentsOf(id))[0]).toMatchObject({ status: "confirmed", note: "GTB ref 123456" });
         const receipt = emails().find(sent => sent.to === email)!;
         expect(receipt.subject).toBe("Payment received: your full business check report");
-        expect(receipt.body).toContain("within five working days");
+        expect(receipt.body).toMatch(/Complete your report form: https?:\/\/\S+\/report\/\S+/);
         expect((await rowFor(token)).pipelineStage).toBe("qualified_lead");
 
         // Confirming again changes nothing and sends nothing; the details cannot be re-sent for a paid item.
@@ -232,9 +233,12 @@ for (const target of targets) {
         const report = (await paymentsOf(id)).find((row: { item: string }) => row.item === "full_report");
         expect(emails().some(sent => sent.to === email && sent.subject === "Payment details for your full business check report")).toBe(true);
 
-        // 2. They pay for the report and reply with proof; the team confirms.
+        // 2. They pay for the report and reply with proof; the team confirms; they answer the form and get the report.
         await (await superAdmin.call()).businessSupport.markProofReceived({ paymentRequestId: report.id });
         await (await superAdmin.call()).businessSupport.confirmPayment({ paymentRequestId: report.id });
+        const formLink = emails().find(sent => sent.to === email && sent.subject === "Payment received: your full business check report")!.body.match(/Complete your report form: (\S+)/)![1];
+        await (await browser().call()).fullReport.submit({ token: decodeURIComponent(formLink.split("/report/")[1]), intake: sampleIntake });
+        expect(emails().some(sent => sent.to === email && sent.subject.startsWith("Your full business check report") && sent.attachments?.length === 1)).toBe(true);
 
         // 3. After the call, the team sends the Current State details; the owner pays; the team confirms.
         const { paymentRequestId } = await (await superAdmin.call()).businessSupport.requestPayment({ businessCheckId: id, item: "current_state" });
@@ -263,6 +267,102 @@ for (const target of targets) {
         expect(actions.filter(action => action === "payment_confirmed")).toHaveLength(2);
         expect(actions.filter(action => action === "payment_details_sent")).toHaveLength(2);
         expect(actions.filter(action => action === "payment_proof_received")).toHaveLength(2);
+        expect(actions).toContain("full_report_delivered");
+        expect(detail.report).toMatchObject({ status: "delivered" });
+      });
+    });
+
+    describe("the full report, once paid", () => {
+      /** A finished check whose report payment is confirmed; returns the form token from the confirmation email. */
+      async function paidReport(label: string) {
+        const check = await finishedCheck(label);
+        await (await check.visitor.call()).businessCheck.requestNext({ token: check.token, choice: "report" });
+        const [payment] = await paymentsOf(check.id);
+        mocked.deliverEmail.mockClear();
+        await (await superAdmin.call()).businessSupport.confirmPayment({ paymentRequestId: payment.id });
+        const confirmation = emails().find(sent => sent.to === check.email && sent.subject === "Payment received: your full business check report")!;
+        const link = confirmation.body.match(/Complete your report form: (\S+)/)![1];
+        return { ...check, reportToken: decodeURIComponent(link.split("/report/")[1]) };
+      }
+      const reportRow = async (businessCheckId: number) => (await db.select().from(schema.fullReports).where(eq(schema.fullReports.businessCheckId, businessCheckId)))[0];
+
+      it("sends a single-use form link with the payment confirmation, storing only its hash", async () => {
+        const { id, reportToken, email } = await paidReport("report-link");
+        const row = await reportRow(id);
+        expect(row).toMatchObject({ status: "awaiting_intake", intakeJson: null });
+        expect(row.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(row.tokenHash).not.toContain(reportToken);
+        expect(await browser().call().then(caller => caller.fullReport.form({ token: reportToken }))).toMatchObject({ status: "awaiting_intake", email });
+        await expect((await browser().call()).fullReport.form({ token: "not-a-real-token" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      });
+
+      it("builds the report from the form and emails the PDF straight away, with nobody in between", async () => {
+        const { id, reportToken, email } = await paidReport("report-sent");
+        mocked.deliverEmail.mockClear();
+        const sent = await (await browser().call()).fullReport.submit({ token: reportToken, intake: sampleIntake });
+        expect(sent).toMatchObject({ delivered: true, deliveryStatus: "Simulated" });
+        expect(Buffer.from(sent.pdf, "base64").subarray(0, 5).toString()).toBe("%PDF-");
+
+        const toOwner = emails().find(item => item.to === email)!;
+        expect(toOwner.subject).toMatch(/^Your full business check report: /);
+        expect(toOwner.sender).toBe("business_support");
+        expect(toOwner.body).toContain("FIX THIS FIRST");
+        expect(toOwner.attachments).toEqual([expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/-full-business-check-report\.pdf$/) })]);
+        expect(toOwner.attachments![0].content.subarray(0, 5).toString()).toBe("%PDF-");
+        expect(emails().find(item => item.to === "info@ipfactory.co")!.subject).toMatch(/^Full report sent: /);
+
+        const row = await reportRow(id);
+        expect(row).toMatchObject({ status: "delivered", reportVersion: 1, deliveryStatus: "Simulated" });
+        expect(JSON.parse(row.intakeJson)).toEqual(sampleIntake);
+        expect(row.deliveredAt).toBeInstanceOf(Date);
+        expect(await auditsFor("full_report_delivered", id)).toHaveLength(1);
+      });
+
+      it("accepts the form once, then offers the same report to download", async () => {
+        const { reportToken } = await paidReport("report-once");
+        await (await browser().call()).fullReport.submit({ token: reportToken, intake: sampleIntake });
+        await expect((await browser().call()).fullReport.submit({ token: reportToken, intake: { ...sampleIntake, goal: "Something else" } })).rejects.toMatchObject({ code: "CONFLICT" });
+        const again = await (await browser().call()).fullReport.download({ token: reportToken });
+        expect(Buffer.from(again.pdf, "base64").subarray(0, 5).toString()).toBe("%PDF-");
+        expect((await (await browser().call()).fullReport.form({ token: reportToken })).status).toBe("delivered");
+      });
+
+      it("refuses an incomplete form without using up the link", async () => {
+        const { id, reportToken } = await paidReport("report-invalid");
+        await expect((await browser().call()).fullReport.submit({ token: reportToken, intake: { ...sampleIntake, products: [] } })).rejects.toMatchObject({ code: "BAD_REQUEST", message: "Add at least one product or service." });
+        await expect((await browser().call()).fullReport.submit({ token: reportToken, intake: { ...sampleIntake, topEarner: 2, products: [sampleIntake.products[0]] } })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect((await browser().call()).fullReport.download({ token: reportToken })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect((await reportRow(id)).status).toBe("awaiting_intake");
+      });
+
+      it("lets the team see, download and resend; a resent link replaces the old one", async () => {
+        const { id, reportToken, email } = await paidReport("report-admin");
+        expect((await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: id })).report).toMatchObject({ status: "awaiting_intake" });
+        await expect((await superAdmin.call()).businessSupport.downloadReport({ businessCheckId: id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        mocked.deliverEmail.mockClear();
+        await (await superAdmin.call()).businessSupport.resendReportLink({ businessCheckId: id });
+        const resent = emails().find(item => item.to === email && item.subject === "Your report form")!;
+        const newToken = decodeURIComponent(resent.body.match(/Complete your report form: (\S+)/)![1].split("/report/")[1]);
+        expect(newToken).not.toBe(reportToken);
+        await expect((await browser().call()).fullReport.form({ token: reportToken })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        await (await browser().call()).fullReport.submit({ token: newToken, intake: sampleIntake });
+        const detail = await (await superAdmin.call()).businessSupport.checkDetail({ businessCheckId: id });
+        expect(detail.report).toMatchObject({ status: "delivered", deliveryStatus: "Simulated" });
+        expect(detail.stageHistory.map(event => event.action)).toEqual(expect.arrayContaining(["full_report_link_sent", "full_report_delivered"]));
+        const pdf = await (await superAdmin.call()).businessSupport.downloadReport({ businessCheckId: id });
+        expect(Buffer.from(pdf.pdf, "base64").subarray(0, 5).toString()).toBe("%PDF-");
+        await expect((await superAdmin.call()).businessSupport.resendReportLink({ businessCheckId: id })).rejects.toMatchObject({ code: "CONFLICT" });
+      }, 30_000);
+
+      it("keeps the report's admin actions to the right people", async () => {
+        const { id } = await paidReport("report-permissions");
+        const analyst = await signInStaff(await person({}, ["analyst"]));
+        for (const b of [browser(), analyst]) {
+          await expect((await b.call()).businessSupport.downloadReport({ businessCheckId: id })).rejects.toMatchObject({ code: "FORBIDDEN" });
+          await expect((await b.call()).businessSupport.resendReportLink({ businessCheckId: id })).rejects.toMatchObject({ code: "FORBIDDEN" });
+        }
       });
     });
 

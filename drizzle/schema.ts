@@ -736,3 +736,30 @@ export const paymentRequests = pgTable("payment_requests", {
 ]);
 
 export type PaymentRequest = typeof paymentRequests.$inferSelect;
+
+export const fullReportsStatusEnum = pgEnum("full_reports_status", ["awaiting_intake", "delivered"]);
+export const fullReportsDeliveryStatusEnum = pgEnum("full_reports_delivery_status", ["Sent", "Failed", "Simulated"]);
+
+/**
+ * The paid full business check report (server/fullReport/service.ts). Created when the report payment is confirmed,
+ * with a single link for the Report Intake; only the SHA-256 of its token is stored. Once the owner submits the intake,
+ * the report is built by fixed rules and emailed at once; the stored answers let it be rebuilt word for word.
+ */
+export const fullReports = pgTable("full_reports", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  businessCheckId: integer("businessCheckId").notNull().unique().references(() => businessChecks.id),
+  paymentRequestId: integer("paymentRequestId").notNull().references(() => paymentRequests.id),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  status: fullReportsStatusEnum("status").default("awaiting_intake").notNull(),
+  /** The Report Intake answers, as validated by shared/fullReport/intake.ts. */
+  intakeJson: text("intakeJson"),
+  intakeSubmittedAt: timestamp("intakeSubmittedAt", { withTimezone: true }),
+  /** The report builder version that produced it (REPORT_VERSION). */
+  reportVersion: integer("reportVersion"),
+  deliveredAt: timestamp("deliveredAt", { withTimezone: true }),
+  deliveryStatus: fullReportsDeliveryStatusEnum("deliveryStatus").default("Simulated").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => sql`now()`).notNull(),
+});
+
+export type FullReportRecord = typeof fullReports.$inferSelect;

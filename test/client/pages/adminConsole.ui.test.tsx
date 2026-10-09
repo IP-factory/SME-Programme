@@ -16,7 +16,7 @@ const hoisted = vi.hoisted(() => {
     details: {} as Record<number, unknown>,
     metrics: { businessChecks: 3, users: 2, portalUsers: 1, businesses: 1, memberships: 1, pendingInvitations: 0, platformRoleAssignments: 0 },
     error: undefined as { message: string } | undefined,
-    mutations: { schedule: [] as unknown[], outcome: [] as unknown[], stage: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[], requestPayment: [] as unknown[], proof: [] as unknown[], confirmPayment: [] as unknown[] },
+    mutations: { schedule: [] as unknown[], outcome: [] as unknown[], stage: [] as unknown[], invite: [] as unknown[], revoke: [] as unknown[], requestPayment: [] as unknown[], proof: [] as unknown[], confirmPayment: [] as unknown[], downloadReport: [] as unknown[], resendReportLink: [] as unknown[] },
     inviteResult: { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 } as Record<string, unknown>,
   };
   const query = (key: "checks" | "calls" | "clients" | "candidates" | "invitations" | "metrics") => () => ({ data: api[key], isLoading: false, error: api.error });
@@ -32,6 +32,7 @@ const hoisted = vi.hoisted(() => {
 });
 const { api } = hoisted;
 
+vi.mock("@/lib/savePdf", () => ({ savePdf: () => undefined }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     useUtils: () => ({
@@ -49,6 +50,8 @@ vi.mock("@/lib/trpc", () => ({
       requestPayment: { useMutation: hoisted.mutation("requestPayment", () => ({ reference: "TS-CS-000001", deliveryStatus: "Simulated" })) },
       markProofReceived: { useMutation: hoisted.mutation("proof") },
       confirmPayment: { useMutation: hoisted.mutation("confirmPayment", () => ({ success: true, changed: true, invitation: "sent" })) },
+      downloadReport: { useMutation: hoisted.mutation("downloadReport", () => ({ fileName: "report.pdf", pdf: "JVBERi0=" })) },
+      resendReportLink: { useMutation: hoisted.mutation("resendReportLink", () => ({ success: true, deliveryStatus: "Simulated" })) },
     },
     onboarding: {
       candidates: { useQuery: hoisted.query("candidates") },
@@ -110,7 +113,7 @@ beforeEach(() => {
   api.invitations = [];
   api.details = { 1: detailFor(), 2: detailFor({ id: 2, fullName: "Bola Quiet", businessName: "Bola Bakes", email: "bola@example.test", whatsapp: null, pipelineStage: "qualified_lead", callRequestedAt: null }) };
   api.error = undefined;
-  api.mutations = { schedule: [], outcome: [], stage: [], invite: [], revoke: [], requestPayment: [], proof: [], confirmPayment: [] };
+  api.mutations = { schedule: [], outcome: [], stage: [], invite: [], revoke: [], requestPayment: [], proof: [], confirmPayment: [], downloadReport: [], resendReportLink: [] };
   api.inviteResult = { invitationUrl: "https://app.example.test/onboarding/TOKEN123", deliveryStatus: "Simulated", expiresAt: new Date(), invitationId: 1 };
 });
 afterEach(cleanup);
@@ -723,5 +726,25 @@ describe("payments in Business Checks", () => {
     renderConsole();
     openRow("Ada Okafor");
     expect(payments().getByText("Payments are not set up in the database yet (migration 0006).")).toBeTruthy();
+  });
+
+  it("shows where a paid report stands: waiting for the form, with a resend, or sent, with a download", () => {
+    const paid = payment({ id: 9, item: "full_report", amountNaira: 100_000, reference: "TS-R-000001", status: "confirmed", confirmedAt: new Date("2026-10-09T10:00:00Z") });
+    api.details[1] = detailFor({ payments: [paid], report: { status: "awaiting_intake", createdAt: new Date("2026-10-09T10:00:00Z"), deliveredAt: null, deliveryStatus: "Simulated" } });
+    renderConsole();
+    openRow("Ada Okafor");
+    const report = within(payments().getByRole("listitem", { name: "Your full business check report" }));
+    expect(report.getByText(/Waiting for the owner's answers/)).toBeTruthy();
+    fireEvent.click(report.getByRole("button", { name: "Send the form link again" }));
+    expect(api.mutations.resendReportLink).toEqual([{ businessCheckId: 1 }]);
+    cleanup();
+
+    api.details[1] = detailFor({ payments: [paid], report: { status: "delivered", createdAt: new Date("2026-10-09T10:00:00Z"), deliveredAt: new Date("2026-10-09T11:00:00Z"), deliveryStatus: "Sent" } });
+    renderConsole();
+    openRow("Ada Okafor");
+    const sent = within(payments().getByRole("listitem", { name: "Your full business check report" }));
+    expect(sent.getByText("Report sent 9 Oct 2026")).toBeTruthy();
+    fireEvent.click(sent.getByRole("button", { name: "Download the report" }));
+    expect(api.mutations.downloadReport).toEqual([{ businessCheckId: 1 }]);
   });
 });

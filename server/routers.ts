@@ -17,6 +17,7 @@ import { accountRouter } from "./routers/account";
 import { clientOnboardingRouter } from "./routers/clientOnboarding";
 import { platformRolesRouter } from "./routers/platformRoles";
 import { businessSupportRouter } from "./routers/businessSupport";
+import { fullReportRouter } from "./routers/fullReport";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -46,6 +47,7 @@ export const appRouter = router({
   businessCheck: businessCheckRouter,
   account: accountRouter,
   onboarding: clientOnboardingRouter,
+  fullReport: fullReportRouter,
   platformRoles: platformRolesRouter,
   businessSupport: businessSupportRouter,
 });
